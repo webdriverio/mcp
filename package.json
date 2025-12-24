@@ -1,8 +1,9 @@
 {
-  "name": "webdriverio-mcp",
+  "name": "webdriverio/mcp",
+  "author": "Vince Graics",
   "repository": {
     "type": "git",
-    "url": "git://github.com/Winify/webdriverio-mcp.git"
+    "url": "git://github.com/webdriverio/mcp.git"
   },
   "version": "1.4.0",
   "description": "MCP server with WebdriverIO for browser and mobile app automation (iOS/Android via Appium)",
