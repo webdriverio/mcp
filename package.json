@@ -11,7 +11,8 @@
   "module": "./lib/server.js",
   "types": "./lib/server.d.ts",
   "bin": {
-    "webdriverio-mcp": "lib/server.js"
+    "webdriverio-mcp": "lib/server.js",
+    "wdio-agent": "lib/cli/index.js"
   },
   "license": "MIT",
   "type": "module",
@@ -20,10 +21,11 @@
   ],
   "scripts": {
     "prebundle": "rimraf lib --glob ./*.tgz",
-    "bundle": "tsup && shx chmod +x lib/server.js",
+    "bundle": "tsup && shx chmod +x lib/server.js && shx chmod +x lib/cli/index.js",
     "postbundle": "npm pack",
     "start": "node lib/server.js",
-    "dev": "tsx src/server.ts"
+    "dev": "tsx src/server.ts",
+    "agent": "tsx src/cli/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.25",
