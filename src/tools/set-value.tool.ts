@@ -1,6 +1,6 @@
-import {getBrowser} from './browser.tool';
-import {z} from 'zod';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
+import { getBrowser } from './browser.tool';
+import { z } from 'zod';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 
 const defaultTimeout: number = 3000;
 
@@ -11,7 +11,7 @@ export const setValueToolArguments = {
   timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
 };
 
-export const setValueTool: ToolCallback = async ({selector, value, scrollToView = true, timeout = defaultTimeout}: {
+export const setValueTool: ToolCallback = async ({ selector, value, scrollToView = true, timeout = defaultTimeout}: {
   selector: string;
   value: string;
   scrollToView?: boolean;
@@ -19,18 +19,18 @@ export const setValueTool: ToolCallback = async ({selector, value, scrollToView 
 }) => {
   try {
     const browser = getBrowser();
-    await browser.waitUntil(browser.$(selector).isExisting, {timeout});
+    await browser.waitUntil(browser.$(selector).isExisting, { timeout });
     if (scrollToView) {
       await browser.$(selector).scrollIntoView({ block: 'center', inline: 'center' });
     }
     await browser.$(selector).clearValue();
     await browser.$(selector).setValue(value);
     return {
-      content: [{type: 'text', text: `Text "${value}" entered into element`}],
+      content: [{ type: 'text', text: `Text "${value}" entered into element` }],
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error entering text: ${e}`}],
+      content: [{ type: 'text', text: `Error entering text: ${e}` }],
     };
   }
 };

@@ -1,7 +1,7 @@
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
-import {CallToolResult} from '@modelcontextprotocol/sdk/types';
-import {z} from 'zod';
-import {getBrowser} from './browser.tool';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import { z } from 'zod';
+import { getBrowser } from './browser.tool';
 
 // Tap Element Tool
 export const tapElementToolArguments = {
@@ -20,14 +20,14 @@ export const tapElementTool: ToolCallback = async (args: {
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    const {selector, x, y} = args;
+    const { selector, x, y } = args;
 
     if (selector) {
       // Tap on element by selector
       const element = await browser.$(selector);
       await element.tap();
       return {
-        content: [{type: 'text', text: `Tapped element: ${selector}`}],
+        content: [{ type: 'text', text: `Tapped element: ${selector}` }],
       };
     } else if (x !== undefined && y !== undefined) {
       // Tap at coordinates
@@ -37,16 +37,16 @@ export const tapElementTool: ToolCallback = async (args: {
         y,
       });
       return {
-        content: [{type: 'text', text: `Tapped at coordinates: (${x}, ${y})`}],
-      };
-    } else {
-      return {
-        content: [{type: 'text', text: 'Error: Must provide either selector or x,y coordinates'}],
+        content: [{ type: 'text', text: `Tapped at coordinates: (${x}, ${y})` }],
       };
     }
+    return {
+      content: [{ type: 'text', text: 'Error: Must provide either selector or x,y coordinates' }],
+    };
+
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error tapping element: ${e}`}],
+      content: [{ type: 'text', text: `Error tapping element: ${e}` }],
     };
   }
 };
@@ -77,7 +77,7 @@ export const swipeTool: ToolCallback = async (args: {
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    const {direction, duration = 500, startX, startY, distance} = args;
+    const { direction, duration = 500, startX, startY, distance } = args;
 
     // Get screen size
     const windowSize = await browser.getWindowSize();
@@ -110,10 +110,10 @@ export const swipeTool: ToolCallback = async (args: {
 
     // Perform swipe
     await browser.touchPerform([
-      {action: 'press', options: {x: centerX, y: centerY}},
-      {action: 'wait', options: {ms: duration}},
-      {action: 'moveTo', options: {x: endX, y: endY}},
-      {action: 'release', options: {}},
+      { action: 'press', options: { x: centerX, y: centerY } },
+      { action: 'wait', options: { ms: duration } },
+      { action: 'moveTo', options: { x: endX, y: endY } },
+      { action: 'release', options: {} },
     ]);
 
     return {
@@ -126,7 +126,7 @@ export const swipeTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error swiping: ${e}`}],
+      content: [{ type: 'text', text: `Error swiping: ${e}` }],
     };
   }
 };
@@ -150,37 +150,37 @@ export const longPressTool: ToolCallback = async (args: {
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    const {selector, x, y, duration = 1000} = args;
+    const { selector, x, y, duration = 1000 } = args;
 
     if (selector) {
       // Long press on element by selector
       const element = await browser.$(selector);
       await element.touchAction([
-        {action: 'longPress'},
-        {action: 'wait', ms: duration},
-        {action: 'release'},
+        { action: 'longPress' },
+        { action: 'wait', ms: duration },
+        { action: 'release' },
       ]);
       return {
-        content: [{type: 'text', text: `Long pressed element: ${selector} for ${duration}ms`}],
+        content: [{ type: 'text', text: `Long pressed element: ${selector} for ${duration}ms` }],
       };
     } else if (x !== undefined && y !== undefined) {
       // Long press at coordinates
       await browser.touchPerform([
-        {action: 'press', options: {x, y}},
-        {action: 'wait', options: {ms: duration}},
-        {action: 'release', options: {}},
+        { action: 'press', options: { x, y } },
+        { action: 'wait', options: { ms: duration } },
+        { action: 'release', options: {} },
       ]);
       return {
-        content: [{type: 'text', text: `Long pressed at coordinates: (${x}, ${y}) for ${duration}ms`}],
-      };
-    } else {
-      return {
-        content: [{type: 'text', text: 'Error: Must provide either selector or x,y coordinates'}],
+        content: [{ type: 'text', text: `Long pressed at coordinates: (${x}, ${y}) for ${duration}ms` }],
       };
     }
+    return {
+      content: [{ type: 'text', text: 'Error: Must provide either selector or x,y coordinates' }],
+    };
+
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error long pressing: ${e}`}],
+      content: [{ type: 'text', text: `Error long pressing: ${e}` }],
     };
   }
 };
@@ -207,7 +207,7 @@ export const dragAndDropTool: ToolCallback = async (args: {
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    const {fromSelector, fromX, fromY, toSelector, toX, toY, duration = 500} = args;
+    const { fromSelector, fromX, fromY, toSelector, toX, toY, duration = 500 } = args;
 
     let startX: number;
     let startY: number;
@@ -226,7 +226,7 @@ export const dragAndDropTool: ToolCallback = async (args: {
       startY = fromY;
     } else {
       return {
-        content: [{type: 'text', text: 'Error: Must provide either fromSelector or fromX,fromY coordinates'}],
+        content: [{ type: 'text', text: 'Error: Must provide either fromSelector or fromX,fromY coordinates' }],
       };
     }
 
@@ -242,16 +242,16 @@ export const dragAndDropTool: ToolCallback = async (args: {
       endY = toY;
     } else {
       return {
-        content: [{type: 'text', text: 'Error: Must provide either toSelector or toX,toY coordinates'}],
+        content: [{ type: 'text', text: 'Error: Must provide either toSelector or toX,toY coordinates' }],
       };
     }
 
     // Perform drag and drop
     await browser.touchPerform([
-      {action: 'press', options: {x: startX, y: startY}},
-      {action: 'wait', options: {ms: duration}},
-      {action: 'moveTo', options: {x: endX, y: endY}},
-      {action: 'release', options: {}},
+      { action: 'press', options: { x: startX, y: startY } },
+      { action: 'wait', options: { ms: duration } },
+      { action: 'moveTo', options: { x: endX, y: endY } },
+      { action: 'release', options: {} },
     ]);
 
     return {
@@ -264,7 +264,7 @@ export const dragAndDropTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error dragging and dropping: ${e}`}],
+      content: [{ type: 'text', text: `Error dragging and dropping: ${e}` }],
     };
   }
 };

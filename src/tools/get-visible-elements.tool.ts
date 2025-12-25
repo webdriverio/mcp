@@ -1,7 +1,7 @@
 import { getBrowser } from './browser.tool';
 import getInteractableElements from '../scripts/get-interactable-elements';
 import { getMobileVisibleElements } from '../utils/mobile-elements';
-import { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import { encode } from '@toon-format/toon';
 import { z } from 'zod';
 

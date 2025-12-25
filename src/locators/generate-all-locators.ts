@@ -4,9 +4,12 @@
  * Based on: https://github.com/appium/appium-mcp/blob/main/src/locators/generate-all-locators.ts
  */
 
-import {getSuggestedLocators, locatorsToObject, LocatorStrategy} from './locator-generation';
-import { xmlToJSON, JSONElement, parseAndroidBounds, parseIOSBounds } from './source-parsing';
-import { shouldIncludeElement, FilterOptions, hasMeaningfulContent, isLayoutContainer } from './element-filter';
+import type { LocatorStrategy } from './locator-generation';
+import { getSuggestedLocators, locatorsToObject } from './locator-generation';
+import type { JSONElement } from './source-parsing';
+import { parseAndroidBounds, parseIOSBounds, xmlToJSON } from './source-parsing';
+import type { FilterOptions } from './element-filter';
+import { hasMeaningfulContent, isLayoutContainer, shouldIncludeElement } from './element-filter';
 
 export interface ElementWithLocators {
   tagName: string;

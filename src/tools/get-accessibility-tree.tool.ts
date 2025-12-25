@@ -1,7 +1,7 @@
-import {getBrowser} from './browser.tool';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
-import {CallToolResult} from '@modelcontextprotocol/sdk/types';
-import { encode } from '@toon-format/toon'
+import { getBrowser } from './browser.tool';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import { encode } from '@toon-format/toon';
 
 /**
  * Flatten a hierarchical accessibility tree into a flat list
@@ -62,7 +62,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (): Promise<CallTool
 
     if (pages.length === 0) {
       return {
-        content: [{type: 'text', text: 'No active pages found'}],
+        content: [{ type: 'text', text: 'No active pages found' }],
       };
     }
 
@@ -75,7 +75,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (): Promise<CallTool
 
     if (!snapshot) {
       return {
-        content: [{type: 'text', text: 'No accessibility tree available'}],
+        content: [{ type: 'text', text: 'No accessibility tree available' }],
       };
     }
 
@@ -90,7 +90,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (): Promise<CallTool
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error getting accessibility tree: ${e}`}],
+      content: [{ type: 'text', text: `Error getting accessibility tree: ${e}` }],
     };
   }
 };

@@ -1,5 +1,5 @@
-import { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import { z } from 'zod';
 import { getBrowser } from './browser.tool';
 

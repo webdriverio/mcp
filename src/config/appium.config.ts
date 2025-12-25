@@ -18,6 +18,7 @@ export interface IOSCapabilityOptions {
   udid?: string;
   noReset?: boolean;
   fullReset?: boolean;
+
   [key: string]: any;
 }
 
@@ -31,6 +32,7 @@ export interface AndroidCapabilityOptions {
   appWaitActivity?: string;
   noReset?: boolean;
   fullReset?: boolean;
+
   [key: string]: any;
 }
 

@@ -4,7 +4,7 @@
  * Based on: https://github.com/appium/appium-mcp/blob/main/src/locators/element-filter.ts
  */
 
-import {JSONElement} from './source-parsing';
+import type { JSONElement } from './source-parsing';
 
 export interface FilterOptions {
   includeTagNames?: string[]; // Only include these tags (whitelist)

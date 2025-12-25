@@ -22,6 +22,7 @@
     "prebundle": "rimraf lib --glob ./*.tgz",
     "bundle": "tsup && shx chmod +x lib/server.js",
     "postbundle": "npm pack",
+    "lint": "eslint src/ --fix",
     "start": "node lib/server.js",
     "dev": "tsx src/server.ts"
   },
@@ -33,6 +34,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@wdio/eslint": "^0.1.3",
+    "eslint": "^9.39.2",
     "rimraf": "^6.1.2",
     "shx": "^0.4.0",
     "tsup": "^8.5.1",

@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 
-import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-import {closeSessionTool, closeSessionToolArguments, startBrowserTool, startBrowserToolArguments} from './tools/browser.tool';
-import {navigateTool, navigateToolArguments} from './tools/navigate.tool';
-import {clickTool, clickToolArguments, clickToolViaText} from './tools/click.tool';
-import {setValueTool, setValueToolArguments} from './tools/set-value.tool';
-import {findElementTool, findElementToolArguments} from './tools/find-element.tool';
-import {getElementTextTool, getElementTextToolArguments} from './tools/get-element-text.tool';
-import {isDisplayedTool, isDisplayedToolArguments} from './tools/is-displayed.tool';
-import {scrollDownTool, scrollDownToolArguments} from './tools/scroll-down.tool';
-import {scrollUpTool, scrollUpToolArguments} from './tools/scroll-up.tool';
-import {getVisibleElementsTool, getVisibleElementsToolArguments} from './tools/get-visible-elements.tool';
-import {takeScreenshotTool, takeScreenshotToolArguments} from './tools/take-screenshot.tool';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  closeSessionTool,
+  closeSessionToolArguments,
+  startBrowserTool,
+  startBrowserToolArguments
+} from './tools/browser.tool';
+import { navigateTool, navigateToolArguments } from './tools/navigate.tool';
+import { clickTool, clickToolArguments, clickToolViaText } from './tools/click.tool';
+import { setValueTool, setValueToolArguments } from './tools/set-value.tool';
+import { findElementTool, findElementToolArguments } from './tools/find-element.tool';
+import { getElementTextTool, getElementTextToolArguments } from './tools/get-element-text.tool';
+import { isDisplayedTool, isDisplayedToolArguments } from './tools/is-displayed.tool';
+import { scrollDownTool, scrollDownToolArguments } from './tools/scroll-down.tool';
+import { scrollUpTool, scrollUpToolArguments } from './tools/scroll-up.tool';
+import { getVisibleElementsTool, getVisibleElementsToolArguments } from './tools/get-visible-elements.tool';
+import { takeScreenshotTool, takeScreenshotToolArguments } from './tools/take-screenshot.tool';
 import {
   deleteCookiesTool,
   deleteCookiesToolArguments,
@@ -21,8 +26,8 @@ import {
   setCookieTool,
   setCookieToolArguments,
 } from './tools/cookies.tool';
-import {getAccessibilityTreeTool} from './tools/get-accessibility-tree.tool';
-import {startAppTool, startAppToolArguments} from './tools/app-session.tool';
+import { getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
+import { startAppTool, startAppToolArguments } from './tools/app-session.tool';
 import {
   dragAndDropTool,
   dragAndDropToolArguments,
@@ -41,7 +46,12 @@ import {
   terminateAppTool,
   terminateAppToolArguments,
 } from './tools/app-actions.tool';
-import {getContextsTool, getCurrentContextTool, switchContextTool, switchContextToolArguments} from './tools/context.tool';
+import {
+  getContextsTool,
+  getCurrentContextTool,
+  switchContextTool,
+  switchContextToolArguments
+} from './tools/context.tool';
 import {
   getDeviceInfoTool,
   getGeolocationTool,
@@ -64,10 +74,10 @@ import {
 } from './tools/device.tool';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
-const originalConsoleLog = console.log;
-const originalConsoleInfo = console.info;
-const originalConsoleWarn = console.warn;
-const originalConsoleDebug = console.debug;
+const _originalConsoleLog = console.log;
+const _originalConsoleInfo = console.info;
+const _originalConsoleWarn = console.warn;
+const _originalConsoleDebug = console.debug;
 
 console.log = (...args) => console.error('[LOG]', ...args);
 console.info = (...args) => console.error('[INFO]', ...args);

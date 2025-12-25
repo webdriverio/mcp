@@ -4,7 +4,8 @@
  * Based on: https://github.com/appium/appium-mcp/blob/main/src/locators/locator-generation.ts
  */
 
-import { JSONElement, isAttributeUnique } from './source-parsing';
+import type { JSONElement } from './source-parsing';
+import { isAttributeUnique } from './source-parsing';
 
 export type LocatorStrategy =
   | 'accessibility-id'

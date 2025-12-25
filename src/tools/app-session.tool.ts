@@ -1,12 +1,8 @@
 import { remote } from 'webdriverio';
-import { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import { z } from 'zod';
-import {
-  getAppiumServerConfig,
-  buildIOSCapabilities,
-  buildAndroidCapabilities,
-} from '../config/appium.config';
+import { buildAndroidCapabilities, buildIOSCapabilities, getAppiumServerConfig, } from '../config/appium.config';
 import { getBrowser } from './browser.tool';
 
 export const startAppToolArguments = {
@@ -97,10 +93,8 @@ export const startAppTool: ToolCallback = async (args: {
     });
 
     // Build platform-specific capabilities
-    let capabilities: Record<string, any>;
-
-    if (platform === 'iOS') {
-      capabilities = buildIOSCapabilities(appPath, {
+    const capabilities: Record<string, any> = platform === 'iOS'
+      ? buildIOSCapabilities(appPath, {
         deviceName,
         platformVersion,
         automationName: (automationName as 'XCUITest') || 'XCUITest',
@@ -110,10 +104,8 @@ export const startAppTool: ToolCallback = async (args: {
         udid,
         noReset,
         fullReset,
-      });
-    } else {
-      // Android
-      capabilities = buildAndroidCapabilities(appPath, {
+      })
+      : buildAndroidCapabilities(appPath, {
         deviceName,
         platformVersion,
         automationName: (automationName as 'UiAutomator2' | 'Espresso') || 'UiAutomator2',
@@ -124,7 +116,6 @@ export const startAppTool: ToolCallback = async (args: {
         noReset,
         fullReset,
       });
-    }
 
     // Create Appium session
     const browser = await remote({
@@ -135,7 +126,7 @@ export const startAppTool: ToolCallback = async (args: {
       capabilities,
     });
 
-    const {sessionId} = browser;
+    const { sessionId } = browser;
 
     // Store session and metadata
     // Auto-set isAttached=true when noReset or no appPath to preserve session on close
@@ -163,7 +154,7 @@ export const startAppTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error starting app session: ${e}`}],
+      content: [{ type: 'text', text: `Error starting app session: ${e}` }],
     };
   }
 };

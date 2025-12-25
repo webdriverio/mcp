@@ -72,7 +72,7 @@ const elementsScript = () => (function () {
 
     // Build a path-based selector
     let current = element;
-    let path = [];
+    const path = [];
 
     while (current && current !== document.documentElement) {
       let selector = current.tagName.toLowerCase();
