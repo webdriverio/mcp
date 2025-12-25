@@ -1,5 +1,5 @@
 {
-  "name": "webdriverio/mcp",
+  "name": "webdriverio-mcp",
   "author": "Vince Graics",
   "repository": {
     "type": "git",
@@ -26,17 +26,17 @@
     "dev": "tsx src/server.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12",
+    "@modelcontextprotocol/sdk": "1.25",
     "@toon-format/toon": "^1.0.0",
     "@xmldom/xmldom": "^0.8.11",
-    "webdriverio": "9.15"
+    "webdriverio": "9.22"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "rimraf": "^6.0.1",
+    "rimraf": "^6.1.2",
     "shx": "^0.4.0",
     "tsup": "^8.5.1",
-    "tsx": "^4.20.3",
-    "typescript": "5.8"
+    "tsx": "^4.21.0",
+    "typescript": "5.9"
   }
 }
