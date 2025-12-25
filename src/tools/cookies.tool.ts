@@ -1,14 +1,15 @@
-import {getBrowser} from './browser.tool';
-import {z} from 'zod';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
-import {CallToolResult} from '@modelcontextprotocol/sdk/types';
+import { getBrowser } from './browser.tool';
+import { z } from 'zod';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { Cookie, SameSiteOptions } from '@wdio/protocols';
 
 // Get all cookies or a specific cookie by name
 export const getCookiesToolArguments = {
   name: z.string().optional().describe('Optional cookie name to retrieve a specific cookie. If not provided, returns all cookies'),
 };
 
-export const getCookiesTool: ToolCallback = async ({name}: { name?: string }): Promise<CallToolResult> => {
+export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
 
@@ -17,27 +18,27 @@ export const getCookiesTool: ToolCallback = async ({name}: { name?: string }): P
       const cookie = await browser.getCookies([name]);
       if (cookie.length === 0) {
         return {
-          content: [{type: 'text', text: `Cookie "${name}" not found`}],
+          content: [{ type: 'text', text: `Cookie "${name}" not found` }],
         };
       }
       return {
-        content: [{type: 'text', text: JSON.stringify(cookie[0], null, 2)}],
-      };
-    } else {
-      // Get all cookies
-      const cookies = await browser.getCookies();
-      if (cookies.length === 0) {
-        return {
-          content: [{type: 'text', text: 'No cookies found'}],
-        };
-      }
-      return {
-        content: [{type: 'text', text: JSON.stringify(cookies, null, 2)}],
+        content: [{ type: 'text', text: JSON.stringify(cookie[0], null, 2) }],
       };
     }
+    // Get all cookies
+    const cookies = await browser.getCookies();
+    if (cookies.length === 0) {
+      return {
+        content: [{ type: 'text', text: 'No cookies found' }],
+      };
+    }
+    return {
+      content: [{ type: 'text', text: JSON.stringify(cookies, null, 2) }],
+    };
+
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error getting cookies: ${e}`}],
+      content: [{ type: 'text', text: `Error getting cookies: ${e}` }],
     };
   }
 };
@@ -71,32 +72,31 @@ export const setCookieTool: ToolCallback = async ({
   expires?: number;
   httpOnly?: boolean;
   secure?: boolean;
-  sameSite?: 'Strict' | 'Lax' | 'None';
+  sameSite?: SameSiteOptions;
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
 
     // Build cookie object
-    const cookie: any = {
+    const cookie: Cookie = {
       name,
       value,
       path,
+      domain,
+      expiry: expires,
+      httpOnly,
+      secure,
+      sameSite,
     };
-
-    if (domain) cookie.domain = domain;
-    if (expires) cookie.expiry = expires;
-    if (httpOnly !== undefined) cookie.httpOnly = httpOnly;
-    if (secure !== undefined) cookie.secure = secure;
-    if (sameSite) cookie.sameSite = sameSite;
 
     await browser.setCookies(cookie);
 
     return {
-      content: [{type: 'text', text: `Cookie "${name}" set successfully`}],
+      content: [{ type: 'text', text: `Cookie "${name}" set successfully` }],
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error setting cookie: ${e}`}],
+      content: [{ type: 'text', text: `Error setting cookie: ${e}` }],
     };
   }
 };
@@ -106,7 +106,7 @@ export const deleteCookiesToolArguments = {
   name: z.string().optional().describe('Optional cookie name to delete a specific cookie. If not provided, deletes all cookies'),
 };
 
-export const deleteCookiesTool: ToolCallback = async ({name}: { name?: string }): Promise<CallToolResult> => {
+export const deleteCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
 
@@ -114,18 +114,18 @@ export const deleteCookiesTool: ToolCallback = async ({name}: { name?: string })
       // Delete specific cookie by name
       await browser.deleteCookies([name]);
       return {
-        content: [{type: 'text', text: `Cookie "${name}" deleted successfully`}],
-      };
-    } else {
-      // Delete all cookies
-      await browser.deleteCookies();
-      return {
-        content: [{type: 'text', text: 'All cookies deleted successfully'}],
+        content: [{ type: 'text', text: `Cookie "${name}" deleted successfully` }],
       };
     }
+    // Delete all cookies
+    await browser.deleteCookies();
+    return {
+      content: [{ type: 'text', text: 'All cookies deleted successfully' }],
+    };
+
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error deleting cookies: ${e}`}],
+      content: [{ type: 'text', text: `Error deleting cookies: ${e}` }],
     };
   }
 };

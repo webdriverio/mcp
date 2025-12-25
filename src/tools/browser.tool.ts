@@ -1,7 +1,7 @@
-import {remote} from 'webdriverio';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
-import {CallToolResult} from '@modelcontextprotocol/sdk/types';
-import {z} from 'zod';
+import { remote } from 'webdriverio';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import { z } from 'zod';
 
 export const startBrowserToolArguments = {
   headless: z.boolean().optional(),
@@ -33,7 +33,7 @@ export const getBrowser = () => {
 // Export state for app-session.tool.ts to access
 (getBrowser as any).__state = state;
 
-export const startBrowserTool: ToolCallback = async ({headless = false, windowWidth = 1280, windowHeight = 1080}: {
+export const startBrowserTool: ToolCallback = async ({ headless = false, windowWidth = 1280, windowHeight = 1080}: {
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
@@ -67,7 +67,7 @@ export const startBrowserTool: ToolCallback = async ({headless = false, windowWi
     },
   });
 
-  const {sessionId} = browser;
+  const { sessionId } = browser;
   state.browsers.set(sessionId, browser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, {
@@ -107,11 +107,11 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
       : '';
 
     return {
-      content: [{type: 'text', text: `Session ${sessionId} ${action}${note}`}],
+      content: [{ type: 'text', text: `Session ${sessionId} ${action}${note}` }],
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error closing session: ${e}`}],
+      content: [{ type: 'text', text: `Error closing session: ${e}` }],
     };
   }
 };

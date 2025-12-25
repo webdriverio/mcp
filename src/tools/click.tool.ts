@@ -1,7 +1,7 @@
-import {getBrowser} from './browser.tool';
-import {z} from 'zod';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
-import {CallToolResult} from '@modelcontextprotocol/sdk/types';
+import { getBrowser } from './browser.tool';
+import { z } from 'zod';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 
 const defaultTimeout: number = 3000;
 
@@ -14,29 +14,28 @@ export const clickToolArguments = {
 const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    await browser.waitUntil(browser.$(selector).isExisting, {timeout});
+    await browser.waitUntil(browser.$(selector).isExisting, { timeout });
     if (scrollToView) {
       await browser.$(selector).scrollIntoView({ block: 'center', inline: 'center' });
     }
     await browser.$(selector).click();
     return {
-      content: [{type: 'text', text: `Element clicked (selector: ${selector})`}],
+      content: [{ type: 'text', text: `Element clicked (selector: ${selector})` }],
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error clicking element: ${e}`}],
+      content: [{ type: 'text', text: `Error clicking element: ${e}` }],
     };
   }
 };
 
-export const clickTool: ToolCallback = async ({selector, scrollToView, timeout = defaultTimeout}: {
+export const clickTool: ToolCallback = async ({ selector, scrollToView, timeout = defaultTimeout}: {
   selector: string;
   scrollToView?: boolean;
   timeout?: number
 }): Promise<CallToolResult> => clickAction(selector, timeout, scrollToView);
 
-
-export const clickToolViaText: ToolCallback = async ({text, scrollToView, timeout = defaultTimeout}: {
+export const clickToolViaText: ToolCallback = async ({ text, scrollToView, timeout = defaultTimeout}: {
   text: string;
   scrollToView?: boolean;
   timeout?: number

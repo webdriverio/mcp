@@ -1,6 +1,6 @@
-import {getBrowser} from './browser.tool';
-import {z} from 'zod';
-import {ToolCallback} from '@modelcontextprotocol/sdk/server/mcp';
+import { getBrowser } from './browser.tool';
+import { z } from 'zod';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 
 const defaultTimeout: number = 3000;
 
@@ -9,17 +9,20 @@ export const getElementTextToolArguments = {
   timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
 };
 
-export const getElementTextTool: ToolCallback = async ({selector, timeout = defaultTimeout}: { selector: string; timeout?: number }) => {
+export const getElementTextTool: ToolCallback = async ({ selector, timeout = defaultTimeout}: {
+  selector: string;
+  timeout?: number
+}) => {
   try {
     const browser = getBrowser();
-    await browser.waitUntil(browser.$(selector).isExisting, {timeout});
+    await browser.waitUntil(browser.$(selector).isExisting, { timeout });
     const text = await browser.$(selector).getText();
     return {
-      content: [{type: 'text', text: `Text from element "${selector}": ${text}`}],
+      content: [{ type: 'text', text: `Text from element "${selector}": ${text}` }],
     };
   } catch (e) {
     return {
-      content: [{type: 'text', text: `Error getting element text: ${e}`}],
+      content: [{ type: 'text', text: `Error getting element text: ${e}` }],
     };
   }
 };
