@@ -14,6 +14,9 @@
     "webdriverio-mcp": "lib/server.js"
   },
   "license": "MIT",
+  "publishConfig": {                                                                                                                                                                                                                                                                   
+    "access": "public"                                                                                                                                                                                                                                                                 
+  },  
   "type": "module",
   "files": [
     "lib"
