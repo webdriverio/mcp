@@ -19,7 +19,8 @@
   },
   "type": "module",
   "files": [
-    "lib"
+    "lib",
+    "README.md"
   ],
   "scripts": {
     "prebundle": "rimraf lib --glob ./*.tgz",
