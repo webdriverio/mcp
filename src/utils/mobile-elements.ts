@@ -4,12 +4,8 @@
  * Uses page source parsing for optimal performance (2 HTTP calls vs 600+ for 50 elements)
  */
 
-import {
-  generateAllElementLocators,
-  getDefaultFilters,
-  ElementWithLocators,
-  FilterOptions,
-} from '../locators';
+import type { ElementWithLocators, FilterOptions } from '../locators';
+import { generateAllElementLocators, getDefaultFilters } from '../locators';
 
 /**
  * Element info returned by getMobileVisibleElements
