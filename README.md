@@ -14,7 +14,7 @@ Add the following configuration to your Claude MCP settings:
 ```json
 {
   "mcpServers": {
-    "webdriverio-mcp": {
+    "wdio-mcp": {
       "command": "npx",
       "args": [
         "-y",
@@ -36,14 +36,14 @@ Then configure MCP:
 ```json
 {
   "mcpServers": {
-    "webdriverio-mcp": {
-      "command": "webdriverio-mcp"
+    "wdio-mcp": {
+      "command": "wdio-mcp"
     }
   }
 }
 ```
 
-> **Note:** The npm package is `@wdio/mcp`, but the executable binary is `webdriverio-mcp`.
+> **Note:** The npm package is `@wdio/mcp`, but the executable binary is `wdio-mcp`.
 
 **Restart Claude Desktop**
 
