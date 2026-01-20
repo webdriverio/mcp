@@ -28,7 +28,7 @@
     "postbundle": "npm pack",
     "lint": "eslint src/ --fix && tsc --noEmit",
     "start": "node lib/server.js",
-    "dev": "tsx src/server.ts --watch",
+    "dev": "tsx --watch src/server.ts",
     "prepare": "husky"
   },
   "dependencies": {
