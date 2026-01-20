@@ -1,3 +1,7 @@
+# Changelog
+
+## 1.5.1 (2026-01-20)
+
 # [1.5.0](https://github.com/webdriverio/mcp/compare/1.4.1...1.5.0) (2026-01-20)
 
 ### Features
@@ -98,6 +102,3 @@
 
 * Add repository info to package.json and expand browser dimension
   constraints ([590acd7](https://github.com/webdriverio/mcp/commit/590acd7))
-
-
-
