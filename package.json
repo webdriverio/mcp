@@ -28,7 +28,7 @@
     "postbundle": "npm pack",
     "lint": "eslint src/ --fix && tsc --noEmit",
     "start": "node lib/server.js",
-    "dev": "tsx src/server.ts",
+    "dev": "tsx src/server.ts --watch",
     "prepare": "husky"
   },
   "dependencies": {
@@ -36,6 +36,7 @@
     "@toon-format/toon": "^1.0.0",
     "@wdio/protocols": "^9.16.2",
     "@xmldom/xmldom": "^0.8.11",
+    "puppeteer-core": "^24.35.0",
     "webdriverio": "9.22",
     "zod": "^4.3.5"
   },
