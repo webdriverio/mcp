@@ -52,7 +52,7 @@ jobs:
         run: pnpm run bundle
 
       - name: Release
-        run: npx release-it ${{github.event.inputs.releaseType}} --github.release --ci --npm.skipChecks --no-git.requireCleanWorkingDir --npm.tag=${{github.event.inputs.distTag}}
+        run: npx release-it ${{github.event.inputs.releaseType}} --ci --no-git.requireCleanWorkingDir --npm.tag=${{github.event.inputs.distTag}}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_REGISTRY: https://registry.npmjs.org/

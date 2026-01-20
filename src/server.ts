@@ -86,6 +86,7 @@ import {
   unlockDeviceTool,
   unlockDeviceToolDefinition,
 } from './tools/device.tool';
+import pkg from '../package.json' with { type: 'json' };
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
 const _originalConsoleLog = console.log;
@@ -99,11 +100,14 @@ console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 
 const server = new McpServer({
-  name: 'MCP WebdriverIO',
-  version: '1.4.0',
+  title: 'WebdriverIO MCP Server',
+  name: pkg.name,
+  version: pkg.version,
+  description: pkg.description,
+  websiteUrl: 'https://github.com/webdriverio/mcp',
 }, {
+  instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome browser control (headed/headless) and iOS/Android native app testing via Appium.',
   capabilities: {
-    resources: {},
     tools: {},
   },
 });
