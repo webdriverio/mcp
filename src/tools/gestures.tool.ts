@@ -1,16 +1,21 @@
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from './browser.tool';
 
 // Tap Element Tool
-export const tapElementToolArguments = {
-  selector: z
-    .string()
-    .optional()
-    .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
-  x: z.number().optional().describe('X coordinate for tap (if no selector provided)'),
-  y: z.number().optional().describe('Y coordinate for tap (if no selector provided)'),
+export const tapElementToolDefinition: ToolDefinition = {
+  name: 'tap_element',
+  description: 'taps an element by selector or coordinates (mobile)',
+  inputSchema: {
+    selector: z
+      .string()
+      .optional()
+      .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
+    x: z.number().optional().describe('X coordinate for tap (if no selector provided)'),
+    y: z.number().optional().describe('Y coordinate for tap (if no selector provided)'),
+  },
 };
 
 export const tapElementTool: ToolCallback = async (args: {
@@ -52,20 +57,24 @@ export const tapElementTool: ToolCallback = async (args: {
 };
 
 // Swipe Tool
-export const swipeToolArguments = {
-  direction: z.enum(['up', 'down', 'left', 'right']).describe('Swipe direction'),
-  duration: z
-    .number()
-    .min(100)
-    .max(5000)
-    .optional()
-    .describe('Swipe duration in milliseconds (default: 500)'),
-  startX: z.number().optional().describe('Start X coordinate (optional, uses screen center)'),
-  startY: z.number().optional().describe('Start Y coordinate (optional, uses screen center)'),
-  distance: z
-    .number()
-    .optional()
-    .describe('Swipe distance in pixels (optional, uses percentage of screen)'),
+export const swipeToolDefinition: ToolDefinition = {
+  name: 'swipe',
+  description: 'performs a swipe gesture in specified direction (mobile)',
+  inputSchema: {
+    direction: z.enum(['up', 'down', 'left', 'right']).describe('Swipe direction'),
+    duration: z
+      .number()
+      .min(100)
+      .max(5000)
+      .optional()
+      .describe('Swipe duration in milliseconds (default: 500)'),
+    startX: z.number().optional().describe('Start X coordinate (optional, uses screen center)'),
+    startY: z.number().optional().describe('Start Y coordinate (optional, uses screen center)'),
+    distance: z
+      .number()
+      .optional()
+      .describe('Swipe distance in pixels (optional, uses percentage of screen)'),
+  },
 };
 
 export const swipeTool: ToolCallback = async (args: {
@@ -132,14 +141,18 @@ export const swipeTool: ToolCallback = async (args: {
 };
 
 // Long Press Tool
-export const longPressToolArguments = {
-  selector: z
-    .string()
-    .optional()
-    .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
-  x: z.number().optional().describe('X coordinate for long press (if no selector provided)'),
-  y: z.number().optional().describe('Y coordinate for long press (if no selector provided)'),
-  duration: z.number().min(500).max(10000).optional().describe('Long press duration in milliseconds (default: 1000)'),
+export const longPressToolDefinition: ToolDefinition = {
+  name: 'long_press',
+  description: 'performs a long press on element or coordinates (mobile)',
+  inputSchema: {
+    selector: z
+      .string()
+      .optional()
+      .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
+    x: z.number().optional().describe('X coordinate for long press (if no selector provided)'),
+    y: z.number().optional().describe('Y coordinate for long press (if no selector provided)'),
+    duration: z.number().min(500).max(10000).optional().describe('Long press duration in milliseconds (default: 1000)'),
+  },
 };
 
 export const longPressTool: ToolCallback = async (args: {
@@ -186,14 +199,18 @@ export const longPressTool: ToolCallback = async (args: {
 };
 
 // Drag and Drop Tool
-export const dragAndDropToolArguments = {
-  fromSelector: z.string().optional().describe('Source element selector'),
-  fromX: z.number().optional().describe('Source X coordinate'),
-  fromY: z.number().optional().describe('Source Y coordinate'),
-  toSelector: z.string().optional().describe('Target element selector'),
-  toX: z.number().optional().describe('Target X coordinate'),
-  toY: z.number().optional().describe('Target Y coordinate'),
-  duration: z.number().min(100).max(5000).optional().describe('Drag duration in milliseconds (default: 500)'),
+export const dragAndDropToolDefinition: ToolDefinition = {
+  name: 'drag_and_drop',
+  description: 'drags from one location to another (mobile)',
+  inputSchema: {
+    fromSelector: z.string().optional().describe('Source element selector'),
+    fromX: z.number().optional().describe('Source X coordinate'),
+    fromY: z.number().optional().describe('Source Y coordinate'),
+    toSelector: z.string().optional().describe('Target element selector'),
+    toX: z.number().optional().describe('Target X coordinate'),
+    toY: z.number().optional().describe('Target Y coordinate'),
+    duration: z.number().min(100).max(5000).optional().describe('Drag duration in milliseconds (default: 500)'),
+  },
 };
 
 export const dragAndDropTool: ToolCallback = async (args: {

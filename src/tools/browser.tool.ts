@@ -1,16 +1,25 @@
 import { remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 
-export const startBrowserToolArguments = {
-  headless: z.boolean().optional(),
-  windowWidth: z.number().min(400).max(3840).optional(),
-  windowHeight: z.number().min(400).max(2160).optional(),
+export const startBrowserToolDefinition: ToolDefinition = {
+  name: 'start_browser',
+  description: 'starts a browser session and sets it to the current state',
+  inputSchema: {
+    headless: z.boolean().optional(),
+    windowWidth: z.number().min(400).max(3840).optional(),
+    windowHeight: z.number().min(400).max(2160).optional(),
+  },
 };
 
-export const closeSessionToolArguments = {
-  detach: z.boolean().optional().describe('If true, disconnect from session without terminating it (preserves app state). Default: false'),
+export const closeSessionToolDefinition: ToolDefinition = {
+  name: 'close_session',
+  description: 'closes or detaches from the current browser or app session',
+  inputSchema: {
+    detach: z.boolean().optional().describe('If true, disconnect from session without terminating it (preserves app state). Default: false'),
+  },
 };
 
 const state: {

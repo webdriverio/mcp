@@ -1,9 +1,14 @@
 import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolDefinition } from '../types/tool';
 
-export const navigateToolArguments: { url: z.ZodString } = {
-  url: z.string().nonempty('URL must be provided'),
+export const navigateToolDefinition: ToolDefinition = {
+  name: 'navigate',
+  description: 'navigates to a URL',
+  inputSchema: {
+    url: z.string().min(1).describe('The URL to navigate to'),
+  },
 };
 
 export const navigateTool: ToolCallback = async ({ url}: { url: string }) => {

@@ -2,75 +2,89 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { ToolDefinition } from './types/tool';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import {
   closeSessionTool,
-  closeSessionToolArguments,
+  closeSessionToolDefinition,
   startBrowserTool,
-  startBrowserToolArguments
+  startBrowserToolDefinition
 } from './tools/browser.tool';
-import { navigateTool, navigateToolArguments } from './tools/navigate.tool';
-import { clickTool, clickToolArguments, clickToolViaText } from './tools/click.tool';
-import { setValueTool, setValueToolArguments } from './tools/set-value.tool';
-import { findElementTool, findElementToolArguments } from './tools/find-element.tool';
-import { getElementTextTool, getElementTextToolArguments } from './tools/get-element-text.tool';
-import { isDisplayedTool, isDisplayedToolArguments } from './tools/is-displayed.tool';
-import { scrollDownTool, scrollDownToolArguments } from './tools/scroll-down.tool';
-import { scrollUpTool, scrollUpToolArguments } from './tools/scroll-up.tool';
-import { getVisibleElementsTool, getVisibleElementsToolArguments } from './tools/get-visible-elements.tool';
-import { takeScreenshotTool, takeScreenshotToolArguments } from './tools/take-screenshot.tool';
+import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
+import { clickTool, clickToolDefinition, clickToolViaText, clickViaTextToolDefinition } from './tools/click.tool';
+import { setValueTool, setValueToolDefinition } from './tools/set-value.tool';
+import { findElementTool, findElementToolDefinition } from './tools/find-element.tool';
+import { getElementTextTool, getElementTextToolDefinition } from './tools/get-element-text.tool';
+import { isDisplayedTool, isDisplayedToolDefinition } from './tools/is-displayed.tool';
+import { scrollDownTool, scrollDownToolDefinition } from './tools/scroll-down.tool';
+import { scrollUpTool, scrollUpToolDefinition } from './tools/scroll-up.tool';
+import { getVisibleElementsTool, getVisibleElementsToolDefinition } from './tools/get-visible-elements.tool';
+import { takeScreenshotTool, takeScreenshotToolDefinition } from './tools/take-screenshot.tool';
 import {
   deleteCookiesTool,
-  deleteCookiesToolArguments,
+  deleteCookiesToolDefinition,
   getCookiesTool,
-  getCookiesToolArguments,
+  getCookiesToolDefinition,
   setCookieTool,
-  setCookieToolArguments,
+  setCookieToolDefinition,
 } from './tools/cookies.tool';
-import { getAccessibilityTreeTool, getAccessibilityToolArguments } from './tools/get-accessibility-tree.tool';
-import { startAppTool, startAppToolArguments } from './tools/app-session.tool';
+import { getAccessibilityToolDefinition, getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
+import { startAppTool, startAppToolDefinition } from './tools/app-session.tool';
 import {
   dragAndDropTool,
-  dragAndDropToolArguments,
+  dragAndDropToolDefinition,
   longPressTool,
-  longPressToolArguments,
+  longPressToolDefinition,
   swipeTool,
-  swipeToolArguments,
+  swipeToolDefinition,
   tapElementTool,
-  tapElementToolArguments,
+  tapElementToolDefinition,
 } from './tools/gestures.tool';
 import {
   activateAppTool,
-  activateAppToolArguments,
+  activateAppToolDefinition,
   getAppStateTool,
-  getAppStateToolArguments,
+  getAppStateToolDefinition,
   terminateAppTool,
-  terminateAppToolArguments,
+  terminateAppToolDefinition,
 } from './tools/app-actions.tool';
 import {
   getContextsTool,
+  getContextsToolDefinition,
   getCurrentContextTool,
+  getCurrentContextToolDefinition,
   switchContextTool,
-  switchContextToolArguments
+  switchContextToolDefinition
 } from './tools/context.tool';
 import {
   getDeviceInfoTool,
+  getDeviceInfoToolDefinition,
   getGeolocationTool,
+  getGeolocationToolDefinition,
   getOrientationTool,
+  getOrientationToolDefinition,
   hideKeyboardTool,
+  hideKeyboardToolDefinition,
   isDeviceLockedTool,
+  isDeviceLockedToolDefinition,
   isKeyboardShownTool,
+  isKeyboardShownToolDefinition,
   lockDeviceTool,
+  lockDeviceToolDefinition,
   openNotificationsTool,
+  openNotificationsToolDefinition,
   pressKeyCodeTool,
-  pressKeyCodeToolArguments,
+  pressKeyCodeToolDefinition,
   rotateDeviceTool,
-  rotateDeviceToolArguments,
+  rotateDeviceToolDefinition,
   sendKeysTool,
-  sendKeysToolArguments,
+  sendKeysToolDefinition,
   setGeolocationTool,
-  setGeolocationToolArguments,
+  setGeolocationToolDefinition,
   shakeDeviceTool,
+  shakeDeviceToolDefinition,
   unlockDeviceTool,
+  unlockDeviceToolDefinition,
 } from './tools/device.tool';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
@@ -94,63 +108,76 @@ const server = new McpServer({
   },
 });
 
+// Helper function to register tools using the new registerTool pattern
+const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
+  server.registerTool(definition.name, {
+    description: definition.description,
+    inputSchema: definition.inputSchema,
+  }, callback);
+
 // Browser and App Session Management
-server.tool('start_browser', 'starts a browser session and sets it to the current state', startBrowserToolArguments, startBrowserTool);
-server.tool('start_app_session', 'starts a mobile app session (iOS/Android) via Appium', startAppToolArguments, startAppTool);
-server.tool('close_session', 'closes or detaches from the current browser or app session', closeSessionToolArguments, closeSessionTool);
-server.tool('navigate', 'navigates to a URL', navigateToolArguments, navigateTool);
+registerTool(startBrowserToolDefinition, startBrowserTool);
+registerTool(startAppToolDefinition, startAppTool);
+registerTool(closeSessionToolDefinition, closeSessionTool);
+registerTool(navigateToolDefinition, navigateTool);
 
-server.tool('get_visible_elements', 'get a list of visible (in viewport & displayed) interactable elements on the page (buttons, links, inputs). Use elementType="visual" for images/SVGs. Must prefer this to take_screenshot for interactions', getVisibleElementsToolArguments, getVisibleElementsTool);
-server.tool('get_accessibility', 'gets accessibility tree snapshot with semantic information about page elements (roles, names, states). Browser-only - use when get_visible_elements does not return expected elements.', getAccessibilityToolArguments, getAccessibilityTreeTool);
+// Element Discovery
+registerTool(getVisibleElementsToolDefinition, getVisibleElementsTool);
+registerTool(getAccessibilityToolDefinition, getAccessibilityTreeTool);
 
-server.tool('scroll_down', 'scrolls the page down by specified pixels', scrollDownToolArguments, scrollDownTool);
-server.tool('scroll_up', 'scrolls the page up by specified pixels', scrollUpToolArguments, scrollUpTool);
+// Scrolling
+registerTool(scrollDownToolDefinition, scrollDownTool);
+registerTool(scrollUpToolDefinition, scrollUpTool);
 
-server.tool('find_element', 'finds an element', findElementToolArguments, findElementTool);
-server.tool('click_element', 'clicks an element', clickToolArguments, clickTool);
-server.tool('click_via_text', 'clicks an element', clickToolArguments, clickToolViaText);
-server.tool('set_value', 'set value to an element, aka typing', setValueToolArguments, setValueTool);
+// Element Interaction
+registerTool(findElementToolDefinition, findElementTool);
+registerTool(clickToolDefinition, clickTool);
+registerTool(clickViaTextToolDefinition, clickToolViaText);
+registerTool(setValueToolDefinition, setValueTool);
 
-server.tool('get_element_text', 'gets the text content of an element', getElementTextToolArguments, getElementTextTool);
-server.tool('is_displayed', 'checks if an element is displayed', isDisplayedToolArguments, isDisplayedTool);
+// Element Inspection
+registerTool(getElementTextToolDefinition, getElementTextTool);
+registerTool(isDisplayedToolDefinition, isDisplayedTool);
 
-server.tool('take_screenshot', 'captures a screenshot of the current page', takeScreenshotToolArguments, takeScreenshotTool);
+// Screenshots
+registerTool(takeScreenshotToolDefinition, takeScreenshotTool);
 
-server.tool('get_cookies', 'gets all cookies or a specific cookie by name', getCookiesToolArguments, getCookiesTool);
-server.tool('set_cookie', 'sets a cookie with specified name, value, and optional attributes', setCookieToolArguments, setCookieTool);
-server.tool('delete_cookies', 'deletes all cookies or a specific cookie by name', deleteCookiesToolArguments, deleteCookiesTool);
+// Cookies
+registerTool(getCookiesToolDefinition, getCookiesTool);
+registerTool(setCookieToolDefinition, setCookieTool);
+registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
 // Mobile Gesture Tools
-server.tool('tap_element', 'taps an element by selector or coordinates (mobile)', tapElementToolArguments, tapElementTool);
-server.tool('swipe', 'performs a swipe gesture in specified direction (mobile)', swipeToolArguments, swipeTool);
-server.tool('long_press', 'performs a long press on element or coordinates (mobile)', longPressToolArguments, longPressTool);
-server.tool('drag_and_drop', 'drags from one location to another (mobile)', dragAndDropToolArguments, dragAndDropTool);
+registerTool(tapElementToolDefinition, tapElementTool);
+registerTool(swipeToolDefinition, swipeTool);
+registerTool(longPressToolDefinition, longPressTool);
+registerTool(dragAndDropToolDefinition, dragAndDropTool);
 
 // App Lifecycle Management
-server.tool('get_app_state', 'gets the state of an app (not installed, not running, background, foreground)', getAppStateToolArguments, getAppStateTool);
-server.tool('activate_app', 'activates/brings an app to foreground', activateAppToolArguments, activateAppTool);
-server.tool('terminate_app', 'terminates a running app', terminateAppToolArguments, terminateAppTool);
+registerTool(getAppStateToolDefinition, getAppStateTool);
+registerTool(activateAppToolDefinition, activateAppTool);
+registerTool(terminateAppToolDefinition, terminateAppTool);
 
 // Context Switching (Native/WebView)
-server.tool('get_contexts', 'lists available contexts (NATIVE_APP, WEBVIEW)', {}, getContextsTool);
-server.tool('get_current_context', 'shows the currently active context', {}, getCurrentContextTool);
-server.tool('switch_context', 'switches between native and webview contexts', switchContextToolArguments, switchContextTool);
+registerTool(getContextsToolDefinition, getContextsTool);
+registerTool(getCurrentContextToolDefinition, getCurrentContextTool);
+registerTool(switchContextToolDefinition, switchContextTool);
 
 // Device Interaction
-server.tool('get_device_info', 'gets device information (platform, version, screen size)', {}, getDeviceInfoTool);
-server.tool('rotate_device', 'rotates device to portrait or landscape orientation', rotateDeviceToolArguments, rotateDeviceTool);
-server.tool('get_orientation', 'gets current device orientation', {}, getOrientationTool);
-server.tool('lock_device', 'locks the device screen', {}, lockDeviceTool);
-server.tool('unlock_device', 'unlocks the device screen', {}, unlockDeviceTool);
-server.tool('is_device_locked', 'checks if device is locked', {}, isDeviceLockedTool);
-server.tool('shake_device', 'shakes the device (iOS only)', {}, shakeDeviceTool);
-server.tool('send_keys', 'sends keys to the app (Android only)', sendKeysToolArguments, sendKeysTool);
-server.tool('press_key_code', 'presses an Android key code (Android only)', pressKeyCodeToolArguments, pressKeyCodeTool);
-server.tool('hide_keyboard', 'hides the on-screen keyboard', {}, hideKeyboardTool);
-server.tool('is_keyboard_shown', 'checks if keyboard is visible', {}, isKeyboardShownTool);
-server.tool('open_notifications', 'opens the notifications panel (Android only)', {}, openNotificationsTool);
-server.tool('get_geolocation', 'gets current device geolocation', {}, getGeolocationTool);
-server.tool('set_geolocation', 'sets device geolocation (latitude, longitude, altitude)', setGeolocationToolArguments, setGeolocationTool);
+registerTool(getDeviceInfoToolDefinition, getDeviceInfoTool);
+registerTool(rotateDeviceToolDefinition, rotateDeviceTool);
+registerTool(getOrientationToolDefinition, getOrientationTool);
+registerTool(lockDeviceToolDefinition, lockDeviceTool);
+registerTool(unlockDeviceToolDefinition, unlockDeviceTool);
+registerTool(isDeviceLockedToolDefinition, isDeviceLockedTool);
+registerTool(shakeDeviceToolDefinition, shakeDeviceTool);
+registerTool(sendKeysToolDefinition, sendKeysTool);
+registerTool(pressKeyCodeToolDefinition, pressKeyCodeTool);
+registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
+registerTool(isKeyboardShownToolDefinition, isKeyboardShownTool);
+registerTool(openNotificationsToolDefinition, openNotificationsTool);
+registerTool(getGeolocationToolDefinition, getGeolocationTool);
+registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 async function main() {
   const transport = new StdioServerTransport();

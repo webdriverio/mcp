@@ -3,10 +3,15 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { Cookie, SameSiteOptions } from '@wdio/protocols';
+import type { ToolDefinition } from '../types/tool';
 
-// Get all cookies or a specific cookie by name
-export const getCookiesToolArguments = {
-  name: z.string().optional().describe('Optional cookie name to retrieve a specific cookie. If not provided, returns all cookies'),
+// Tool definitions
+export const getCookiesToolDefinition: ToolDefinition = {
+  name: 'get_cookies',
+  description: 'gets all cookies or a specific cookie by name',
+  inputSchema: {
+    name: z.string().optional().describe('Optional cookie name to retrieve a specific cookie. If not provided, returns all cookies'),
+  },
 };
 
 export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
@@ -44,15 +49,19 @@ export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): 
 };
 
 // Set a cookie
-export const setCookieToolArguments = {
-  name: z.string().describe('Cookie name'),
-  value: z.string().describe('Cookie value'),
-  domain: z.string().optional().describe('Cookie domain (defaults to current domain)'),
-  path: z.string().optional().describe('Cookie path (defaults to "/")'),
-  expires: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
-  httpOnly: z.boolean().optional().describe('HttpOnly flag'),
-  secure: z.boolean().optional().describe('Secure flag'),
-  sameSite: z.enum(['Strict', 'Lax', 'None']).optional().describe('SameSite attribute'),
+export const setCookieToolDefinition: ToolDefinition = {
+  name: 'set_cookie',
+  description: 'sets a cookie with specified name, value, and optional attributes',
+  inputSchema: {
+    name: z.string().describe('Cookie name'),
+    value: z.string().describe('Cookie value'),
+    domain: z.string().optional().describe('Cookie domain (defaults to current domain)'),
+    path: z.string().optional().describe('Cookie path (defaults to "/")'),
+    expires: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
+    httpOnly: z.boolean().optional().describe('HttpOnly flag'),
+    secure: z.boolean().optional().describe('Secure flag'),
+    sameSite: z.enum(['Strict', 'Lax', 'None']).optional().describe('SameSite attribute'),
+  },
 };
 
 export const setCookieTool: ToolCallback = async ({
@@ -102,8 +111,12 @@ export const setCookieTool: ToolCallback = async ({
 };
 
 // Delete cookies
-export const deleteCookiesToolArguments = {
-  name: z.string().optional().describe('Optional cookie name to delete a specific cookie. If not provided, deletes all cookies'),
+export const deleteCookiesToolDefinition: ToolDefinition = {
+  name: 'delete_cookies',
+  description: 'deletes all cookies or a specific cookie by name',
+  inputSchema: {
+    name: z.string().optional().describe('Optional cookie name to delete a specific cookie. If not provided, deletes all cookies'),
+  },
 };
 
 export const deleteCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {

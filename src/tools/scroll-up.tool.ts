@@ -1,9 +1,14 @@
 import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolDefinition } from '../types/tool';
 
-export const scrollUpToolArguments = {
-  pixels: z.number().optional().default(500),
+export const scrollUpToolDefinition: ToolDefinition = {
+  name: 'scroll_up',
+  description: 'scrolls the page up by specified pixels',
+  inputSchema: {
+    pixels: z.number().optional().default(500),
+  },
 };
 
 export const scrollUpTool: ToolCallback = async ({ pixels = 500}: { pixels?: number }) => {

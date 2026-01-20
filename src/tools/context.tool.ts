@@ -1,7 +1,35 @@
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from './browser.tool';
+
+// Get Contexts Tool Definition
+export const getContextsToolDefinition: ToolDefinition = {
+  name: 'get_contexts',
+  description: 'lists available contexts (NATIVE_APP, WEBVIEW)',
+  inputSchema: {},
+};
+
+// Get Current Context Tool Definition
+export const getCurrentContextToolDefinition: ToolDefinition = {
+  name: 'get_current_context',
+  description: 'shows the currently active context',
+  inputSchema: {},
+};
+
+// Switch Context Tool Definition
+export const switchContextToolDefinition: ToolDefinition = {
+  name: 'switch_context',
+  description: 'switches between native and webview contexts',
+  inputSchema: {
+    context: z
+      .string()
+      .describe(
+        'Context name to switch to (e.g., "NATIVE_APP", "WEBVIEW_com.example.app", or use index from get_contexts)',
+      ),
+  },
+};
 
 // Get Contexts Tool
 export const getContextsTool: ToolCallback = async (): Promise<CallToolResult> => {
@@ -40,15 +68,6 @@ export const getCurrentContextTool: ToolCallback = async (): Promise<CallToolRes
       content: [{ type: 'text', text: `Error getting current context: ${e}` }],
     };
   }
-};
-
-// Switch Context Tool
-export const switchContextToolArguments = {
-  context: z
-    .string()
-    .describe(
-      'Context name to switch to (e.g., "NATIVE_APP", "WEBVIEW_com.example.app", or use index from get_contexts)',
-    ),
 };
 
 export const switchContextTool: ToolCallback = async (args: {

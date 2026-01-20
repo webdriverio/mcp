@@ -2,38 +2,43 @@ import { getBrowser } from './browser.tool';
 import getInteractableElements from '../scripts/get-interactable-elements';
 import { getMobileVisibleElements } from '../utils/mobile-elements';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolDefinition } from '../types/tool';
 import { encode } from '@toon-format/toon';
 import { z } from 'zod';
 import { stripUndefinedFromArray } from '../utils/strip-undefined';
 
 /**
- * Arguments for get_visible_elements tool
+ * Tool definition for get_visible_elements
  */
-export const getVisibleElementsToolArguments = {
-  inViewportOnly: z
-    .boolean()
-    .optional()
-    .describe(
-      'Only return elements within the visible viewport. Default: true. Set to false to get ALL elements on the page.',
-    ),
-  includeContainers: z
-    .boolean()
-    .optional()
-    .describe(
-      'Include layout containers (ViewGroup, FrameLayout, ScrollView, etc). Default: false. Set to true to see all elements including layouts.',
-    ),
-  elementType: z
-    .enum(['interactable', 'visual', 'all'])
-    .optional()
-    .describe(
-      'Type of elements to return: "interactable" (default) for buttons/links/inputs, "visual" for images/SVGs, "all" for both.',
-    ),
-  limit: z
-    .number()
-    .optional()
-    .describe(
-      'Maximum number of elements to return. Default: 0 (unlimited). Set a limit for pages with many elements.',
-    ),
+export const getVisibleElementsToolDefinition: ToolDefinition = {
+  name: 'get_visible_elements',
+  description: 'get a list of visible (in viewport & displayed) interactable elements on the page (buttons, links, inputs). Use elementType="visual" for images/SVGs. Must prefer this to take_screenshot for interactions',
+  inputSchema: {
+    inViewportOnly: z
+      .boolean()
+      .optional()
+      .describe(
+        'Only return elements within the visible viewport. Default: true. Set to false to get ALL elements on the page.',
+      ),
+    includeContainers: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include layout containers (ViewGroup, FrameLayout, ScrollView, etc). Default: false. Set to true to see all elements including layouts.',
+      ),
+    elementType: z
+      .enum(['interactable', 'visual', 'all'])
+      .optional()
+      .describe(
+        'Type of elements to return: "interactable" (default) for buttons/links/inputs, "visual" for images/SVGs, "all" for both.',
+      ),
+    limit: z
+      .number()
+      .optional()
+      .describe(
+        'Maximum number of elements to return. Default: 0 (unlimited). Set a limit for pages with many elements.',
+      ),
+  },
 };
 
 /**

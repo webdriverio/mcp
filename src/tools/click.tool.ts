@@ -2,13 +2,28 @@ import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 
 const defaultTimeout: number = 3000;
 
-export const clickToolArguments = {
-  selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text")'),
-  scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before clicking').default(true),
-  timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
+export const clickToolDefinition: ToolDefinition = {
+  name: 'click_element',
+  description: 'clicks an element',
+  inputSchema: {
+    selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text")'),
+    scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before clicking').default(true),
+    timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
+  },
+};
+
+export const clickViaTextToolDefinition: ToolDefinition = {
+  name: 'click_via_text',
+  description: 'clicks an element',
+  inputSchema: {
+    selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text")'),
+    scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before clicking').default(true),
+    timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
+  },
 };
 
 const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {

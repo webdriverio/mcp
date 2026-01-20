@@ -1,7 +1,104 @@
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from './browser.tool';
+
+// Tool Definitions for zero-argument tools
+export const getDeviceInfoToolDefinition: ToolDefinition = {
+  name: 'get_device_info',
+  description: 'gets device information (platform, version, screen size)',
+  inputSchema: {},
+};
+
+export const getOrientationToolDefinition: ToolDefinition = {
+  name: 'get_orientation',
+  description: 'gets current device orientation',
+  inputSchema: {},
+};
+
+export const lockDeviceToolDefinition: ToolDefinition = {
+  name: 'lock_device',
+  description: 'locks the device screen',
+  inputSchema: {},
+};
+
+export const unlockDeviceToolDefinition: ToolDefinition = {
+  name: 'unlock_device',
+  description: 'unlocks the device screen',
+  inputSchema: {},
+};
+
+export const isDeviceLockedToolDefinition: ToolDefinition = {
+  name: 'is_device_locked',
+  description: 'checks if device is locked',
+  inputSchema: {},
+};
+
+export const shakeDeviceToolDefinition: ToolDefinition = {
+  name: 'shake_device',
+  description: 'shakes the device (iOS only)',
+  inputSchema: {},
+};
+
+export const hideKeyboardToolDefinition: ToolDefinition = {
+  name: 'hide_keyboard',
+  description: 'hides the on-screen keyboard',
+  inputSchema: {},
+};
+
+export const isKeyboardShownToolDefinition: ToolDefinition = {
+  name: 'is_keyboard_shown',
+  description: 'checks if keyboard is visible',
+  inputSchema: {},
+};
+
+export const openNotificationsToolDefinition: ToolDefinition = {
+  name: 'open_notifications',
+  description: 'opens the notifications panel (Android only)',
+  inputSchema: {},
+};
+
+export const getGeolocationToolDefinition: ToolDefinition = {
+  name: 'get_geolocation',
+  description: 'gets current device geolocation',
+  inputSchema: {},
+};
+
+// Tool Definitions for tools with arguments
+export const rotateDeviceToolDefinition: ToolDefinition = {
+  name: 'rotate_device',
+  description: 'rotates device to portrait or landscape orientation',
+  inputSchema: {
+    orientation: z.enum(['PORTRAIT', 'LANDSCAPE']).describe('Device orientation'),
+  },
+};
+
+export const sendKeysToolDefinition: ToolDefinition = {
+  name: 'send_keys',
+  description: 'sends keys to the app (Android only)',
+  inputSchema: {
+    keys: z.array(z.string()).describe('Array of keys to send (e.g., ["h", "e", "l", "l", "o"])'),
+  },
+};
+
+export const pressKeyCodeToolDefinition: ToolDefinition = {
+  name: 'press_key_code',
+  description: 'presses an Android key code (Android only)',
+  inputSchema: {
+    keyCode: z.number().describe('Android key code (e.g., 4 for BACK, 3 for HOME)'),
+  },
+};
+
+export const setGeolocationToolDefinition: ToolDefinition = {
+  name: 'set_geolocation',
+  description: 'sets device geolocation (latitude, longitude, altitude)',
+  inputSchema: {
+    latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
+    longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),
+    altitude: z.number().optional().describe('Altitude in meters (optional)'),
+  },
+};
 
 // Get Device Info Tool
 export const getDeviceInfoTool: ToolCallback = async (): Promise<CallToolResult> => {
@@ -38,10 +135,6 @@ export const getDeviceInfoTool: ToolCallback = async (): Promise<CallToolResult>
 };
 
 // Rotate Device Tool
-export const rotateDeviceToolArguments = {
-  orientation: z.enum(['PORTRAIT', 'LANDSCAPE']).describe('Device orientation'),
-};
-
 export const rotateDeviceTool: ToolCallback = async (args: {
   orientation: 'PORTRAIT' | 'LANDSCAPE';
 }): Promise<CallToolResult> => {
@@ -147,10 +240,6 @@ export const shakeDeviceTool: ToolCallback = async (): Promise<CallToolResult> =
 };
 
 // Send Keys Tool (Android only)
-export const sendKeysToolArguments = {
-  keys: z.array(z.string()).describe('Array of keys to send (e.g., ["h", "e", "l", "l", "o"])'),
-};
-
 export const sendKeysTool: ToolCallback = async (args: {
   keys: string[];
 }): Promise<CallToolResult> => {
@@ -171,10 +260,6 @@ export const sendKeysTool: ToolCallback = async (args: {
 };
 
 // Press Key Code Tool (Android only)
-export const pressKeyCodeToolArguments = {
-  keyCode: z.number().describe('Android key code (e.g., 4 for BACK, 3 for HOME)'),
-};
-
 export const pressKeyCodeTool: ToolCallback = async (args: {
   keyCode: number;
 }): Promise<CallToolResult> => {
@@ -268,12 +353,6 @@ export const getGeolocationTool: ToolCallback = async (): Promise<CallToolResult
 };
 
 // Set Geolocation Tool
-export const setGeolocationToolArguments = {
-  latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
-  longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),
-  altitude: z.number().optional().describe('Altitude in meters (optional)'),
-};
-
 export const setGeolocationTool: ToolCallback = async (args: {
   latitude: number;
   longitude: number;

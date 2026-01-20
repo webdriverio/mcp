@@ -1,14 +1,19 @@
 import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolDefinition } from '../types/tool';
 
 const defaultTimeout: number = 3000;
 
-export const setValueToolArguments = {
-  selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']")'),
-  value: z.string().describe('Text to enter into the element'),
-  scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before typing').default(true),
-  timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
+export const setValueToolDefinition: ToolDefinition = {
+  name: 'set_value',
+  description: 'set value to an element, aka typing',
+  inputSchema: {
+    selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']")'),
+    value: z.string().describe('Text to enter into the element'),
+    scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before typing').default(true),
+    timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
+  },
 };
 
 export const setValueTool: ToolCallback = async ({ selector, value, scrollToView = true, timeout = defaultTimeout}: {

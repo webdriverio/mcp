@@ -1,9 +1,14 @@
 import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolDefinition } from '../types/tool';
 
-export const takeScreenshotToolArguments = {
-  outputPath: z.string().optional().describe('Optional path where to save the screenshot. If not provided, returns base64 data.'),
+export const takeScreenshotToolDefinition: ToolDefinition = {
+  name: 'take_screenshot',
+  description: 'captures a screenshot of the current page',
+  inputSchema: {
+    outputPath: z.string().optional().describe('Optional path where to save the screenshot. If not provided, returns base64 data.'),
+  },
 };
 
 export const takeScreenshotTool: ToolCallback = async ({ outputPath}: { outputPath?: string }) => {

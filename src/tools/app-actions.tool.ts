@@ -1,11 +1,16 @@
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from './browser.tool';
 
 // Get App State Tool
-export const getAppStateToolArguments = {
-  bundleId: z.string().describe('App bundle ID (e.g., com.example.app)'),
+export const getAppStateToolDefinition: ToolDefinition = {
+  name: 'get_app_state',
+  description: 'gets the state of an app (not installed, not running, background, foreground)',
+  inputSchema: {
+    bundleId: z.string().describe('App bundle ID (e.g., com.example.app)'),
+  },
 };
 
 export const getAppStateTool: ToolCallback = async (args: {
@@ -45,8 +50,12 @@ export const getAppStateTool: ToolCallback = async (args: {
 };
 
 // Activate App Tool
-export const activateAppToolArguments = {
-  bundleId: z.string().describe('App bundle ID to activate (e.g., com.example.app)'),
+export const activateAppToolDefinition: ToolDefinition = {
+  name: 'activate_app',
+  description: 'activates/brings an app to foreground',
+  inputSchema: {
+    bundleId: z.string().describe('App bundle ID to activate (e.g., com.example.app)'),
+  },
 };
 
 export const activateAppTool: ToolCallback = async (args: {
@@ -73,8 +82,12 @@ export const activateAppTool: ToolCallback = async (args: {
 };
 
 // Terminate App Tool
-export const terminateAppToolArguments = {
-  bundleId: z.string().describe('App bundle ID to terminate (e.g., com.example.app)'),
+export const terminateAppToolDefinition: ToolDefinition = {
+  name: 'terminate_app',
+  description: 'terminates a running app',
+  inputSchema: {
+    bundleId: z.string().describe('App bundle ID to terminate (e.g., com.example.app)'),
+  },
 };
 
 export const terminateAppTool: ToolCallback = async (args: {

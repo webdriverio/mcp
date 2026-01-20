@@ -1,19 +1,24 @@
 import { getBrowser } from './browser.tool';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolDefinition } from '../types/tool';
 import { encode } from '@toon-format/toon';
 import { z } from 'zod';
 
 /**
- * Arguments for get_accessibility tool
+ * Tool definition for get_accessibility
  */
-export const getAccessibilityToolArguments = {
-  limit: z.number().optional()
-    .describe('Maximum number of nodes to return. Default: 100. Use 0 for unlimited.'),
-  roles: z.array(z.string()).optional()
-    .describe('Filter to specific roles (e.g., ["button", "link", "textbox"]). Default: all roles.'),
-  namedOnly: z.boolean().optional()
-    .describe('Only return nodes with a name/label. Default: true. Filters out anonymous containers.'),
+export const getAccessibilityToolDefinition: ToolDefinition = {
+  name: 'get_accessibility',
+  description: 'gets accessibility tree snapshot with semantic information about page elements (roles, names, states). Browser-only - use when get_visible_elements does not return expected elements.',
+  inputSchema: {
+    limit: z.number().optional()
+      .describe('Maximum number of nodes to return. Default: 100. Use 0 for unlimited.'),
+    roles: z.array(z.string()).optional()
+      .describe('Filter to specific roles (e.g., ["button", "link", "textbox"]). Default: all roles.'),
+    namedOnly: z.boolean().optional()
+      .describe('Only return nodes with a name/label. Default: true. Filters out anonymous containers.'),
+  },
 };
 
 /**
