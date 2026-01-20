@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.25",
-    "@toon-format/toon": "^1.0.0",
+    "@toon-format/toon": "^2.1.0",
     "@wdio/protocols": "^9.16.2",
     "@xmldom/xmldom": "^0.8.11",
     "webdriverio": "9.22",
