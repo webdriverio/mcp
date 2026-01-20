@@ -1,4 +1,10 @@
-const elementsScript = () => (function () {
+/**
+ * Browser script to get visible elements on the page
+ * Supports interactable elements, visual elements, or both
+ *
+ * @param elementType - Type of elements to return: 'interactable', 'visual', or 'all'
+ */
+const elementsScript = (elementType: 'interactable' | 'visual' | 'all' = 'interactable') => (function () {
   const interactableSelectors = [
     'a[href]',                    // Links with href
     'button',                     // Buttons
@@ -19,6 +25,15 @@ const elementsScript = () => (function () {
     '[role="searchbox"]',         // Elements with searchbox role
     '[contenteditable="true"]',   // Editable content
     '[tabindex]:not([tabindex="-1"])', // Elements with tabindex
+  ];
+
+  const visualSelectors = [
+    'img',                        // Images
+    'picture',                    // Picture elements
+    'svg',                        // SVG graphics
+    'video',                      // Video elements
+    'canvas',                     // Canvas elements
+    '[style*="background-image"]', // Elements with background images
   ];
 
   /**
@@ -56,7 +71,7 @@ const elementsScript = () => (function () {
     }
 
     // Try to build a selector with classes if available
-    if (element.className) {
+    if (element.className && typeof element.className === 'string') {
       const classes = element.className.trim().split(/\s+/).filter(Boolean);
       if (classes.length > 0) {
         // Use up to 2 classes to avoid overly complex selectors
@@ -71,7 +86,7 @@ const elementsScript = () => (function () {
     }
 
     // Build a path-based selector
-    let current = element;
+    let current: HTMLElement | null = element;
     const path = [];
 
     while (current && current !== document.documentElement) {
@@ -88,7 +103,7 @@ const elementsScript = () => (function () {
       const parent = current.parentElement;
       if (parent) {
         const siblings = Array.from(parent.children).filter(child =>
-          child.tagName === current.tagName,
+          child.tagName === current!.tagName,
         );
 
         if (siblings.length > 1) {
@@ -110,14 +125,22 @@ const elementsScript = () => (function () {
   }
 
   /**
-   * Get all interactable and visible elements on the page
-   * @returns {ElementInfo[]} - Array of element information objects
+   * Get all visible elements on the page based on elementType
+   * @returns {Record<string, unknown>[]} - Array of element information objects
    */
-  function getInteractableElements() {
+  function getElements(): Record<string, unknown>[] {
+    // Select which selectors to use based on elementType
+    const selectors: string[] = [];
+    if (elementType === 'interactable' || elementType === 'all') {
+      selectors.push(...interactableSelectors);
+    }
+    if (elementType === 'visual' || elementType === 'all') {
+      selectors.push(...visualSelectors);
+    }
 
-    // Get all potentially interactable elements
-    const allElements = [];
-    interactableSelectors.forEach(selector => {
+    // Get all potentially matching elements
+    const allElements: Element[] = [];
+    selectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(element => {
         if (!allElements.includes(element)) {
@@ -128,10 +151,13 @@ const elementsScript = () => (function () {
 
     // Filter for visible elements and collect information
     const elementInfos = allElements
-      .filter(element => isVisible(element) && !(element).disabled)
+      .filter(element => isVisible(element as HTMLElement) && !(element as HTMLInputElement).disabled)
       .map(element => {
+        const el = element as HTMLElement;
+        const inputEl = element as HTMLInputElement;
+
         // Get element information
-        const rect = element.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
         const isInViewport = (
           rect.top >= 0 &&
           rect.left >= 0 &&
@@ -139,28 +165,61 @@ const elementsScript = () => (function () {
           rect.right <= (window.innerWidth || document.documentElement.clientWidth)
         );
 
-        return {
-          tagName: element.tagName.toLowerCase(),
-          type: element.getAttribute('type') || undefined,
-          id: element.id || undefined,
-          className: element.className || undefined,
-          textContent: element.textContent?.trim() || undefined,
-          value: (element).value || undefined,
-          placeholder: (element).placeholder || undefined,
-          href: element.getAttribute('href') || undefined,
-          ariaLabel: element.getAttribute('aria-label') || undefined,
-          role: element.getAttribute('role') || undefined,
-          cssSelector: getCssSelector(element),
+        // Build object with only defined values (no null clutter in TOON output)
+        const info: Record<string, unknown> = {
+          tagName: el.tagName.toLowerCase(),
+          cssSelector: getCssSelector(el),
           isInViewport: isInViewport,
         };
+
+        // Only add properties that have actual values
+        const type = el.getAttribute('type');
+        if (type) info.type = type;
+
+        const id = el.id;
+        if (id) info.id = id;
+
+        const className = el.className;
+        if (className && typeof className === 'string') info.className = className;
+
+        const textContent = el.textContent?.trim();
+        if (textContent) info.textContent = textContent;
+
+        const value = inputEl.value;
+        if (value) info.value = value;
+
+        const placeholder = inputEl.placeholder;
+        if (placeholder) info.placeholder = placeholder;
+
+        const href = el.getAttribute('href');
+        if (href) info.href = href;
+
+        const ariaLabel = el.getAttribute('aria-label');
+        if (ariaLabel) info.ariaLabel = ariaLabel;
+
+        const role = el.getAttribute('role');
+        if (role) info.role = role;
+
+        // Visual element specific properties
+        const src = el.getAttribute('src');
+        if (src) info.src = src;
+
+        const alt = el.getAttribute('alt');
+        if (alt) info.alt = alt;
+
+        // Check for background-image (only if it's a visual element type query)
+        if (elementType === 'visual' || elementType === 'all') {
+          const bgImage = window.getComputedStyle(el).backgroundImage;
+          if (bgImage && bgImage !== 'none') info.backgroundImage = bgImage;
+        }
+
+        return info;
       });
 
-    return [
-      ...elementInfos,
-    ];
+    return elementInfos;
   }
 
-  return getInteractableElements();
+  return getElements();
 })();
 
 export default elementsScript;

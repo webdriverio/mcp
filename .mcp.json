@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "webdriverio-mcp": {
-      "command": "node",
-      "args": ["lib/server.js"]
+    "wdio-mcp-dev": {
+      "command": "tsx",
+      "args": [
+        "--watch",
+        "/Users/vince/webdriverio/mcp/src/server.ts"
+      ]
     }
   }
 }

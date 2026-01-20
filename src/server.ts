@@ -26,7 +26,7 @@ import {
   setCookieTool,
   setCookieToolArguments,
 } from './tools/cookies.tool';
-import { getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
+import { getAccessibilityTreeTool, getAccessibilityToolArguments } from './tools/get-accessibility-tree.tool';
 import { startAppTool, startAppToolArguments } from './tools/app-session.tool';
 import {
   dragAndDropTool,
@@ -100,8 +100,8 @@ server.tool('start_app_session', 'starts a mobile app session (iOS/Android) via 
 server.tool('close_session', 'closes or detaches from the current browser or app session', closeSessionToolArguments, closeSessionTool);
 server.tool('navigate', 'navigates to a URL', navigateToolArguments, navigateTool);
 
-server.tool('get_visible_elements', 'get a list of visible (in viewport & displayed) elements on the page, must prefer this to take_screenshot for interactions', getVisibleElementsToolArguments, getVisibleElementsTool);
-server.tool('get_accessibility', 'gets accessibility tree snapshot with semantic information about page elements (roles, names, states)', {}, getAccessibilityTreeTool);
+server.tool('get_visible_elements', 'get a list of visible (in viewport & displayed) interactable elements on the page (buttons, links, inputs). Use elementType="visual" for images/SVGs. Must prefer this to take_screenshot for interactions', getVisibleElementsToolArguments, getVisibleElementsTool);
+server.tool('get_accessibility', 'gets accessibility tree snapshot with semantic information about page elements (roles, names, states). Browser-only - use when get_visible_elements does not return expected elements.', getAccessibilityToolArguments, getAccessibilityTreeTool);
 
 server.tool('scroll_down', 'scrolls the page down by specified pixels', scrollDownToolArguments, scrollDownTool);
 server.tool('scroll_up', 'scrolls the page up by specified pixels', scrollUpToolArguments, scrollUpTool);
