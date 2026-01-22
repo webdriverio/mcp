@@ -2,7 +2,7 @@ import { getBrowser } from './browser.tool';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
-import type { Cookie, SameSiteOptions } from '@wdio/protocols';
+import type { Cookie } from '@wdio/protocols';
 import type { ToolDefinition } from '../types/tool';
 
 // Tool definitions
@@ -57,10 +57,10 @@ export const setCookieToolDefinition: ToolDefinition = {
     value: z.string().describe('Cookie value'),
     domain: z.string().optional().describe('Cookie domain (defaults to current domain)'),
     path: z.string().optional().describe('Cookie path (defaults to "/")'),
-    expires: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
+    expiry: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
     httpOnly: z.boolean().optional().describe('HttpOnly flag'),
     secure: z.boolean().optional().describe('Secure flag'),
-    sameSite: z.enum(['Strict', 'Lax', 'None']).optional().describe('SameSite attribute'),
+    sameSite: z.enum(['strict', 'lax', 'none']).optional().describe('SameSite attribute'),
   },
 };
 
@@ -69,34 +69,15 @@ export const setCookieTool: ToolCallback = async ({
   value,
   domain,
   path = '/',
-  expires,
+  expiry,
   httpOnly,
   secure,
   sameSite,
-}: {
-  name: string;
-  value: string;
-  domain?: string;
-  path?: string;
-  expires?: number;
-  httpOnly?: boolean;
-  secure?: boolean;
-  sameSite?: SameSiteOptions;
-}): Promise<CallToolResult> => {
+}: Cookie): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
 
-    // Build cookie object
-    const cookie: Cookie = {
-      name,
-      value,
-      path,
-      domain,
-      expiry: expires,
-      httpOnly,
-      secure,
-      sameSite,
-    };
+    const cookie: Cookie = { name, value, path, domain, expiry, httpOnly, secure, sameSite };
 
     await browser.setCookies(cookie);
 
