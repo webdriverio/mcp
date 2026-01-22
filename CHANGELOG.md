@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1](https://github.com/webdriverio/mcp/compare/v1.6.0...v1.6.1) (2026-01-22)
+
+### Performance
+
+* Add image processing for screenshots with `sharp` ([e396b0a](https://github.com/webdriverio/mcp/commit/e396b0acf05bacad894c9e44e7e3cf8af61524a8))
+
 ## [1.6.0](https://github.com/webdriverio/mcp/compare/v1.5.1...v1.6.0) (2026-01-22)
 
 ### Features
