@@ -5,7 +5,7 @@
     "type": "git",
     "url": "git://github.com/webdriverio/mcp.git"
   },
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "MCP server with WebdriverIO for browser and mobile app automation (iOS/Android via Appium)",
   "main": "./lib/server.js",
   "module": "./lib/server.js",

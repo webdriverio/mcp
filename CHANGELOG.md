@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.6.0 (2026-01-22)
+
 ## [1.5.1](https://github.com/webdriverio/mcp/compare/1.5.0...1.5.1) (2026-01-20)
 
 ### Refactoring
