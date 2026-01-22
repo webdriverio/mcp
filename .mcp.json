@@ -4,7 +4,7 @@
       "command": "tsx",
       "args": [
         "--watch",
-        "/Users/vince/webdriverio/mcp/src/server.ts"
+        "src/server.ts"
       ]
     }
   }
