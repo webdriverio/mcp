@@ -37,6 +37,7 @@
     "@wdio/protocols": "^9.16.2",
     "@xmldom/xmldom": "^0.8.11",
     "puppeteer-core": "^24.35.0",
+    "sharp": "^0.34.5",
     "webdriverio": "9.23",
     "zod": "^4.3.5"
   },
