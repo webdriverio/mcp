@@ -14,6 +14,8 @@ export const getAccessibilityToolDefinition: ToolDefinition = {
   inputSchema: {
     limit: z.number().optional()
       .describe('Maximum number of nodes to return. Default: 100. Use 0 for unlimited.'),
+    offset: z.number().optional()
+      .describe('Number of nodes to skip (for pagination). Default: 0.'),
     roles: z.array(z.string()).optional()
       .describe('Filter to specific roles (e.g., ["button", "link", "textbox"]). Default: all roles.'),
     namedOnly: z.boolean().optional()
@@ -76,6 +78,7 @@ function flattenAccessibilityTree(node: any, result: any[] = []): any[] {
 
 export const getAccessibilityTreeTool: ToolCallback = async (args: {
   limit?: number;
+  offset?: number;
   roles?: string[];
   namedOnly?: boolean;
 }): Promise<CallToolResult> => {
@@ -92,7 +95,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       };
     }
 
-    const { limit = 100, roles, namedOnly = true } = args || {};
+    const { limit = 100, offset = 0, roles, namedOnly = true } = args || {};
 
     // Get Puppeteer instance for native accessibility API
     const puppeteer = await browser.getPuppeteer();
@@ -131,16 +134,25 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       nodes = nodes.filter(n => n.role && roleSet.has(n.role.toLowerCase()));
     }
 
-    // Apply limit (0 means unlimited)
-    if (limit > 0 && nodes.length > limit) {
+    const total = nodes.length;
+
+    // Apply pagination
+    if (offset > 0) {
+      nodes = nodes.slice(offset);
+    }
+    if (limit > 0) {
       nodes = nodes.slice(0, limit);
     }
 
+    const result = {
+      total,
+      showing: nodes.length,
+      hasMore: offset + nodes.length < total,
+      nodes,
+    };
+
     return {
-      content: [{
-        type: 'text',
-        text: encode(nodes),
-      }],
+      content: [{ type: 'text', text: encode(result) }],
     };
   } catch (e) {
     return {

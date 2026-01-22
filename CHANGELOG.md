@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.5.1 (2026-01-20)
+## [1.5.1](https://github.com/webdriverio/mcp/compare/1.5.0...1.5.1) (2026-01-20)
+
+### Refactoring
+
+* Replace tool argument exports with unified tool
+  definitions ([93a0f4e](https://github.com/webdriverio/mcp/commit/93a0f4e))
 
 # [1.5.0](https://github.com/webdriverio/mcp/compare/1.4.1...1.5.0) (2026-01-20)
 
