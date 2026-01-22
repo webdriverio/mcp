@@ -178,6 +178,7 @@ const parameters = {
   autoDismissAlerts: false,          // Optional, set to true to dismiss instead of accept
   noReset: false,                    // Optional, defaults to false (preserves app state if true)
   fullReset: true,                   // Optional, defaults to true (uninstalls app if true)
+  newCommandTimeout: 300,            // Optional, session timeout in seconds (default: 60)
 }
 ```
 
@@ -236,6 +237,7 @@ const parameters = {
   appWaitActivity: 'com.example.MainActivity',  // Optional, specific activity to wait for
   noReset: false,                       // Optional, defaults to false (preserves app state if true)
   fullReset: true,                      // Optional, defaults to true (uninstalls app if true)
+  newCommandTimeout: 300,               // Optional, session timeout in seconds (default: 60)
 }
 ```
 
@@ -283,6 +285,35 @@ start_app_session({
   noReset: false,
   fullReset: false
 })
+```
+
+**Session Timeout (newCommandTimeout):**
+
+Control how long Appium keeps the session alive when no commands are received. This is essential when using `close_session({ detach: true })` to preserve sessions for manual testing or reconnection.
+
+| newCommandTimeout | Behavior |
+|-------------------|----------|
+| undefined (default) | Uses Appium's default (~60 seconds) |
+| `300` | Session stays alive for 5 minutes without commands |
+| `600` | Session stays alive for 10 minutes without commands |
+| `0` | Session never times out (use with caution) |
+
+**Example - Keep session alive for manual testing:**
+```typescript
+// Start session that stays alive for 5 minutes after detaching
+start_app_session({
+  platform: 'Android',
+  deviceName: 'emulator-5554',
+  noReset: true,
+  newCommandTimeout: 300,  // 5 minutes
+})
+
+// ... run some automation ...
+
+// Detach (session stays alive on Appium server for 5 minutes)
+close_session({ detach: true })
+
+// You now have 5 minutes to manually interact with the app or reconnect
 ```
 
 ### Session Management

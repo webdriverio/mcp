@@ -28,6 +28,7 @@ export const startAppToolDefinition: ToolDefinition = {
     udid: z.string().optional().describe('Unique Device Identifier for iOS real device testing (e.g., "00008030-001234567890002E")'),
     noReset: z.boolean().optional().describe('Do not reset app state before session (preserves app data). Default: false'),
     fullReset: z.boolean().optional().describe('Uninstall app before/after session. Default: true. Set to false with noReset=true to preserve app state completely'),
+    newCommandTimeout: z.number().min(0).optional().describe('How long (in seconds) Appium will wait for a new command before assuming the client has quit and ending the session. Default: 60. Set to 300 for 5 minutes, etc.'),
   },
 };
 
@@ -60,6 +61,7 @@ export const startAppTool: ToolCallback = async (args: {
   udid?: string;
   noReset?: boolean;
   fullReset?: boolean;
+  newCommandTimeout?: number;
 }): Promise<CallToolResult> => {
   try {
     const {
@@ -78,6 +80,7 @@ export const startAppTool: ToolCallback = async (args: {
       udid,
       noReset,
       fullReset,
+      newCommandTimeout,
     } = args;
 
     // Validate: either appPath or noReset=true is required
@@ -109,6 +112,7 @@ export const startAppTool: ToolCallback = async (args: {
         udid,
         noReset,
         fullReset,
+        newCommandTimeout,
       })
       : buildAndroidCapabilities(appPath, {
         deviceName,
@@ -120,6 +124,7 @@ export const startAppTool: ToolCallback = async (args: {
         appWaitActivity,
         noReset,
         fullReset,
+        newCommandTimeout,
       });
 
     // Create Appium session

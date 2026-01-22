@@ -18,6 +18,7 @@ export interface IOSCapabilityOptions {
   udid?: string;
   noReset?: boolean;
   fullReset?: boolean;
+  newCommandTimeout?: number;
 
   [key: string]: any;
 }
@@ -32,6 +33,7 @@ export interface AndroidCapabilityOptions {
   appWaitActivity?: string;
   noReset?: boolean;
   fullReset?: boolean;
+  newCommandTimeout?: number;
 
   [key: string]: any;
 }
@@ -79,6 +81,11 @@ export function buildIOSCapabilities(
     capabilities['appium:fullReset'] = options.fullReset;
   }
 
+  // Set session timeout (how long Appium waits for new commands)
+  if (options.newCommandTimeout !== undefined) {
+    capabilities['appium:newCommandTimeout'] = options.newCommandTimeout;
+  }
+
   capabilities['appium:autoGrantPermissions'] = options.autoGrantPermissions ?? true;
   capabilities['appium:autoAcceptAlerts'] = options.autoAcceptAlerts ?? true;
 
@@ -90,7 +97,7 @@ export function buildIOSCapabilities(
   // Add any additional custom options
   for (const [key, value] of Object.entries(options)) {
     if (
-      !['deviceName', 'platformVersion', 'automationName', 'autoAcceptAlerts', 'autoDismissAlerts', 'udid', 'noReset', 'fullReset'].includes(
+      !['deviceName', 'platformVersion', 'automationName', 'autoAcceptAlerts', 'autoDismissAlerts', 'udid', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
         key,
       )
     ) {
@@ -128,6 +135,11 @@ export function buildAndroidCapabilities(
     capabilities['appium:fullReset'] = options.fullReset;
   }
 
+  // Set session timeout (how long Appium waits for new commands)
+  if (options.newCommandTimeout !== undefined) {
+    capabilities['appium:newCommandTimeout'] = options.newCommandTimeout;
+  }
+
   // Optional Android-specific settings
   capabilities['appium:autoGrantPermissions'] = options.autoGrantPermissions ?? true;
   capabilities['appium:autoAcceptAlerts'] = options.autoAcceptAlerts ?? true;
@@ -144,7 +156,7 @@ export function buildAndroidCapabilities(
   // Add any additional custom options
   for (const [key, value] of Object.entries(options)) {
     if (
-      !['deviceName', 'platformVersion', 'automationName', 'autoGrantPermissions', 'appWaitActivity', 'noReset', 'fullReset'].includes(
+      !['deviceName', 'platformVersion', 'automationName', 'autoGrantPermissions', 'appWaitActivity', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
         key,
       )
     ) {
