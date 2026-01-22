@@ -26,6 +26,12 @@ export const getVisibleElementsToolDefinition: ToolDefinition = {
       .describe(
         'Include layout containers (ViewGroup, FrameLayout, ScrollView, etc). Default: false. Set to true to see all elements including layouts.',
       ),
+    includeBounds: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include element bounds/coordinates (x, y, width, height). Default: false. Set to true for coordinate-based interactions or layout debugging.',
+      ),
     elementType: z
       .enum(['interactable', 'visual', 'all'])
       .optional()
@@ -48,6 +54,7 @@ export const getVisibleElementsToolDefinition: ToolDefinition = {
 export const getVisibleElementsTool: ToolCallback = async (args: {
   inViewportOnly?: boolean;
   includeContainers?: boolean;
+  includeBounds?: boolean;
   elementType?: 'interactable' | 'visual' | 'all';
   limit?: number;
 }) => {
@@ -56,50 +63,31 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
     const {
       inViewportOnly = true,
       includeContainers = false,
+      includeBounds = false,
       elementType = 'interactable',
       limit = 0,
     } = args || {};
 
-    // Handle mobile apps differently from web browsers
+    let elements: { isInViewport?: boolean }[];
+
     if (browser.isAndroid || browser.isIOS) {
       const platform = browser.isAndroid ? 'android' : 'ios';
-      let elements = await getMobileVisibleElements(browser, platform, {
-        includeContainers,
-      });
-
-      // Filter by viewport if requested (default: true)
-      if (inViewportOnly) {
-        elements = elements.filter((el) => el.isInViewport);
-      }
-
-      // Apply limit (0 means unlimited)
-      if (limit > 0 && elements.length > limit) {
-        elements = elements.slice(0, limit);
-      }
-
-      return {
-        content: [{ type: 'text', text: encode(elements) }],
-      };
+      elements = await getMobileVisibleElements(browser, platform, { includeContainers, includeBounds });
+    } else {
+      const raw = await browser.execute(getInteractableElements, elementType);
+      elements = stripUndefinedFromArray(raw);
     }
 
-    // Web browser - pass elementType to browser script
-    let elements = await browser.execute(getInteractableElements, elementType);
-
-    // Filter by viewport for web if needed
     if (inViewportOnly) {
-      elements = elements.filter((el: any) => el.isInViewport !== false);
+      elements = elements.filter((el) => el.isInViewport !== false);
     }
 
-    // Apply limit (0 means unlimited)
     if (limit > 0 && elements.length > limit) {
       elements = elements.slice(0, limit);
     }
 
-    // Strip any remaining undefined values (browser script already does this, but safety net)
-    const cleanedElements = stripUndefinedFromArray(elements);
-
     return {
-      content: [{ type: 'text', text: encode(cleanedElements) }],
+      content: [{ type: 'text', text: encode(elements) }],
     };
   } catch (e) {
     return {
