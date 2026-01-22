@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.6.0 (2026-01-22)
+## [1.6.0](https://github.com/webdriverio/mcp/compare/v1.5.1...v1.6.0) (2026-01-22)
+
+### Features
+
+* Add pagination support to `get-visible-elements` and `get-accessibility-tree` ([90517e0](https://github.com/webdriverio/mcp/commit/90517e0d79ab79423ed38ab62eb96316788555bc))
+
+### Performance
+
+* Clean up mobile selectors and introduce `includeBounds` options, decrease token size ([187e84b](https://github.com/webdriverio/mcp/commit/187e84b))
 
 ## [1.5.1](https://github.com/webdriverio/mcp/compare/1.5.0...1.5.1) (2026-01-20)
 
