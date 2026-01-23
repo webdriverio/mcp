@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0](https://github.com/webdriverio/mcp/compare/v1.6.1...v2.0.0) (2026-01-23)
+
+### ⚠ BREAKING CHANGES
+
+* Removed deprecated tools (`find_element`, `getElementText`, `longPress`, `isDisplayed`, `clickViaText`, etc.) and unused utilities (`mobile-selectors`, `get_orientation`, `lock_device`, etc.).
+
+### Features
+
+* Add `execute_script` tool for running browser JavaScript and Appium mobile commands ([ade4484](https://github.com/webdriverio/mcp/commit/ade448441f67fdbaba3152f35508669503c6e42c))
+* Add `navigationUrl` support to `startBrowserTool` and default dimensions ([bae7ca7](https://github.com/webdriverio/mcp/commit/bae7ca7362cbf5e1432a009496aa02aa389a807e))
+* Add `newCommandTimeout` support to session configuration ([ce09399](https://github.com/webdriverio/mcp/commit/ce093996b47d581ebeda47f888693ee7607f1812))
+* Simplify tools and consolidate functionality ([ae66bc4](https://github.com/webdriverio/mcp/commit/ae66bc48534f8a8b497554084431508d1d2b396f))
+
+### Refactoring
+
+* Rename scripts for clarity and update imports ([adaa015](https://github.com/webdriverio/mcp/commit/adaa015c8f174fbdb4c1cb918cc171dfd86295e9))
+* Simplify `cookies.tool` handling and update object structures ([80291ec](https://github.com/webdriverio/mcp/commit/80291ecddf7327fa561afa9d840a08bd6341677f))
+
 ## [1.6.1](https://github.com/webdriverio/mcp/compare/v1.6.0...v1.6.1) (2026-01-22)
 
 ### Performance
