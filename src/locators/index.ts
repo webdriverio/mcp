@@ -3,8 +3,19 @@
  * Provides XML parsing and locator generation for mobile elements
  */
 
-export { xmlToJSON, parseAndroidBounds, parseIOSBounds, flattenElementTree } from './source-parsing';
-export type { JSONElement, ElementAttributes } from './source-parsing';
+export {
+  xmlToJSON,
+  xmlToDOM,
+  parseAndroidBounds,
+  parseIOSBounds,
+  flattenElementTree,
+  evaluateXPath,
+  checkXPathUniqueness,
+  findDOMNodeByPath,
+  isAttributeUnique,
+  countAttributeOccurrences,
+} from './source-parsing';
+export type { JSONElement, ElementAttributes, UniquenessResult } from './source-parsing';
 
 export {
   shouldIncludeElement,
@@ -24,7 +35,7 @@ export {
   getBestLocator,
   locatorsToObject,
 } from './locator-generation';
-export type { LocatorStrategy } from './locator-generation';
+export type { LocatorStrategy, LocatorContext } from './locator-generation';
 
 export { generateAllElementLocators } from './generate-all-locators';
 export type { ElementWithLocators, GenerateLocatorsOptions } from './generate-all-locators';

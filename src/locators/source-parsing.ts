@@ -6,6 +6,13 @@
  */
 
 import { DOMParser } from '@xmldom/xmldom';
+import xpath from 'xpath';
+
+export interface UniquenessResult {
+  isUnique: boolean;
+  index?: number;      // 1-based index if not unique
+  totalMatches?: number;
+}
 
 export interface ElementAttributes {
   // Android attributes
@@ -131,6 +138,161 @@ export function xmlToJSON(sourceXML: string): JSONElement | null {
 }
 
 /**
+ * Parse XML source to DOM Document for XPath evaluation
+ * @param sourceXML - The XML string from getPageSource()
+ * @returns DOM Document or null if parsing fails
+ */
+export function xmlToDOM(sourceXML: string): Document | null {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sourceXML, 'text/xml');
+
+    // Handle parsing errors
+    const parseErrors = doc.getElementsByTagName('parsererror');
+    if (parseErrors.length > 0) {
+      console.error('[xmlToDOM] XML parsing error:', parseErrors[0].textContent);
+      return null;
+    }
+
+    return doc;
+  } catch (e) {
+    console.error('[xmlToDOM] Failed to parse XML:', e);
+    return null;
+  }
+}
+
+/**
+ * Execute XPath query on DOM document
+ * @param doc - DOM Document to query
+ * @param xpathExpr - XPath expression
+ * @returns Array of matching nodes
+ */
+export function evaluateXPath(doc: Document, xpathExpr: string): Node[] {
+  try {
+    const nodes = xpath.select(xpathExpr, doc);
+    // xpath.select can return string | number | boolean | Node[]
+    if (Array.isArray(nodes)) {
+      return nodes as Node[];
+    }
+    return [];
+  } catch (e) {
+    console.error(`[evaluateXPath] Failed to evaluate "${xpathExpr}":`, e);
+    return [];
+  }
+}
+
+/**
+ * Check if an XPath selector is unique and get index if not
+ * @param doc - DOM Document to query
+ * @param xpathExpr - XPath expression to check
+ * @param targetNode - The specific node we're generating a locator for (optional)
+ * @returns UniquenessResult with isUnique flag and optional index
+ */
+export function checkXPathUniqueness(
+  doc: Document,
+  xpathExpr: string,
+  targetNode?: Node,
+): UniquenessResult {
+  try {
+    const nodes = evaluateXPath(doc, xpathExpr);
+    const totalMatches = nodes.length;
+
+    if (totalMatches === 0) {
+      return { isUnique: false }; // No matches means something is wrong
+    }
+
+    if (totalMatches === 1) {
+      return { isUnique: true };
+    }
+
+    // Not unique - find index of target node if provided
+    if (targetNode) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].isSameNode(targetNode) || isSameElement(nodes[i], targetNode)) {
+          return {
+            isUnique: false,
+            index: i + 1, // 1-based index for XPath
+            totalMatches,
+          };
+        }
+      }
+    }
+
+    return { isUnique: false, totalMatches };
+  } catch (e) {
+    console.error(`[checkXPathUniqueness] Error checking "${xpathExpr}":`, e);
+    return { isUnique: false };
+  }
+}
+
+/**
+ * Compare two nodes for equality (used when isSameNode fails)
+ */
+function isSameElement(node1: Node, node2: Node): boolean {
+  if (node1.nodeType !== 1 || node2.nodeType !== 1) return false;
+  const el1 = node1 as Element;
+  const el2 = node2 as Element;
+
+  // Compare by tag name and key attributes
+  if (el1.nodeName !== el2.nodeName) return false;
+
+  // For Android, compare by bounds (unique per element)
+  const bounds1 = el1.getAttribute('bounds');
+  const bounds2 = el2.getAttribute('bounds');
+  if (bounds1 && bounds2) {
+    return bounds1 === bounds2;
+  }
+
+  // For iOS, compare by x, y, width, height
+  const x1 = el1.getAttribute('x');
+  const y1 = el1.getAttribute('y');
+  const x2 = el2.getAttribute('x');
+  const y2 = el2.getAttribute('y');
+  if (x1 && y1 && x2 && y2) {
+    return (
+      x1 === x2 &&
+      y1 === y2 &&
+      el1.getAttribute('width') === el2.getAttribute('width') &&
+      el1.getAttribute('height') === el2.getAttribute('height')
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Find DOM node by JSONElement path (e.g., "0.2.1")
+ * @param doc - DOM Document
+ * @param path - Dot-separated index path
+ * @returns Matching DOM node or null
+ */
+export function findDOMNodeByPath(doc: Document, path: string): Node | null {
+  if (!path) return doc.documentElement;
+
+  const indices = path.split('.').map(Number);
+  let current: Node | null = doc.documentElement;
+
+  for (const index of indices) {
+    if (!current) return null;
+
+    // Get element children only
+    const children: Node[] = [];
+    if (current.childNodes) {
+      for (let i = 0; i < current.childNodes.length; i++) {
+        const child = current.childNodes.item(i);
+        if (child?.nodeType === 1) { // ELEMENT_NODE
+          children.push(child);
+        }
+      }
+    }
+
+    current = children[index] || null;
+  }
+
+  return current;
+}
+
+/**
  * Parse Android bounds string "[x1,y1][x2,y2]" to coordinates
  * @param bounds - Bounds string in format "[x1,y1][x2,y2]"
  * @returns Object with x, y, width, height
@@ -216,7 +378,9 @@ export function countAttributeOccurrences(
 }
 
 /**
- * Check if an attribute value is unique in the source
+ * Check if an attribute value is unique in the source (fast regex-based check)
+ * Note: This is a fast-path check that may have false positives.
+ * For accurate uniqueness checking, use checkXPathUniqueness with a DOM.
  */
 export function isAttributeUnique(
   sourceXML: string,

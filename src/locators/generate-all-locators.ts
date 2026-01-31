@@ -7,7 +7,7 @@
 import type { LocatorStrategy } from './locator-generation';
 import { getSuggestedLocators, locatorsToObject } from './locator-generation';
 import type { JSONElement } from './source-parsing';
-import { parseAndroidBounds, parseIOSBounds, xmlToJSON } from './source-parsing';
+import { findDOMNodeByPath, parseAndroidBounds, parseIOSBounds, xmlToDOM, xmlToJSON } from './source-parsing';
 import type { FilterOptions } from './element-filter';
 import { hasMeaningfulContent, isLayoutContainer, shouldIncludeElement } from './element-filter';
 
@@ -39,6 +39,7 @@ interface ProcessingContext {
   viewportSize: { width: number; height: number };
   filters: FilterOptions;
   results: ElementWithLocators[];
+  parsedDOM: Document | null;
 }
 
 /**
@@ -123,7 +124,16 @@ function processElement(element: JSONElement, ctx: ProcessingContext): void {
   if (!shouldProcess(element, ctx)) return;
 
   try {
-    const locators = getSuggestedLocators(element, ctx.sourceXML, ctx.isNative, ctx.automationName);
+    // Find DOM node for this element (for indexed locator generation)
+    const targetNode = ctx.parsedDOM ? findDOMNodeByPath(ctx.parsedDOM, element.path) : undefined;
+
+    const locators = getSuggestedLocators(
+      element,
+      ctx.sourceXML,
+      ctx.automationName,
+      { sourceXML: ctx.sourceXML, parsedDOM: ctx.parsedDOM, isAndroid: ctx.platform === 'android' },
+      targetNode || undefined,
+    );
     if (locators.length === 0) return;
 
     const transformed = transformElement(element, locators, ctx);
@@ -155,11 +165,16 @@ export function generateAllElementLocators(
   sourceXML: string,
   options: GenerateLocatorsOptions,
 ): ElementWithLocators[] {
+  // Parse to JSON tree
   const sourceJSON = xmlToJSON(sourceXML);
+
   if (!sourceJSON) {
     console.error('[generateAllElementLocators] Failed to parse page source XML');
     return [];
   }
+
+  // Parse DOM for XPath-based uniqueness checking
+  const parsedDOM = xmlToDOM(sourceXML);
 
   const ctx: ProcessingContext = {
     sourceXML,
@@ -169,8 +184,10 @@ export function generateAllElementLocators(
     viewportSize: options.viewportSize ?? { width: 9999, height: 9999 },
     filters: options.filters ?? {},
     results: [],
+    parsedDOM,
   };
 
   traverseTree(sourceJSON, ctx);
+
   return ctx.results;
 }
