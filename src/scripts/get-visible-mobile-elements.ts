@@ -19,7 +19,7 @@ export interface MobileElementInfo {
   resourceId: string;
   accessibilityId: string;
   isEnabled: boolean;
-  alternativeSelectors: string[];
+  altSelector: string; // Single alternative selector (flattened for tabular format)
   // Only present when includeBounds=true
   bounds?: { x: number; y: number; width: number; height: number };
 }
@@ -94,7 +94,7 @@ function toMobileElementInfo(element: ElementWithLocators, includeBounds: boolea
     resourceId: element.resourceId || '',
     accessibilityId: accessId || '',
     isEnabled: element.enabled !== false,
-    alternativeSelectors: selectedLocators.length > 1 ? selectedLocators.slice(1) : [],
+    altSelector: selectedLocators[1] || '', // Single alternative (flattened for tabular)
   };
 
   // Only include bounds if explicitly requested (adds 4 extra columns)
