@@ -118,29 +118,29 @@ export const startBrowserTool: ToolCallback = async ({
       break;
   }
 
-  const browser = await remote({
+  const wdioBrowser = await remote({
     capabilities,
   });
 
-  const { sessionId } = browser;
-  state.browsers.set(sessionId, browser);
+  const { sessionId } = wdioBrowser;
+  state.browsers.set(sessionId, wdioBrowser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, {
     type: 'browser',
-    capabilities: browser.capabilities,
+    capabilities: wdioBrowser.capabilities,
     isAttached: false,
   });
 
   let sizeNote = '';
   try {
-    await browser.setWindowSize(windowWidth, windowHeight);
+    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
   } catch (e) {
     sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
   }
 
   // Navigate to URL if provided
   if (navigationUrl) {
-    await browser.url(navigationUrl);
+    await wdioBrowser.url(navigationUrl);
   }
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
