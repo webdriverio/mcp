@@ -4,12 +4,15 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 
+const supportedBrowsers = ['chrome', 'firefox', 'edge', 'safari'] as const;
+const browserSchema = z.enum(supportedBrowsers).default('chrome');
+type SupportedBrowser = z.infer<typeof browserSchema>;
+
 export const startBrowserToolDefinition: ToolDefinition = {
   name: 'start_browser',
   description: 'starts a browser session (Chrome, Firefox, Edge, Safari) and sets it to the current state',
   inputSchema: {
-    browserName: z.string().optional().describe('Browser to launch: chrome, firefox, edge, safari (default: chrome)'),
-    browser: z.string().optional().describe('Alias for browserName'),
+    browser: browserSchema.describe('Browser to launch: chrome, firefox, edge, safari (default: chrome)'),
     headless: z.boolean().optional(),
     windowWidth: z.number().min(400).max(3840).optional().default(1920),
     windowHeight: z.number().min(400).max(2160).optional().default(1080),
@@ -46,61 +49,25 @@ export const getBrowser = () => {
 (getBrowser as any).__state = state;
 
 export const startBrowserTool: ToolCallback = async ({
-  browserName,
-  browser: browserAlias,
+  browser = 'chrome',
   headless = false,
   windowWidth = 1920,
   windowHeight = 1080,
   navigationUrl
 }: {
-  browserName?: string;
-  browser?: string;
+  browser?: SupportedBrowser;
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
   navigationUrl?: string;
 }): Promise<CallToolResult> => {
-  type SupportedBrowser = 'chrome' | 'firefox' | 'edge' | 'safari';
-  const browserAliases: Record<string, SupportedBrowser> = {
-    chrome: 'chrome',
-    chromium: 'chrome',
-    'google chrome': 'chrome',
-    firefox: 'firefox',
-    ff: 'firefox',
-    mozilla: 'firefox',
-    edge: 'edge',
-    msedge: 'edge',
-    'microsoft edge': 'edge',
-    safari: 'safari',
-  };
   const browserDisplayNames: Record<SupportedBrowser, string> = {
     chrome: 'Chrome',
     firefox: 'Firefox',
     edge: 'Edge',
     safari: 'Safari',
   };
-  const resolveBrowserName = () => {
-    const provided = browserName ?? browserAlias;
-    const rawValue = (provided ?? 'chrome').trim().toLowerCase().replace(/\s+/g, ' ');
-    const resolved = browserAliases[rawValue];
-    if (!resolved) {
-      const label = provided || rawValue;
-      return {
-        ok: false as const,
-        error: `Unsupported browser "${label}". Supported browsers: chrome, firefox, edge, safari.`,
-      };
-    }
-    return { ok: true as const, value: resolved };
-  };
-
-  const resolvedBrowser = resolveBrowserName();
-  if (!resolvedBrowser.ok) {
-    return {
-      content: [{ type: 'text', text: resolvedBrowser.error }],
-    };
-  }
-
-  const selectedBrowser = resolvedBrowser.value;
+  const selectedBrowser = browser;
   const headlessSupported = selectedBrowser !== 'safari';
   const effectiveHeadless = headless && headlessSupported;
   const chromiumArgs = [

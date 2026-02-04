@@ -203,13 +203,13 @@ You are a Testing expert, and want to assess the basic workflows of a web applic
 start_browser()
 
 // Firefox
-start_browser({browserName: 'firefox'})
+start_browser({browser: 'firefox'})
 
 // Edge
-start_browser({browserName: 'edge'})
+start_browser({browser: 'edge'})
 
 // Safari (headed only; requires macOS)
-start_browser({browserName: 'safari'})
+start_browser({browser: 'safari'})
 
 // Headless mode
 start_browser({headless: true})
