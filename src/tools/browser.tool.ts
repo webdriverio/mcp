@@ -6,8 +6,10 @@ import { z } from 'zod';
 
 export const startBrowserToolDefinition: ToolDefinition = {
   name: 'start_browser',
-  description: 'starts a browser session and sets it to the current state',
+  description: 'starts a browser session (Chrome, Firefox, Edge, Safari) and sets it to the current state',
   inputSchema: {
+    browserName: z.string().optional().describe('Browser to launch: chrome, firefox, edge, safari (default: chrome)'),
+    browser: z.string().optional().describe('Alias for browserName'),
     headless: z.boolean().optional(),
     windowWidth: z.number().min(400).max(3840).optional().default(1920),
     windowHeight: z.number().min(400).max(2160).optional().default(1080),
@@ -44,17 +46,64 @@ export const getBrowser = () => {
 (getBrowser as any).__state = state;
 
 export const startBrowserTool: ToolCallback = async ({
+  browserName,
+  browser: browserAlias,
   headless = false,
   windowWidth = 1920,
   windowHeight = 1080,
   navigationUrl
 }: {
+  browserName?: string;
+  browser?: string;
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
   navigationUrl?: string;
 }): Promise<CallToolResult> => {
-  const chromeArgs = [
+  type SupportedBrowser = 'chrome' | 'firefox' | 'edge' | 'safari';
+  const browserAliases: Record<string, SupportedBrowser> = {
+    chrome: 'chrome',
+    chromium: 'chrome',
+    'google chrome': 'chrome',
+    firefox: 'firefox',
+    ff: 'firefox',
+    mozilla: 'firefox',
+    edge: 'edge',
+    msedge: 'edge',
+    'microsoft edge': 'edge',
+    safari: 'safari',
+  };
+  const browserDisplayNames: Record<SupportedBrowser, string> = {
+    chrome: 'Chrome',
+    firefox: 'Firefox',
+    edge: 'Edge',
+    safari: 'Safari',
+  };
+  const resolveBrowserName = () => {
+    const provided = browserName ?? browserAlias;
+    const rawValue = (provided ?? 'chrome').trim().toLowerCase().replace(/\s+/g, ' ');
+    const resolved = browserAliases[rawValue];
+    if (!resolved) {
+      const label = provided || rawValue;
+      return {
+        ok: false as const,
+        error: `Unsupported browser "${label}". Supported browsers: chrome, firefox, edge, safari.`,
+      };
+    }
+    return { ok: true as const, value: resolved };
+  };
+
+  const resolvedBrowser = resolveBrowserName();
+  if (!resolvedBrowser.ok) {
+    return {
+      content: [{ type: 'text', text: resolvedBrowser.error }],
+    };
+  }
+
+  const selectedBrowser = resolvedBrowser.value;
+  const headlessSupported = selectedBrowser !== 'safari';
+  const effectiveHeadless = headless && headlessSupported;
+  const chromiumArgs = [
     `--window-size=${windowWidth},${windowHeight}`,
     '--no-sandbox',
     '--disable-search-engine-choice-screen',
@@ -67,20 +116,43 @@ export const startBrowserTool: ToolCallback = async ({
   ];
 
   // Add headless argument if enabled
-  if (headless) {
-    chromeArgs.push('--headless=new');
-    chromeArgs.push('--disable-gpu');
-    chromeArgs.push('--disable-dev-shm-usage');
+  if (effectiveHeadless) {
+    chromiumArgs.push('--headless=new');
+    chromiumArgs.push('--disable-gpu');
+    chromiumArgs.push('--disable-dev-shm-usage');
+  }
+
+  const firefoxArgs: string[] = [];
+  if (effectiveHeadless && selectedBrowser === 'firefox') {
+    firefoxArgs.push('-headless');
+  }
+
+  const capabilities: Record<string, any> = {
+    acceptInsecureCerts: true,
+  };
+
+  switch (selectedBrowser) {
+    case 'chrome':
+      capabilities.browserName = 'chrome';
+      capabilities['goog:chromeOptions'] = { args: chromiumArgs };
+      break;
+    case 'edge':
+      capabilities.browserName = 'msedge';
+      capabilities['ms:edgeOptions'] = { args: chromiumArgs };
+      break;
+    case 'firefox':
+      capabilities.browserName = 'firefox';
+      if (firefoxArgs.length > 0) {
+        capabilities['moz:firefoxOptions'] = { args: firefoxArgs };
+      }
+      break;
+    case 'safari':
+      capabilities.browserName = 'safari';
+      break;
   }
 
   const browser = await remote({
-    capabilities: {
-      browserName: 'chrome',
-      'goog:chromeOptions': {
-        args: chromeArgs,
-      },
-      acceptInsecureCerts: true,
-    },
+    capabilities,
   });
 
   const { sessionId } = browser;
@@ -92,17 +164,28 @@ export const startBrowserTool: ToolCallback = async ({
     isAttached: false,
   });
 
+  let sizeNote = '';
+  try {
+    await browser.setWindowSize(windowWidth, windowHeight);
+  } catch (e) {
+    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+  }
+
   // Navigate to URL if provided
   if (navigationUrl) {
     await browser.url(navigationUrl);
   }
 
-  const modeText = headless ? 'headless' : 'headed';
+  const modeText = effectiveHeadless ? 'headless' : 'headed';
+  const browserText = browserDisplayNames[selectedBrowser];
   const urlText = navigationUrl ? ` and navigated to ${navigationUrl}` : '';
+  const headlessNote = headless && !headlessSupported
+    ? '\nNote: Safari does not support headless mode. Started in headed mode.'
+    : '';
   return {
     content: [{
       type: 'text',
-      text: `Browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}`,
+      text: `${browserText} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}`,
     }],
   };
 };
