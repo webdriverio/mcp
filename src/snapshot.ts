@@ -2,11 +2,19 @@
  * Element snapshot utilities for browser and mobile
  *
  * Lightweight subpath export - does NOT include MCP server dependencies
- * Usage: import { getBrowserElements, getMobileVisibleElements } from '@wdio/mcp/snapshot'
+ * Usage: import { getBrowserAccessibilityTree, getBrowserInteractableElements, getMobileVisibleElements } from '@wdio/mcp/snapshot'
  */
 
-// Browser element detection (self-contained script, no external deps)
-export { default as getBrowserElementsScript } from './scripts/get-interactable-browser-elements';
+// Browser accessibility tree
+export { getBrowserAccessibilityTree, type AccessibilityNode } from './scripts/get-browser-accessibility-tree';
+
+// Browser interactable elements
+export {
+  getBrowserInteractableElements,
+  type BrowserElementInfo,
+  type GetBrowserElementsOptions,
+  type ElementType,
+} from './scripts/get-interactable-browser-elements';
 
 // Mobile element detection (requires xmldom + xpath)
 export {
@@ -14,28 +22,3 @@ export {
   type MobileElementInfo,
   type GetMobileElementsOptions,
 } from './scripts/get-visible-mobile-elements';
-
-// Locator utilities (for advanced usage)
-export {
-  // Types
-  type ElementAttributes,
-  type JSONElement,
-  type Bounds,
-  type FilterOptions,
-  type LocatorStrategy,
-  type LocatorContext,
-  type ElementWithLocators,
-  type GenerateLocatorsOptions,
-
-  // Core functions
-  generateAllElementLocators,
-  getSuggestedLocators,
-  getBestLocator,
-  getDefaultFilters,
-
-  // XML utilities
-  xmlToJSON,
-  xmlToDOM,
-  parseAndroidBounds,
-  parseIOSBounds,
-} from './locators';

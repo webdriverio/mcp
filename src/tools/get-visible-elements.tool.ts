@@ -1,5 +1,5 @@
 import { getBrowser } from './browser.tool';
-import getInteractableElements from '../scripts/get-interactable-browser-elements';
+import { getBrowserInteractableElements } from '../scripts/get-interactable-browser-elements';
 import { getMobileVisibleElements } from '../scripts/get-visible-mobile-elements';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { ToolDefinition } from '../types/tool';
@@ -78,7 +78,7 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
       elements = await getMobileVisibleElements(browser, platform, { includeContainers, includeBounds });
     } else {
       // Keep uniform fields (no stripping) to enable CSV tabular format
-      elements = await browser.execute(getInteractableElements, elementType);
+      elements = await getBrowserInteractableElements(browser, { elementType });
     }
 
     if (inViewportOnly) {
