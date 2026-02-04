@@ -10,6 +10,16 @@
   "main": "./lib/server.js",
   "module": "./lib/server.js",
   "types": "./lib/server.d.ts",
+  "exports": {
+    ".": {
+      "import": "./lib/server.js",
+      "types": "./lib/server.d.ts"
+    },
+    "./snapshot": {
+      "import": "./lib/snapshot.js",
+      "types": "./lib/snapshot.d.ts"
+    }
+  },
   "bin": {
     "wdio-mcp": "lib/server.js"
   },
