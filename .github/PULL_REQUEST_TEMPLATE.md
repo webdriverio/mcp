@@ -19,8 +19,10 @@
 
 [//]: # (_Put an `x` in the boxes that apply. You can also fill these out after creating the PR. If you're unsure about any of them, don't hesitate to ask. We're here to help! This is simply a reminder of what we are going to look for before merging your code._)
 
+- [ ] I have squashed commits that belong together
+- [ ] I have tested with Claude Desktop (or another MCP-compatible client)
 - [ ] I have read the [CONTRIBUTING](https://github.com/webdriverio/webdriverio/blob/main/CONTRIBUTING.md) doc
-- [ ] I have added the necessary documentation (if appropriate)
+- [ ] I have added the necessary documentation for new/changed tools (if appropriate)
 - [ ] I have added proper type definitions for new commands (if appropriate)
 
 ## Further comments
