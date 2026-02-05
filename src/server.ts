@@ -77,7 +77,7 @@ const server = new McpServer({
   description: pkg.description,
   websiteUrl: 'https://github.com/webdriverio/mcp',
 }, {
-  instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome browser control (headed/headless) and iOS/Android native app testing via Appium.',
+  instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome, Firefox, Edge, and Safari browser control plus iOS/Android native app testing via Appium.',
   capabilities: {
     tools: {},
   },

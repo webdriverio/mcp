@@ -4,10 +4,15 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 
+const supportedBrowsers = ['chrome', 'firefox', 'edge', 'safari'] as const;
+const browserSchema = z.enum(supportedBrowsers).default('chrome');
+type SupportedBrowser = z.infer<typeof browserSchema>;
+
 export const startBrowserToolDefinition: ToolDefinition = {
   name: 'start_browser',
-  description: 'starts a browser session and sets it to the current state',
+  description: 'starts a browser session (Chrome, Firefox, Edge, Safari) and sets it to the current state',
   inputSchema: {
+    browser: browserSchema.describe('Browser to launch: chrome, firefox, edge, safari (default: chrome)'),
     headless: z.boolean().optional(),
     windowWidth: z.number().min(400).max(3840).optional().default(1920),
     windowHeight: z.number().min(400).max(2160).optional().default(1080),
@@ -44,17 +49,28 @@ export const getBrowser = () => {
 (getBrowser as any).__state = state;
 
 export const startBrowserTool: ToolCallback = async ({
+  browser = 'chrome',
   headless = false,
   windowWidth = 1920,
   windowHeight = 1080,
   navigationUrl
 }: {
+  browser?: SupportedBrowser;
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
   navigationUrl?: string;
 }): Promise<CallToolResult> => {
-  const chromeArgs = [
+  const browserDisplayNames: Record<SupportedBrowser, string> = {
+    chrome: 'Chrome',
+    firefox: 'Firefox',
+    edge: 'Edge',
+    safari: 'Safari',
+  };
+  const selectedBrowser = browser;
+  const headlessSupported = selectedBrowser !== 'safari';
+  const effectiveHeadless = headless && headlessSupported;
+  const chromiumArgs = [
     `--window-size=${windowWidth},${windowHeight}`,
     '--no-sandbox',
     '--disable-search-engine-choice-screen',
@@ -67,42 +83,76 @@ export const startBrowserTool: ToolCallback = async ({
   ];
 
   // Add headless argument if enabled
-  if (headless) {
-    chromeArgs.push('--headless=new');
-    chromeArgs.push('--disable-gpu');
-    chromeArgs.push('--disable-dev-shm-usage');
+  if (effectiveHeadless) {
+    chromiumArgs.push('--headless=new');
+    chromiumArgs.push('--disable-gpu');
+    chromiumArgs.push('--disable-dev-shm-usage');
   }
 
-  const browser = await remote({
-    capabilities: {
-      browserName: 'chrome',
-      'goog:chromeOptions': {
-        args: chromeArgs,
-      },
-      acceptInsecureCerts: true,
-    },
+  const firefoxArgs: string[] = [];
+  if (effectiveHeadless && selectedBrowser === 'firefox') {
+    firefoxArgs.push('-headless');
+  }
+
+  const capabilities: Record<string, any> = {
+    acceptInsecureCerts: true,
+  };
+
+  switch (selectedBrowser) {
+    case 'chrome':
+      capabilities.browserName = 'chrome';
+      capabilities['goog:chromeOptions'] = { args: chromiumArgs };
+      break;
+    case 'edge':
+      capabilities.browserName = 'msedge';
+      capabilities['ms:edgeOptions'] = { args: chromiumArgs };
+      break;
+    case 'firefox':
+      capabilities.browserName = 'firefox';
+      if (firefoxArgs.length > 0) {
+        capabilities['moz:firefoxOptions'] = { args: firefoxArgs };
+      }
+      break;
+    case 'safari':
+      capabilities.browserName = 'safari';
+      break;
+  }
+
+  const wdioBrowser = await remote({
+    capabilities,
   });
 
-  const { sessionId } = browser;
-  state.browsers.set(sessionId, browser);
+  const { sessionId } = wdioBrowser;
+  state.browsers.set(sessionId, wdioBrowser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, {
     type: 'browser',
-    capabilities: browser.capabilities,
+    capabilities: wdioBrowser.capabilities,
     isAttached: false,
   });
 
-  // Navigate to URL if provided
-  if (navigationUrl) {
-    await browser.url(navigationUrl);
+  let sizeNote = '';
+  try {
+    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+  } catch (e) {
+    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
   }
 
-  const modeText = headless ? 'headless' : 'headed';
+  // Navigate to URL if provided
+  if (navigationUrl) {
+    await wdioBrowser.url(navigationUrl);
+  }
+
+  const modeText = effectiveHeadless ? 'headless' : 'headed';
+  const browserText = browserDisplayNames[selectedBrowser];
   const urlText = navigationUrl ? ` and navigated to ${navigationUrl}` : '';
+  const headlessNote = headless && !headlessSupported
+    ? '\nNote: Safari does not support headless mode. Started in headed mode.'
+    : '';
   return {
     content: [{
       type: 'text',
-      text: `Browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}`,
+      text: `${browserText} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}`,
     }],
   };
 };

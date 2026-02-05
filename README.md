@@ -1,7 +1,7 @@
 # WebDriverIO MCP Server
 
 A Model Context Protocol (MCP) server that enables Claude Desktop to interact with web browsers and mobile applications
-using WebDriverIO. Automate Chrome browsers, iOS apps, and Android apps—all through a unified interface.
+using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified interface.
 
 ## Installation
 
@@ -78,7 +78,7 @@ appium
 
 ### Browser Automation
 
-- **Session Management**: Start and close Chrome browser sessions with headless/headed modes
+- **Session Management**: Start and close browser sessions (Chrome, Firefox, Edge, Safari) with headless/headed modes
 - **Navigation & Interaction**: Navigate URLs, click elements, fill forms, and retrieve content
 - **Page Analysis**: Get visible elements, accessibility trees, take screenshots
 - **Cookie Management**: Get, set, and delete cookies
@@ -99,7 +99,7 @@ appium
 
 | Tool                | Description                                                                              |
 |---------------------|------------------------------------------------------------------------------------------|
-| `start_browser`     | Start a Chrome browser session (headless/headed, custom dimensions)                      |
+| `start_browser`     | Start a browser session (Chrome, Firefox, Edge, Safari; headless/headed, custom dimensions) |
 | `start_app_session` | Start an iOS or Android app session via Appium (supports state preservation via noReset) |
 | `close_session`     | Close or detach from the current browser or app session (supports detach mode)           |
 
@@ -201,6 +201,15 @@ You are a Testing expert, and want to assess the basic workflows of a web applic
 ```javascript
 // Default settings (headed mode, 1280x1080)
 start_browser()
+
+// Firefox
+start_browser({browser: 'firefox'})
+
+// Edge
+start_browser({browser: 'edge'})
+
+// Safari (headed only; requires macOS)
+start_browser({browser: 'safari'})
 
 // Headless mode
 start_browser({headless: true})
@@ -393,7 +402,7 @@ This eliminates the need to manually handle permission popups during automated t
 ## Technical Details
 
 - **Built with:** TypeScript, WebDriverIO, Appium
-- **Browser Support:** Chrome (headed/headless, automated driver management)
+- **Browser Support:** Chrome, Firefox, Edge (headed/headless, automated driver management), Safari (headed only; macOS)
 - **Mobile Support:** iOS (XCUITest) and Android (UiAutomator2/Espresso)
 - **Protocol:** Model Context Protocol (MCP) for Claude Desktop integration
 - **Session Model:** Single active session (browser or mobile app)
@@ -404,7 +413,7 @@ This eliminates the need to manually handle permission popups during automated t
 
 **Browser automation not working?**
 
-- Ensure Chrome is installed
+- Ensure Chrome, Firefox, Edge, or Safari is installed (Safari requires macOS)
 - Try restarting Claude Desktop completely
 - Check that no other WebDriver instances are running
 
