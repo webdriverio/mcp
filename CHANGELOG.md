@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/webdriverio/mcp/compare/v2.1.0...v2.2.0) (2026-02-05)
+
+### Features
+
+* Add `snapshot` subpath export and include lightweight element utilities ([e6afa09](https://github.com/webdriverio/mcp/commit/e6afa09868bb663e969afbb719e466620b8b6010))
+* Add browser accessibility tree support and improve element handling ([97a4a0f](https://github.com/webdriverio/mcp/commit/97a4a0fb886a91f02e901acc5d671b6a89e1ab9a))
+* Rework mobile locator generation ([7e290e1](https://github.com/webdriverio/mcp/commit/7e290e11ba9155c17eaf1ad1dcbed0c68c8c101a))
+
+### Refactoring
+
+* Modularize and clean up locator generation and XML parsing components ([e09e9aa](https://github.com/webdriverio/mcp/commit/e09e9aaeb9037784610c5df1395f0889bdae3127))
+
 ## [2.1.0](https://github.com/webdriverio/mcp/compare/v2.0.0...v2.1.0) (2026-01-27)
 
 ### Performance
