@@ -95,7 +95,7 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
       elements = elements.slice(0, limit);
     }
 
-    const result = {
+    const result: Record<string, unknown> = {
       total,
       showing: elements.length,
       hasMore: offset + elements.length < total,
