@@ -1,10 +1,35 @@
+export type ElementType = 'interactable' | 'visual' | 'all';
+
+export interface BrowserElementInfo {
+  tagName: string;
+  type: string;
+  id: string;
+  className: string;
+  textContent: string;
+  value: string;
+  placeholder: string;
+  href: string;
+  ariaLabel: string;
+  role: string;
+  src: string;
+  alt: string;
+  cssSelector: string;
+  isInViewport: boolean;
+}
+
+export interface GetBrowserElementsOptions {
+  /** Type of elements to return. Default: 'interactable' */
+  elementType?: ElementType;
+}
+
 /**
  * Browser script to get visible elements on the page
  * Supports interactable elements, visual elements, or both
  *
- * @param elementType - Type of elements to return: 'interactable', 'visual', or 'all'
+ * NOTE: This script runs in browser context via browser.execute()
+ * It must be self-contained with no external dependencies
  */
-const elementsScript = (elementType: 'interactable' | 'visual' | 'all' = 'interactable') => (function () {
+const elementsScript = (elementType: ElementType = 'interactable') => (function () {
   const interactableSelectors = [
     'a[href]',                    // Links with href
     'button',                     // Buttons
@@ -192,5 +217,22 @@ const elementsScript = (elementType: 'interactable' | 'visual' | 'all' = 'intera
 
   return getElements();
 })();
+
+/**
+ * Get browser interactable elements
+ * Wrapper function that executes the script in browser context
+ *
+ * @param browser - WebDriverIO browser instance
+ * @param options - Options for element filtering
+ * @returns Array of visible element information
+ */
+export async function getBrowserInteractableElements(
+  browser: WebdriverIO.Browser,
+  options: GetBrowserElementsOptions = {},
+): Promise<BrowserElementInfo[]> {
+  const { elementType = 'interactable' } = options;
+  // browser.execute runs in browser context, returns untyped data
+  return browser.execute(elementsScript, elementType) as unknown as Promise<BrowserElementInfo[]>;
+}
 
 export default elementsScript;
