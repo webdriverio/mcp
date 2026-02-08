@@ -55,7 +55,8 @@ function translateRecursively(
 }
 
 /**
- * Compare two nodes for equality (used when isSameNode fails)
+ * Compare two nodes for equality by platform-specific attributes
+ * (reference equality via === may fail when nodes come from different traversals)
  */
 function isSameElement(node1: Node, node2: Node): boolean {
   if (node1.nodeType !== 1 || node2.nodeType !== 1) return false;
@@ -176,7 +177,7 @@ export function checkXPathUniqueness(
     // Not unique - find index of target node if provided
     if (targetNode) {
       for (let i = 0; i < nodes.length; i++) {
-        if (nodes[i].isSameNode(targetNode) || isSameElement(nodes[i], targetNode)) {
+        if (nodes[i] === targetNode || isSameElement(nodes[i], targetNode)) {
           return {
             isUnique: false,
             index: i + 1, // 1-based index for XPath
