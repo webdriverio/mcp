@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.1](https://github.com/webdriverio/mcp/compare/v2.2.0...v2.2.1) (2026-02-08)
+
+### Bug Fixes
+
+* Improve XML node comparison logic for cross-traversal compatibility ([11e8291](https://github.com/webdriverio/mcp/commit/11e8291e97ba84a9a835d47012f4dfb3f232a586))
+
 ## [2.2.0](https://github.com/webdriverio/mcp/compare/v2.1.0...v2.2.0) (2026-02-05)
 
 ### Features
