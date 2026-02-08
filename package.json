@@ -42,7 +42,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.25",
+    "@modelcontextprotocol/sdk": "1.26",
     "xpath": "^0.0.34",
     "@toon-format/toon": "^2.1.0",
     "@wdio/protocols": "^9.16.2",
