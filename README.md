@@ -364,7 +364,11 @@ start_app_session({
     deviceName: 'emulator-5554',
     noReset: true,         // Don't reset app state
     fullReset: false,      // Don't uninstall
-    autoGrantPermissions: true
+    autoGrantPermissions: true,
+    capabilities: {
+        'appium:chromedriverExecutable': '/path/to/chromedriver',
+        'appium:autoWebview': true
+    }
 })
 // App launches with existing user data, login tokens, preferences intact
 ```
