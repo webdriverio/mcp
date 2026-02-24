@@ -15,6 +15,7 @@ import { clickTool, clickToolDefinition } from './tools/click.tool';
 import { setValueTool, setValueToolDefinition } from './tools/set-value.tool';
 import { scrollTool, scrollToolDefinition } from './tools/scroll.tool';
 import { getVisibleElementsTool, getVisibleElementsToolDefinition } from './tools/get-visible-elements.tool';
+import { getAccessibilityToolDefinition, getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
 import { takeScreenshotTool, takeScreenshotToolDefinition } from './tools/take-screenshot.tool';
 import {
   deleteCookiesTool,
@@ -24,7 +25,6 @@ import {
   setCookieTool,
   setCookieToolDefinition,
 } from './tools/cookies.tool';
-import { getAccessibilityToolDefinition, getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
 import { startAppTool, startAppToolDefinition } from './tools/app-session.tool';
 import {
   dragAndDropTool,
@@ -34,10 +34,7 @@ import {
   tapElementTool,
   tapElementToolDefinition,
 } from './tools/gestures.tool';
-import {
-  getAppStateTool,
-  getAppStateToolDefinition,
-} from './tools/app-actions.tool';
+import { getAppStateTool, getAppStateToolDefinition } from './tools/app-actions.tool';
 import {
   getContextsTool,
   getContextsToolDefinition,

@@ -6,21 +6,16 @@ import type { ToolDefinition } from '../types/tool';
 import { encode } from '@toon-format/toon';
 import { z } from 'zod';
 
-/**
- * Tool definition for get_accessibility
- */
 export const getAccessibilityToolDefinition: ToolDefinition = {
   name: 'get_accessibility',
-  description: 'gets accessibility tree snapshot with semantic information about page elements (roles, names, states). Browser-only - use when get_visible_elements does not return expected elements.',
+  description: 'Gets the accessibility tree: page structure with headings, landmarks, and semantic roles. Browser-only. Use to understand page layout and context around interactable elements.',
   inputSchema: {
     limit: z.number().optional()
       .describe('Maximum number of nodes to return. Default: 100. Use 0 for unlimited.'),
     offset: z.number().optional()
       .describe('Number of nodes to skip (for pagination). Default: 0.'),
     roles: z.array(z.string()).optional()
-      .describe('Filter to specific roles (e.g., ["button", "link", "textbox"]). Default: all roles.'),
-    namedOnly: z.boolean().optional()
-      .describe('Only return nodes with a name/label. Default: true. Filters out anonymous containers.'),
+      .describe('Filter to specific roles (e.g., ["heading", "navigation", "region"]). Default: all roles.'),
   },
 };
 
@@ -28,12 +23,10 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
   limit?: number;
   offset?: number;
   roles?: string[];
-  namedOnly?: boolean;
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
 
-    // Check if this is a mobile session - accessibility tree is browser-only
     if (browser.isAndroid || browser.isIOS) {
       return {
         content: [{
@@ -43,7 +36,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       };
     }
 
-    const { limit = 100, offset = 0, roles, namedOnly = true } = args || {};
+    const { limit = 100, offset = 0, roles } = args || {};
 
     let nodes = await getBrowserAccessibilityTree(browser);
 
@@ -53,12 +46,9 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       };
     }
 
-    // Filter to named nodes only (removes anonymous containers, StaticText duplicates)
-    if (namedOnly) {
-      nodes = nodes.filter((n) => n.name && n.name.trim() !== '');
-    }
+    // Filter out nodes with no meaningful name
+    nodes = nodes.filter((n) => n.name && n.name.trim() !== '');
 
-    // Filter to specific roles if provided
     if (roles && roles.length > 0) {
       const roleSet = new Set(roles.map((r) => r.toLowerCase()));
       nodes = nodes.filter((n) => n.role && roleSet.has(n.role.toLowerCase()));
@@ -66,7 +56,6 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
 
     const total = nodes.length;
 
-    // Apply pagination
     if (offset > 0) {
       nodes = nodes.slice(offset);
     }
@@ -74,14 +63,22 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       nodes = nodes.slice(0, limit);
     }
 
+    // Drop state columns that are empty for every node in this result set
+    const stateKeys = ['level', 'disabled', 'checked', 'expanded', 'selected', 'pressed', 'required', 'readonly'] as const;
+    const usedKeys = stateKeys.filter(k => nodes.some(n => n[k] !== ''));
+    const trimmed = nodes.map(({ role, name, selector, ...state }) => {
+      const node: Record<string, unknown> = { role, name, selector };
+      for (const k of usedKeys) node[k] = state[k];
+      return node;
+    });
+
     const result = {
       total,
-      showing: nodes.length,
-      hasMore: offset + nodes.length < total,
-      nodes,
+      showing: trimmed.length,
+      hasMore: offset + trimmed.length < total,
+      nodes: trimmed,
     };
 
-    // Post-process: replace "" with bare commas for efficiency
     const toon = encode(result)
       .replace(/,""/g, ',')
       .replace(/"",/g, ',');

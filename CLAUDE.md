@@ -6,11 +6,10 @@ Context for Claude Code when working with this repository.
 
 ```bash
 npm run bundle    # Build: clean + tsup + make executable + create .tgz
+npm test          # Run unit tests (vitest + happy-dom)
 npm run dev       # Development server (tsx, no build)
 npm start         # Run built server from lib/server.js
 ```
-
-No test or lint commands currently configured.
 
 ## Architecture
 

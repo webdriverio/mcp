@@ -1,5 +1,5 @@
 import { getBrowser } from './browser.tool';
-import { getBrowserInteractableElements } from '../scripts/get-interactable-browser-elements';
+import { getInteractableBrowserElements } from '../scripts/get-interactable-browser-elements';
 import { getMobileVisibleElements } from '../scripts/get-visible-mobile-elements';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { ToolDefinition } from '../types/tool';
@@ -11,32 +11,20 @@ import { z } from 'zod';
  */
 export const getVisibleElementsToolDefinition: ToolDefinition = {
   name: 'get_visible_elements',
-  description: 'get a list of visible (in viewport & displayed) interactable elements on the page (buttons, links, inputs). Use elementType="visual" for images/SVGs. Must prefer this to take_screenshot for interactions',
+  description: 'Get interactable elements on the page (buttons, links, inputs). Use get_accessibility for page structure and non-interactable elements.',
   inputSchema: {
     inViewportOnly: z
       .boolean()
       .optional()
-      .describe(
-        'Only return elements within the visible viewport. Default: true. Set to false to get ALL elements on the page.',
-      ),
+      .describe('Only return elements within the visible viewport. Default: true. Set to false to get ALL elements on the page.'),
     includeContainers: z
       .boolean()
       .optional()
-      .describe(
-        'Include layout containers (ViewGroup, FrameLayout, ScrollView, etc). Default: false. Set to true to see all elements including layouts.',
-      ),
+      .describe('Mobile only: include layout containers. Default: false.'),
     includeBounds: z
       .boolean()
       .optional()
-      .describe(
-        'Include element bounds/coordinates (x, y, width, height). Default: false. Set to true for coordinate-based interactions or layout debugging.',
-      ),
-    elementType: z
-      .enum(['interactable', 'visual', 'all'])
-      .optional()
-      .describe(
-        'Type of elements to return: "interactable" (default) for buttons/links/inputs, "visual" for images/SVGs, "all" for both.',
-      ),
+      .describe('Include element bounds/coordinates (x, y, width, height). Default: false.'),
     limit: z
       .number()
       .optional()
@@ -56,7 +44,6 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
   inViewportOnly?: boolean;
   includeContainers?: boolean;
   includeBounds?: boolean;
-  elementType?: 'interactable' | 'visual' | 'all';
   limit?: number;
   offset?: number;
 }) => {
@@ -66,7 +53,6 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
       inViewportOnly = true,
       includeContainers = false,
       includeBounds = false,
-      elementType = 'interactable',
       limit = 0,
       offset = 0,
     } = args || {};
@@ -77,8 +63,7 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
       const platform = browser.isAndroid ? 'android' : 'ios';
       elements = await getMobileVisibleElements(browser, platform, { includeContainers, includeBounds });
     } else {
-      // Keep uniform fields (no stripping) to enable CSV tabular format
-      elements = await getBrowserInteractableElements(browser, { elementType });
+      elements = await getInteractableBrowserElements(browser, { includeBounds });
     }
 
     if (inViewportOnly) {
