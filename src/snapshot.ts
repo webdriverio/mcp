@@ -1,20 +1,22 @@
 /**
  * Element snapshot utilities for browser and mobile
  *
- * Lightweight subpath export - does NOT include MCP server dependencies
- * Usage: import { getBrowserAccessibilityTree, getBrowserInteractableElements, getMobileVisibleElements } from '@wdio/mcp/snapshot'
+ * Lightweight subpath export — does NOT include MCP server dependencies
+ * Usage: import { getInteractableBrowserElements, getMobileVisibleElements } from '@wdio/mcp/snapshot'
  */
 
-// Browser accessibility tree
-export { getBrowserAccessibilityTree, type AccessibilityNode } from './scripts/get-browser-accessibility-tree';
-
-// Browser interactable elements
+// Browser element detection
 export {
-  getBrowserInteractableElements,
+  getInteractableBrowserElements,
   type BrowserElementInfo,
   type GetBrowserElementsOptions,
-  type ElementType,
 } from './scripts/get-interactable-browser-elements';
+
+// Browser accessibility tree
+export {
+  getBrowserAccessibilityTree,
+  type AccessibilityNode,
+} from './scripts/get-browser-accessibility-tree';
 
 // Mobile element detection (requires xmldom + xpath)
 export {
