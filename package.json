@@ -44,13 +44,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.26",
+    "@modelcontextprotocol/sdk": "1.27",
     "@toon-format/toon": "^2.1.0",
     "@wdio/protocols": "^9.16.2",
     "@xmldom/xmldom": "^0.8.11",
     "puppeteer-core": "^24.35.0",
     "sharp": "^0.34.5",
-    "webdriverio": "9.23",
+    "webdriverio": "9.24",
     "xpath": "^0.0.34",
     "zod": "^4.3.5"
   },
