@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/webdriverio/mcp/compare/v2.2.1...v2.3.0) (2026-02-24)
+
+### Features
+
+* allow custom appium capabilities in start_app_session ([5d8f91e](https://github.com/webdriverio/mcp/commit/5d8f91e26e7969853b056bbf0862d2a527139d91))
+* allow start_browser custom capabilities ([8f10b60](https://github.com/webdriverio/mcp/commit/8f10b6016ef59e6ce40286408eb996479f42bdac))
+* Enhance browser snapshot scripts with predefined selectors and removed noisy properties ([fd38790](https://github.com/webdriverio/mcp/commit/fd387908320f3d776c4122e69906d256c883b375))
+
 ## [2.2.1](https://github.com/webdriverio/mcp/compare/v2.2.0...v2.2.1) (2026-02-08)
 
 ### Bug Fixes
