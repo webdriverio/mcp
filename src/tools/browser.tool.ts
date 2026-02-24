@@ -17,6 +17,7 @@ export const startBrowserToolDefinition: ToolDefinition = {
     windowWidth: z.number().min(400).max(3840).optional().default(1920),
     windowHeight: z.number().min(400).max(2160).optional().default(1080),
     navigationUrl: z.string().optional().describe('URL to navigate to after starting the browser'),
+    capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional W3C capabilities to merge with defaults (e.g. goog:chromeOptions args/extensions/prefs)'),
   },
 };
 
@@ -53,13 +54,15 @@ export const startBrowserTool: ToolCallback = async ({
   headless = false,
   windowWidth = 1920,
   windowHeight = 1080,
-  navigationUrl
+  navigationUrl,
+  capabilities: userCapabilities = {}
 }: {
   browser?: SupportedBrowser;
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
   navigationUrl?: string;
+  capabilities?: Record<string, unknown>;
 }): Promise<CallToolResult> => {
   const browserDisplayNames: Record<SupportedBrowser, string> = {
     chrome: 'Chrome',
@@ -118,8 +121,38 @@ export const startBrowserTool: ToolCallback = async ({
       break;
   }
 
+  const mergeCapabilityOptions = (defaultOptions: unknown, customOptions: unknown) => {
+    if (!defaultOptions || typeof defaultOptions !== 'object' || !customOptions || typeof customOptions !== 'object') {
+      return customOptions ?? defaultOptions;
+    }
+
+    const defaultRecord = defaultOptions as Record<string, unknown>;
+    const customRecord = customOptions as Record<string, unknown>;
+    const merged = { ...defaultRecord, ...customRecord };
+    if (Array.isArray(defaultRecord.args) || Array.isArray(customRecord.args)) {
+      merged.args = [
+        ...(Array.isArray(defaultRecord.args) ? defaultRecord.args : []),
+        ...(Array.isArray(customRecord.args) ? customRecord.args : []),
+      ];
+    }
+    return merged;
+  };
+
+  const mergedCapabilities: Record<string, unknown> = {
+    ...capabilities,
+    ...userCapabilities,
+    'goog:chromeOptions': mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),
+    'ms:edgeOptions': mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
+    'moz:firefoxOptions': mergeCapabilityOptions(capabilities['moz:firefoxOptions'], userCapabilities['moz:firefoxOptions']),
+  };
+  for (const [key, value] of Object.entries(mergedCapabilities)) {
+    if (value === undefined) {
+      delete mergedCapabilities[key];
+    }
+  }
+
   const wdioBrowser = await remote({
-    capabilities,
+    capabilities: mergedCapabilities,
   });
 
   const { sessionId } = wdioBrowser;

@@ -219,6 +219,16 @@ start_browser({windowWidth: 1920, windowHeight: 1080})
 
 // Headless with custom dimensions
 start_browser({headless: true, windowWidth: 1920, windowHeight: 1080})
+
+// Pass custom capabilities (e.g. Chrome extensions, profile, prefs)
+start_browser({
+  headless: false,
+  capabilities: {
+    'goog:chromeOptions': {
+      args: ['--user-data-dir=/tmp/wdio-mcp-profile', '--load-extension=/path/to/unpacked-extension']
+    }
+  }
+})
 ```
 
 ### Mobile App Automation
@@ -354,7 +364,11 @@ start_app_session({
     deviceName: 'emulator-5554',
     noReset: true,         // Don't reset app state
     fullReset: false,      // Don't uninstall
-    autoGrantPermissions: true
+    autoGrantPermissions: true,
+    capabilities: {
+        'appium:chromedriverExecutable': '/path/to/chromedriver',
+        'appium:autoWebview': true
+    }
 })
 // App launches with existing user data, login tokens, preferences intact
 ```

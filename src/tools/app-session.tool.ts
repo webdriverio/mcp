@@ -29,6 +29,7 @@ export const startAppToolDefinition: ToolDefinition = {
     noReset: z.boolean().optional().describe('Do not reset app state before session (preserves app data). Default: false'),
     fullReset: z.boolean().optional().describe('Uninstall app before/after session. Default: true. Set to false with noReset=true to preserve app state completely'),
     newCommandTimeout: z.number().min(0).optional().describe('How long (in seconds) Appium will wait for a new command before assuming the client has quit and ending the session. Default: 60. Set to 300 for 5 minutes, etc.'),
+    capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional Appium/WebDriver capabilities to merge with defaults (e.g. appium:udid, appium:chromedriverExecutable, appium:autoWebview)'),
   },
 };
 
@@ -62,6 +63,7 @@ export const startAppTool: ToolCallback = async (args: {
   noReset?: boolean;
   fullReset?: boolean;
   newCommandTimeout?: number;
+  capabilities?: Record<string, unknown>;
 }): Promise<CallToolResult> => {
   try {
     const {
@@ -81,6 +83,7 @@ export const startAppTool: ToolCallback = async (args: {
       noReset,
       fullReset,
       newCommandTimeout,
+      capabilities: userCapabilities = {},
     } = args;
 
     // Validate: either appPath or noReset=true is required
@@ -127,13 +130,23 @@ export const startAppTool: ToolCallback = async (args: {
         newCommandTimeout,
       });
 
+    const mergedCapabilities = {
+      ...capabilities,
+      ...userCapabilities,
+    };
+    for (const [key, value] of Object.entries(mergedCapabilities)) {
+      if (value === undefined) {
+        delete mergedCapabilities[key];
+      }
+    }
+
     // Create Appium session
     const browser = await remote({
       protocol: 'http',
       hostname: serverConfig.hostname,
       port: serverConfig.port,
       path: serverConfig.path,
-      capabilities,
+      capabilities: mergedCapabilities,
     });
 
     const { sessionId } = browser;
@@ -146,7 +159,7 @@ export const startAppTool: ToolCallback = async (args: {
     state.currentSession = sessionId;
     state.sessionMetadata.set(sessionId, {
       type: platform.toLowerCase() as 'ios' | 'android',
-      capabilities,
+      capabilities: mergedCapabilities,
       isAttached: shouldAutoDetach,
     });
 
@@ -168,4 +181,3 @@ export const startAppTool: ToolCallback = async (args: {
     };
   }
 };
-
