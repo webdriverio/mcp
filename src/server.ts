@@ -55,6 +55,7 @@ import {
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
 import { attachBrowserTool, attachBrowserToolDefinition } from './tools/attach-browser.tool';
+import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import pkg from '../package.json' with { type: 'json' };
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
@@ -93,6 +94,7 @@ registerTool(startBrowserToolDefinition, startBrowserTool);
 registerTool(startAppToolDefinition, startAppTool);
 registerTool(closeSessionToolDefinition, closeSessionTool);
 registerTool(attachBrowserToolDefinition, attachBrowserTool);
+registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
 registerTool(navigateToolDefinition, navigateTool);
 
 // Element Discovery
