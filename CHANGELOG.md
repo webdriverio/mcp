@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1](https://github.com/webdriverio/mcp/compare/v2.3.0...v2.3.1) (2026-03-12)
+
+### Features
+
+* Default browser tool to headless mode and improve script usage guidance ([4ba256b](https://github.com/webdriverio/mcp/commit/4ba256ba7c4a607fa1f3202ccae7f470d82107d1))
+
 ## [2.3.0](https://github.com/webdriverio/mcp/compare/v2.2.1...v2.3.0) (2026-02-24)
 
 ### Features
