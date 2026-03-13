@@ -51,7 +51,7 @@ describe('attach_browser', () => {
     expect(mockRemote).toHaveBeenCalledWith({
       capabilities: expect.objectContaining({
         browserName: 'chrome',
-        'goog:chromeOptions': { debuggerAddress: 'localhost:9222' },
+        'goog:chromeOptions': { debuggerAddress: 'localhost:9222', args: ['--user-data-dir=/tmp/chrome-debug'] },
       }),
     });
   });
@@ -60,7 +60,16 @@ describe('attach_browser', () => {
     await callTool({ host: '192.168.1.1', port: 9333 });
     expect(mockRemote).toHaveBeenCalledWith({
       capabilities: expect.objectContaining({
-        'goog:chromeOptions': { debuggerAddress: '192.168.1.1:9333' },
+        'goog:chromeOptions': expect.objectContaining({ debuggerAddress: '192.168.1.1:9333' }),
+      }),
+    });
+  });
+
+  it('uses provided userDataDir', async () => {
+    await callTool({ userDataDir: '/custom/profile' });
+    expect(mockRemote).toHaveBeenCalledWith({
+      capabilities: expect.objectContaining({
+        'goog:chromeOptions': expect.objectContaining({ args: ['--user-data-dir=/custom/profile'] }),
       }),
     });
   });

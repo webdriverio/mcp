@@ -238,9 +238,18 @@ start_browser({
 **Attach to a running Chrome instance:**
 
 ```
-// First, launch Chrome with:
-//   macOS: open -a "Google Chrome" --args --remote-debugging-port=9222
-//   Linux: google-chrome --remote-debugging-port=9222
+// First, launch Chrome with remote debugging enabled:
+//
+//   macOS (must quit Chrome first — open -a ignores args if Chrome is already running):
+//     pkill -x "Google Chrome" && sleep 1
+//     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+//       --remote-debugging-port=9222 \
+//       --user-data-dir=/tmp/chrome-debug &
+//
+//   Linux:
+//     google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug &
+//
+//   Verify it's ready: curl http://localhost:9222/json/version
 attach_browser()
 attach_browser({port: 9333})
 attach_browser({port: 9222, navigationUrl: 'https://app.example.com'})
