@@ -83,6 +83,8 @@ appium
 - **Page Analysis**: Get visible elements, accessibility trees, take screenshots
 - **Cookie Management**: Get, set, and delete cookies
 - **Scrolling**: Smooth scrolling with configurable distances
+- **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing authenticated or pre-configured sessions
+- **Device emulation**: Apply mobile/tablet presets (iPhone 15, Pixel 7, etc.) to simulate responsive layouts without a physical device
 
 ### Mobile App Automation (iOS/Android)
 
@@ -102,6 +104,8 @@ appium
 | `start_browser`     | Start a browser session (Chrome, Firefox, Edge, Safari; headless/headed, custom dimensions) |
 | `start_app_session` | Start an iOS or Android app session via Appium (supports state preservation via noReset) |
 | `close_session`     | Close or detach from the current browser or app session (supports detach mode)           |
+| `attach_browser`    | Attach to a running Chrome instance via `--remote-debugging-port` (CDP) |
+| `emulate_device`    | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session |
 
 ### Navigation & Page Interaction (Web & Mobile)
 
@@ -229,6 +233,37 @@ start_browser({
     }
   }
 })
+```
+
+**Attach to a running Chrome instance:**
+
+```
+// First, launch Chrome with remote debugging enabled:
+//
+//   macOS (must quit Chrome first — open -a ignores args if Chrome is already running):
+//     pkill -x "Google Chrome" && sleep 1
+//     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+//       --remote-debugging-port=9222 \
+//       --user-data-dir=/tmp/chrome-debug &
+//
+//   Linux:
+//     google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug &
+//
+//   Verify it's ready: curl http://localhost:9222/json/version
+attach_browser()
+attach_browser({port: 9333})
+attach_browser({port: 9222, navigationUrl: 'https://app.example.com'})
+```
+
+**Device emulation (requires BiDi session):**
+
+```
+// Device emulation (requires BiDi session)
+start_browser({capabilities: {webSocketUrl: true}})
+emulate_device()                         // list available presets
+emulate_device({device: 'iPhone 15'})    // activate emulation
+emulate_device({device: 'Pixel 7'})      // switch device
+emulate_device({device: 'reset'})        // restore desktop defaults
 ```
 
 ### Mobile App Automation
