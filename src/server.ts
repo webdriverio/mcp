@@ -57,6 +57,9 @@ import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-
 import { attachBrowserTool, attachBrowserToolDefinition } from './tools/attach-browser.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import pkg from '../package.json' with { type: 'json' };
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withRecording } from './recording/step-recorder';
+import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from './recording/resources';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
 const _originalConsoleLog = console.log;
@@ -79,6 +82,7 @@ const server = new McpServer({
   instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome, Firefox, Edge, and Safari browser control plus iOS/Android native app testing via Appium.',
   capabilities: {
     tools: {},
+    resources: {},
   },
 });
 
@@ -95,18 +99,18 @@ registerTool(startAppToolDefinition, startAppTool);
 registerTool(closeSessionToolDefinition, closeSessionTool);
 registerTool(attachBrowserToolDefinition, attachBrowserTool);
 registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
-registerTool(navigateToolDefinition, navigateTool);
+registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 
 // Element Discovery
 registerTool(getVisibleElementsToolDefinition, getVisibleElementsTool);
 registerTool(getAccessibilityToolDefinition, getAccessibilityTreeTool);
 
 // Scrolling
-registerTool(scrollToolDefinition, scrollTool);
+registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
 
 // Element Interaction
-registerTool(clickToolDefinition, clickTool);
-registerTool(setValueToolDefinition, setValueTool);
+registerTool(clickToolDefinition, withRecording('click_element', clickTool));
+registerTool(setValueToolDefinition, withRecording('set_value', setValueTool));
 
 // Screenshots
 registerTool(takeScreenshotToolDefinition, takeScreenshotTool);
@@ -117,9 +121,9 @@ registerTool(setCookieToolDefinition, setCookieTool);
 registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
 // Mobile Gesture Tools
-registerTool(tapElementToolDefinition, tapElementTool);
-registerTool(swipeToolDefinition, swipeTool);
-registerTool(dragAndDropToolDefinition, dragAndDropTool);
+registerTool(tapElementToolDefinition, withRecording('tap_element', tapElementTool));
+registerTool(swipeToolDefinition, withRecording('swipe', swipeTool));
+registerTool(dragAndDropToolDefinition, withRecording('drag_and_drop', dragAndDropTool));
 
 // App Lifecycle Management
 registerTool(getAppStateToolDefinition, getAppStateTool);
@@ -137,6 +141,38 @@ registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 // Script Execution (Browser JS / Appium Mobile Commands)
 registerTool(executeScriptToolDefinition, executeScriptTool);
+
+// Session Recording Resources
+server.registerResource(
+  'sessions',
+  'wdio://sessions',
+  { description: 'Index of all browser and app sessions with step counts' },
+  async () => ({
+    contents: [{ uri: 'wdio://sessions', mimeType: 'text/plain', text: buildSessionsIndex() }],
+  }),
+);
+
+server.registerResource(
+  'session-current-steps',
+  'wdio://session/current/steps',
+  { description: 'Steps for the currently active session with generated WebdriverIO JS' },
+  async () => ({
+    contents: [{ uri: 'wdio://session/current/steps', mimeType: 'text/plain', text: buildCurrentSessionSteps() }],
+  }),
+);
+
+server.registerResource(
+  'session-steps',
+  new ResourceTemplate('wdio://session/{sessionId}/steps', { list: undefined }),
+  { description: 'Steps for a specific session by ID with generated WebdriverIO JS' },
+  async (uri, { sessionId }) => ({
+    contents: [{
+      uri: uri.href,
+      mimeType: 'text/plain',
+      text: buildSessionStepsById(sessionId as string),
+    }],
+  }),
+);
 
 async function main() {
   const transport = new StdioServerTransport();

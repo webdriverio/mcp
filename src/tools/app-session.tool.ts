@@ -2,6 +2,7 @@ import { remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
+import type { SessionHistory } from '../types/recording';
 import { z } from 'zod';
 import { buildAndroidCapabilities, buildIOSCapabilities, getAppiumServerConfig, } from '../config/appium.config';
 import { getBrowser } from './browser.tool';
@@ -43,6 +44,7 @@ export const getState = () => {
     browsers: Map<string, WebdriverIO.Browser>;
     currentSession: string | null;
     sessionMetadata: Map<string, { type: 'browser' | 'ios' | 'android'; capabilities: any; isAttached: boolean }>;
+    sessionHistory: Map<string, SessionHistory>;
   };
 };
 
@@ -156,12 +158,37 @@ export const startAppTool: ToolCallback = async (args: {
     const shouldAutoDetach = noReset === true || !appPath;
     const state = getState();
     state.browsers.set(sessionId, browser);
-    state.currentSession = sessionId;
     state.sessionMetadata.set(sessionId, {
       type: platform.toLowerCase() as 'ios' | 'android',
       capabilities: mergedCapabilities,
       isAttached: shouldAutoDetach,
     });
+
+    // If replacing an active session, close its history with transition sentinel
+    if (state.currentSession && state.currentSession !== sessionId) {
+      const outgoing = state.sessionHistory.get(state.currentSession);
+      if (outgoing) {
+        outgoing.steps.push({
+          index: outgoing.steps.length + 1,
+          tool: '__session_transition__',
+          params: { newSessionId: sessionId },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: new Date().toISOString(),
+        });
+        outgoing.endedAt = new Date().toISOString();
+      }
+    }
+
+    state.sessionHistory.set(sessionId, {
+      sessionId,
+      type: platform.toLowerCase() as 'ios' | 'android',
+      startedAt: new Date().toISOString(),
+      capabilities: mergedCapabilities as Record<string, unknown>,
+      steps: [],
+    });
+
+    state.currentSession = sessionId;
 
     const appInfo = appPath ? `\nApp: ${appPath}` : '\nApp: (connected to running app)';
     const detachNote = shouldAutoDetach

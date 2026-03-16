@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SessionHistory } from '../../src/types/recording';
 
 // No mock of browser.tool — closeSessionTool reads from the module-level state directly.
 // We inject test sessions via getBrowser().__state, which IS the module-level state object.
@@ -14,6 +15,13 @@ function setupSession(sessionId: string, isAttached: boolean) {
   state.browsers.set(sessionId, { deleteSession: mockDeleteSession });
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached });
+  state.sessionHistory.set(sessionId, {
+    sessionId,
+    type: 'browser',
+    startedAt: '2026-01-01T00:00:00.000Z',
+    capabilities: {},
+    steps: [],
+  } as SessionHistory);
 }
 
 beforeEach(() => {
@@ -21,6 +29,7 @@ beforeEach(() => {
   const state = (getBrowser as any).__state;
   state.browsers.clear();
   state.sessionMetadata.clear();
+  state.sessionHistory.clear();
   state.currentSession = null;
 });
 
@@ -49,5 +58,25 @@ describe('close_session', () => {
     const state = (getBrowser as any).__state;
     expect(state.currentSession).toBeNull();
     expect(state.browsers.has('sess-2')).toBe(false);
+  });
+});
+
+describe('close_session sessionHistory', () => {
+  it('sets endedAt on the session history when session closes', async () => {
+    setupSession('sess-history', false);
+    await callClose({});
+    const state = (getBrowser as any).__state;
+    const history = state.sessionHistory.get('sess-history');
+    expect(history).toBeDefined();
+    expect(history.endedAt).toBeDefined();
+    expect(typeof history.endedAt).toBe('string');
+  });
+
+  it('retains sessionHistory after session is closed (browsers entry removed)', async () => {
+    setupSession('sess-retain', false);
+    await callClose({});
+    const state = (getBrowser as any).__state;
+    expect(state.browsers.has('sess-retain')).toBe(false);
+    expect(state.sessionHistory.has('sess-retain')).toBe(true);
   });
 });

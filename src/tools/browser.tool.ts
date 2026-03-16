@@ -2,6 +2,7 @@ import { remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
+import type { SessionHistory } from '../types/recording';
 import { z } from 'zod';
 
 const supportedBrowsers = ['chrome', 'firefox', 'edge', 'safari'] as const;
@@ -33,10 +34,12 @@ const state: {
   browsers: Map<string, WebdriverIO.Browser>;
   currentSession: string | null;
   sessionMetadata: Map<string, { type: 'browser' | 'ios' | 'android'; capabilities: any; isAttached: boolean }>;
+  sessionHistory: Map<string, SessionHistory>;
 } = {
   browsers: new Map<string, WebdriverIO.Browser>(),
   currentSession: null,
   sessionMetadata: new Map(),
+  sessionHistory: new Map(),
 };
 
 export const getBrowser = () => {
@@ -157,12 +160,37 @@ export const startBrowserTool: ToolCallback = async ({
 
   const { sessionId } = wdioBrowser;
   state.browsers.set(sessionId, wdioBrowser);
-  state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, {
     type: 'browser',
     capabilities: wdioBrowser.capabilities,
     isAttached: false,
   });
+
+  // If replacing an active session, close its history and append transition sentinel
+  if (state.currentSession && state.currentSession !== sessionId) {
+    const outgoing = state.sessionHistory.get(state.currentSession);
+    if (outgoing) {
+      outgoing.steps.push({
+        index: outgoing.steps.length + 1,
+        tool: '__session_transition__',
+        params: { newSessionId: sessionId },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      });
+      outgoing.endedAt = new Date().toISOString();
+    }
+  }
+
+  state.sessionHistory.set(sessionId, {
+    sessionId,
+    type: 'browser',
+    startedAt: new Date().toISOString(),
+    capabilities: wdioBrowser.capabilities as Record<string, unknown>,
+    steps: [],
+  });
+
+  state.currentSession = sessionId;
 
   let sizeNote = '';
   try {
@@ -195,6 +223,12 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const browser = getBrowser();
     const sessionId = state.currentSession;
     const metadata = state.sessionMetadata.get(sessionId);
+
+    // Retain history but mark session as ended
+    const history = state.sessionHistory.get(sessionId);
+    if (history) {
+      history.endedAt = new Date().toISOString();
+    }
 
     // Skip deleteSession for attached sessions (not created by us) or when user explicitly detaches
     const effectiveDetach = args.detach || !!metadata?.isAttached;
