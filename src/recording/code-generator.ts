@@ -78,25 +78,25 @@ function generateStep(step: RecordedStep): string {
     case 'navigate':
       return `await browser.url('${escapeStr(p.url)}');`;
     case 'click_element':
-      return `await $('${escapeStr(p.selector)}').click();`;
+      return `await browser.$('${escapeStr(p.selector)}').click();`;
     case 'set_value':
-      return `await $('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
+      return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
     case 'scroll': {
       const scrollAmount = (p.direction as string) === 'down' ? (p.pixels as number) : -(p.pixels as number);
       return `await browser.execute(() => window.scrollBy(0, ${scrollAmount}));`;
     }
     case 'tap_element':
       if (p.selector !== undefined) {
-        return `await $('${escapeStr(p.selector)}').click();`;
+        return `await browser.$('${escapeStr(p.selector)}').click();`;
       }
       return `await browser.tap({ x: ${p.x}, y: ${p.y} });`;
     case 'swipe':
       return `await browser.execute('mobile: swipe', { direction: '${escapeStr(p.direction)}' });`;
     case 'drag_and_drop':
       if (p.targetSelector !== undefined) {
-        return `await $('${escapeStr(p.sourceSelector)}').dragAndDrop($('${escapeStr(p.targetSelector)}'));`;
+        return `await browser.$('${escapeStr(p.sourceSelector)}').dragAndDrop(browser.$('${escapeStr(p.targetSelector)}'));`;
       }
-      return `await $('${escapeStr(p.sourceSelector)}').dragAndDrop({ x: ${p.x}, y: ${p.y} });`;
+      return `await browser.$('${escapeStr(p.sourceSelector)}').dragAndDrop({ x: ${p.x}, y: ${p.y} });`;
     default:
       return `// [unknown tool] ${step.tool}`;
   }

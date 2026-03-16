@@ -95,12 +95,12 @@ describe('generateCode - tool mappings', () => {
 
   it('click_element → $().click()', () => {
     const code = generateCode(makeHistory([{ tool: 'click_element', params: { selector: '#btn' } }]));
-    expect(code).toContain("await $('#btn').click();");
+    expect(code).toContain("await browser.$('#btn').click();");
   });
 
   it('set_value → $().setValue()', () => {
     const code = generateCode(makeHistory([{ tool: 'set_value', params: { selector: '#input', value: 'hello' } }]));
-    expect(code).toContain("await $('#input').setValue('hello');");
+    expect(code).toContain("await browser.$('#input').setValue('hello');");
   });
 
   it('scroll down → positive scrollBy', () => {
@@ -115,7 +115,7 @@ describe('generateCode - tool mappings', () => {
 
   it('tap_element (selector form) → $().click()', () => {
     const code = generateCode(makeHistory([{ tool: 'tap_element', params: { selector: '~btn' } }]));
-    expect(code).toContain("await $('~btn').click();");
+    expect(code).toContain("await browser.$('~btn').click();");
   });
 
   it('tap_element (coordinate form) → browser.tap()', () => {
@@ -133,7 +133,7 @@ describe('generateCode - tool mappings', () => {
       tool: 'drag_and_drop',
       params: { sourceSelector: '#from', targetSelector: '#to' },
     }]));
-    expect(code).toContain("await $('#from').dragAndDrop($('#to'));");
+    expect(code).toContain("await browser.$('#from').dragAndDrop(browser.$('#to'));");
   });
 
   it('drag_and_drop (coordinate form) → $().dragAndDrop({ x, y })', () => {
@@ -141,7 +141,7 @@ describe('generateCode - tool mappings', () => {
       tool: 'drag_and_drop',
       params: { sourceSelector: '#from', x: 50, y: 75 },
     }]));
-    expect(code).toContain("await $('#from').dragAndDrop({ x: 50, y: 75 });");
+    expect(code).toContain("await browser.$('#from').dragAndDrop({ x: 50, y: 75 });");
   });
 });
 
