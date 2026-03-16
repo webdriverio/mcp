@@ -3,21 +3,31 @@ import { describe, expect, it } from 'vitest';
 import { generateCode } from '../../src/recording/code-generator';
 import type { SessionHistory, RecordedStep } from '../../src/types/recording';
 
+const START_BROWSER_STEP: RecordedStep = {
+  index: 1,
+  tool: 'start_browser',
+  params: { browser: 'chrome', headless: true, windowWidth: 1920, windowHeight: 1080 },
+  status: 'ok',
+  durationMs: 0,
+  timestamp: '2026-01-01T00:00:00.000Z',
+};
+
 function makeHistory(steps: Partial<RecordedStep>[]): SessionHistory {
+  const extraSteps = steps.map((s, i) => ({
+    index: i + 2,
+    tool: 'navigate',
+    params: {},
+    status: 'ok' as const,
+    durationMs: 10,
+    timestamp: '2026-01-01T00:00:00.000Z',
+    ...s,
+  }));
   return {
     sessionId: 'test-123',
     type: 'browser',
     startedAt: '2026-01-01T00:00:00.000Z',
-    capabilities: { browserName: 'chrome' },
-    steps: steps.map((s, i) => ({
-      index: i + 1,
-      tool: 'navigate',
-      params: {},
-      status: 'ok',
-      durationMs: 10,
-      timestamp: '2026-01-01T00:00:00.000Z',
-      ...s,
-    })),
+    capabilities: {},
+    steps: [START_BROWSER_STEP, ...extraSteps],
   };
 }
 
@@ -27,6 +37,53 @@ describe('generateCode - header', () => {
     expect(code).toContain("import { remote } from 'webdriverio';");
     expect(code).toContain('await browser.deleteSession();');
     expect(code).toContain('browserName');
+  });
+
+  it('generates start_browser as const browser = await remote()', () => {
+    const code = generateCode(makeHistory([]));
+    expect(code).toContain('const browser = await remote(');
+    expect(code).toContain('"browserName": "chrome"');
+  });
+
+  it('appends browser.url() when navigationUrl is set on start_browser', () => {
+    const history: SessionHistory = {
+      sessionId: 'nav-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {},
+      steps: [{
+        index: 1,
+        tool: 'start_browser',
+        params: { browser: 'chrome', headless: false, windowWidth: 1920, windowHeight: 1080, navigationUrl: 'https://github.com/login' },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
+    expect(code).toContain("await browser.url('https://github.com/login');");
+  });
+
+  it('generates start_app_session with appium caps and server config', () => {
+    const history: SessionHistory = {
+      sessionId: 'app-123',
+      type: 'ios',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {},
+      steps: [{
+        index: 1,
+        tool: 'start_app_session',
+        params: { platform: 'iOS', deviceName: 'iPhone 14', platformVersion: '17.0', appPath: '/app/MyApp.app' },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
+    expect(code).toContain('const browser = await remote(');
+    expect(code).toContain('"platformName": "iOS"');
+    expect(code).toContain('"appium:deviceName": "iPhone 14"');
+    expect(code).toContain('"appium:app": "/app/MyApp.app"');
   });
 });
 

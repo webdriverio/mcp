@@ -185,7 +185,31 @@ export const startAppTool: ToolCallback = async (args: {
       type: platform.toLowerCase() as 'ios' | 'android',
       startedAt: new Date().toISOString(),
       capabilities: mergedCapabilities as Record<string, unknown>,
-      steps: [],
+      steps: [{
+        index: 1,
+        tool: 'start_app_session',
+        params: {
+          platform, deviceName,
+          ...(platformVersion !== undefined && { platformVersion }),
+          ...(automationName !== undefined && { automationName }),
+          ...(appPath !== undefined && { appPath }),
+          ...(udid !== undefined && { udid }),
+          ...(noReset !== undefined && { noReset }),
+          ...(fullReset !== undefined && { fullReset }),
+          ...(autoGrantPermissions !== undefined && { autoGrantPermissions }),
+          ...(autoAcceptAlerts !== undefined && { autoAcceptAlerts }),
+          ...(autoDismissAlerts !== undefined && { autoDismissAlerts }),
+          ...(appWaitActivity !== undefined && { appWaitActivity }),
+          ...(newCommandTimeout !== undefined && { newCommandTimeout }),
+          ...(appiumHost !== undefined && { appiumHost }),
+          ...(appiumPort !== undefined && { appiumPort }),
+          ...(appiumPath !== undefined && { appiumPath }),
+          ...(Object.keys(userCapabilities).length > 0 && { capabilities: userCapabilities }),
+        },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+      }],
     });
 
     state.currentSession = sessionId;

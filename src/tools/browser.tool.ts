@@ -11,7 +11,7 @@ type SupportedBrowser = z.infer<typeof browserSchema>;
 
 export const startBrowserToolDefinition: ToolDefinition = {
   name: 'start_browser',
-  description: 'starts a browser session (Chrome, Firefox, Edge, Safari) and sets it to the current state',
+  description: 'starts a browser session (Chrome, Firefox, Edge, Safari) and sets it to the current state. Prefer headless: true unless the user explicitly asks to see the browser.',
   inputSchema: {
     browser: browserSchema.describe('Browser to launch: chrome, firefox, edge, safari (default: chrome)'),
     headless: z.boolean().optional().default(true),
@@ -187,7 +187,14 @@ export const startBrowserTool: ToolCallback = async ({
     type: 'browser',
     startedAt: new Date().toISOString(),
     capabilities: wdioBrowser.capabilities as Record<string, unknown>,
-    steps: [],
+    steps: [{
+      index: 1,
+      tool: 'start_browser',
+      params: { browser, headless, windowWidth, windowHeight, ...(navigationUrl && { navigationUrl }), ...(Object.keys(userCapabilities).length > 0 && { capabilities: userCapabilities }) },
+      status: 'ok',
+      durationMs: 0,
+      timestamp: new Date().toISOString(),
+    }],
   });
 
   state.currentSession = sessionId;
