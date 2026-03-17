@@ -5,6 +5,9 @@ import { getBrowser } from '../../src/tools/browser.tool';
 import type { SessionHistory } from '../../src/types/recording';
 import { appendStep, withRecording, getSessionHistory } from '../../src/recording/step-recorder';
 
+const extra = {} as Parameters<ToolCallback>[1];
+type AnyToolFn = (params: Record<string, unknown>, extra: unknown) => Promise<unknown>;
+
 function setupSession(sessionId: string) {
   const state = (getBrowser as any).__state;
   state.browsers.set(sessionId, {});
@@ -74,8 +77,8 @@ describe('withRecording', () => {
     const mockTool = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'Navigated to https://example.com' }],
     }) as unknown as ToolCallback;
-    const wrapped = withRecording('navigate', mockTool);
-    await wrapped({ url: 'https://example.com' });
+    const wrapped = withRecording('navigate', mockTool) as unknown as AnyToolFn;
+    await wrapped({ url: 'https://example.com' }, extra);
     const steps = getSessionHistory().get('sess-4')?.steps ?? [];
     expect(steps).toHaveLength(1);
     expect(steps[0].status).toBe('ok');
@@ -88,8 +91,8 @@ describe('withRecording', () => {
       isError: true,
       content: [{ type: 'text', text: 'Failed to find element' }],
     }) as unknown as ToolCallback;
-    const wrapped = withRecording('click_element', mockTool);
-    await wrapped({ selector: '#missing' });
+    const wrapped = withRecording('click_element', mockTool) as unknown as AnyToolFn;
+    await wrapped({ selector: '#missing' }, extra);
     const steps = getSessionHistory().get('sess-5')?.steps ?? [];
     expect(steps[0].status).toBe('error');
     expect(steps[0].error).toBe('Failed to find element');
@@ -100,8 +103,8 @@ describe('withRecording', () => {
     const mockTool = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'Error: something went wrong' }],
     }) as unknown as ToolCallback;
-    const wrapped = withRecording('click_element', mockTool);
-    await wrapped({ selector: '#btn' });
+    const wrapped = withRecording('click_element', mockTool) as unknown as AnyToolFn;
+    await wrapped({ selector: '#btn' }, extra);
     const steps = getSessionHistory().get('sess-5b')?.steps ?? [];
     expect(steps[0].status).toBe('ok');
   });
@@ -110,8 +113,8 @@ describe('withRecording', () => {
     setupSession('sess-6');
     const expected = { content: [{ type: 'text', text: 'Done' }] };
     const mockTool = vi.fn().mockResolvedValue(expected) as unknown as ToolCallback;
-    const wrapped = withRecording('navigate', mockTool);
-    const result = await wrapped({});
+    const wrapped = withRecording('navigate', mockTool) as unknown as AnyToolFn;
+    const result = await wrapped({}, extra);
     expect(result).toEqual(expected);
   });
 
@@ -120,8 +123,8 @@ describe('withRecording', () => {
     const mockTool = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'Done' }],
     }) as unknown as ToolCallback;
-    const wrapped = withRecording('navigate', mockTool);
-    await wrapped({});
+    const wrapped = withRecording('navigate', mockTool) as unknown as AnyToolFn;
+    await wrapped({}, extra);
     const step = getSessionHistory().get('sess-7')?.steps[0];
     expect(typeof step?.durationMs).toBe('number');
     expect(step?.durationMs).toBeGreaterThanOrEqual(0);

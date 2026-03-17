@@ -94,10 +94,10 @@ const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
   }, callback);
 
 // Browser and App Session Management
-registerTool(startBrowserToolDefinition, startBrowserTool);
-registerTool(startAppToolDefinition, startAppTool);
+registerTool(startBrowserToolDefinition, withRecording('start_browser', startBrowserTool));
+registerTool(startAppToolDefinition, withRecording('start_app_session', startAppTool));
 registerTool(closeSessionToolDefinition, closeSessionTool);
-registerTool(attachBrowserToolDefinition, attachBrowserTool);
+registerTool(attachBrowserToolDefinition, withRecording('attach_browser', attachBrowserTool));
 registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
 registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 

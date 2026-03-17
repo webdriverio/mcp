@@ -19,7 +19,7 @@ function indentJson(value: unknown): string {
     .join('\n');
 }
 
-function generateStep(step: RecordedStep): string {
+function generateStep(step: RecordedStep, history: SessionHistory): string {
   if (step.tool === '__session_transition__') {
     const newId = (step.params.newSessionId as string) ?? 'unknown';
     return `// --- new session: ${newId} started at ${step.timestamp} ---`;
@@ -32,48 +32,22 @@ function generateStep(step: RecordedStep): string {
   const p = step.params;
   switch (step.tool) {
     case 'start_browser': {
-      const browserName = p.browser === 'edge' ? 'msedge' : String(p.browser ?? 'chrome');
-      const headless = p.headless !== false;
-      const width = (p.windowWidth as number | undefined) ?? 1920;
-      const height = (p.windowHeight as number | undefined) ?? 1080;
-      const args: string[] = [`--window-size=${width},${height}`];
-      if (headless && browserName !== 'safari') {
-        args.push('--headless=new', '--disable-gpu', '--disable-dev-shm-usage');
-      }
-      const caps: Record<string, unknown> = { browserName };
-      if (browserName === 'chrome') caps['goog:chromeOptions'] = { args };
-      else if (browserName === 'msedge') caps['ms:edgeOptions'] = { args };
-      else if (browserName === 'firefox' && headless) caps['moz:firefoxOptions'] = { args: ['-headless'] };
-      const extra = p.capabilities as Record<string, unknown> | undefined;
-      const merged = extra ? { ...caps, ...extra } : caps;
       const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
-      return `const browser = await remote({\n  capabilities: ${indentJson(merged)}\n});${nav}`;
+      return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
     }
     case 'start_app_session': {
-      const caps: Record<string, unknown> = {
-        platformName: p.platform,
-        'appium:deviceName': p.deviceName,
-        ...(p.platformVersion !== undefined && { 'appium:platformVersion': p.platformVersion }),
-        ...(p.automationName !== undefined && { 'appium:automationName': p.automationName }),
-        ...(p.appPath !== undefined && { 'appium:app': p.appPath }),
-        ...(p.udid !== undefined && { 'appium:udid': p.udid }),
-        ...(p.noReset !== undefined && { 'appium:noReset': p.noReset }),
-        ...(p.fullReset !== undefined && { 'appium:fullReset': p.fullReset }),
-        ...(p.autoGrantPermissions !== undefined && { 'appium:autoGrantPermissions': p.autoGrantPermissions }),
-        ...(p.autoAcceptAlerts !== undefined && { 'appium:autoAcceptAlerts': p.autoAcceptAlerts }),
-        ...(p.autoDismissAlerts !== undefined && { 'appium:autoDismissAlerts': p.autoDismissAlerts }),
-        ...(p.appWaitActivity !== undefined && { 'appium:appWaitActivity': p.appWaitActivity }),
-        ...(p.newCommandTimeout !== undefined && { 'appium:newCommandTimeout': p.newCommandTimeout }),
-        ...((p.capabilities as Record<string, unknown> | undefined) ?? {}),
-      };
       const config: Record<string, unknown> = {
         protocol: 'http',
-        hostname: p.appiumHost ?? 'localhost',
-        port: p.appiumPort ?? 4723,
-        path: p.appiumPath ?? '/',
-        capabilities: caps,
+        hostname: history.appiumConfig?.hostname ?? 'localhost',
+        port: history.appiumConfig?.port ?? 4723,
+        path: history.appiumConfig?.path ?? '/',
+        capabilities: history.capabilities,
       };
       return `const browser = await remote(${indentJson(config)});`;
+    }
+    case 'attach_browser': {
+      const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
+      return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
     }
     case 'navigate':
       return `await browser.url('${escapeStr(p.url)}');`;
@@ -103,6 +77,6 @@ function generateStep(step: RecordedStep): string {
 }
 
 export function generateCode(history: SessionHistory): string {
-  const steps = history.steps.map(generateStep).join('\n');
+  const steps = history.steps.map(step => generateStep(step, history)).join('\n');
   return `import { remote } from 'webdriverio';\n\n${steps}\n\nawait browser.deleteSession();`;
 }

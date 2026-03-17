@@ -187,14 +187,7 @@ export const startBrowserTool: ToolCallback = async ({
     type: 'browser',
     startedAt: new Date().toISOString(),
     capabilities: wdioBrowser.capabilities as Record<string, unknown>,
-    steps: [{
-      index: 1,
-      tool: 'start_browser',
-      params: { browser, headless, windowWidth, windowHeight, ...(navigationUrl && { navigationUrl }), ...(Object.keys(userCapabilities).length > 0 && { capabilities: userCapabilities }) },
-      status: 'ok',
-      durationMs: 0,
-      timestamp: new Date().toISOString(),
-    }],
+    steps: [],
   });
 
   state.currentSession = sessionId;

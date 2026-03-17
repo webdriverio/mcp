@@ -14,5 +14,6 @@ export interface SessionHistory {
   startedAt: string;                  // ISO 8601
   endedAt?: string;                   // set on session close
   capabilities: Record<string, unknown>;  // full resolved capabilities
+  appiumConfig?: { hostname: string; port: number; path: string };  // app sessions only
   steps: RecordedStep[];
 }

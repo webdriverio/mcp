@@ -87,14 +87,7 @@ export const switchContextTool: ToolCallback = async (args: {
       if (index >= 0 && index < contexts.length) {
         targetContext = contexts[index] as string;
       } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: Invalid context index ${context}. Available contexts: ${contexts.length}`,
-            },
-          ],
-        };
+        throw new Error(`Error: Invalid context index ${context}. Available contexts: ${contexts.length}`);
       }
     }
 

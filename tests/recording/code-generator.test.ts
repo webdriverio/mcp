@@ -26,7 +26,10 @@ function makeHistory(steps: Partial<RecordedStep>[]): SessionHistory {
     sessionId: 'test-123',
     type: 'browser',
     startedAt: '2026-01-01T00:00:00.000Z',
-    capabilities: {},
+    capabilities: {
+      browserName: 'chrome',
+      'goog:chromeOptions': { args: ['--window-size=1920,1080', '--headless=new'] },
+    },
     steps: [START_BROWSER_STEP, ...extraSteps],
   };
 }
@@ -39,10 +42,53 @@ describe('generateCode - header', () => {
     expect(code).toContain('browserName');
   });
 
-  it('generates start_browser as const browser = await remote()', () => {
-    const code = generateCode(makeHistory([]));
+  it('generates start_browser using history.capabilities, not reconstructed from params', () => {
+    const history: SessionHistory = {
+      sessionId: 'caps-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {
+        browserName: 'chrome',
+        acceptInsecureCerts: true,
+        'goog:chromeOptions': { args: ['--headless=new', '--custom-flag'] },
+      },
+      steps: [{
+        index: 1,
+        tool: 'start_browser',
+        params: { browser: 'chrome', headless: true },
+        status: 'ok',
+        durationMs: 100,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
     expect(code).toContain('const browser = await remote(');
     expect(code).toContain('"browserName": "chrome"');
+    expect(code).toContain('--custom-flag'); // only present in history.capabilities
+  });
+
+  it('generates attach_browser using history.capabilities', () => {
+    const history: SessionHistory = {
+      sessionId: 'attach-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {
+        browserName: 'chrome',
+        'goog:chromeOptions': { debuggerAddress: 'localhost:9222', args: ['--user-data-dir=/tmp/chrome-debug'] },
+      },
+      steps: [{
+        index: 1,
+        tool: 'attach_browser',
+        params: { port: 9222, host: 'localhost', userDataDir: '/tmp/chrome-debug' },
+        status: 'ok',
+        durationMs: 100,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
+    expect(code).toContain('const browser = await remote(');
+    expect(code).toContain('"debuggerAddress": "localhost:9222"');
+    expect(code).toContain('--user-data-dir=/tmp/chrome-debug');
   });
 
   it('appends browser.url() when navigationUrl is set on start_browser', () => {
@@ -50,7 +96,7 @@ describe('generateCode - header', () => {
       sessionId: 'nav-123',
       type: 'browser',
       startedAt: '2026-01-01T00:00:00.000Z',
-      capabilities: {},
+      capabilities: { browserName: 'chrome' },
       steps: [{
         index: 1,
         tool: 'start_browser',
@@ -64,26 +110,30 @@ describe('generateCode - header', () => {
     expect(code).toContain("await browser.url('https://github.com/login');");
   });
 
-  it('generates start_app_session with appium caps and server config', () => {
+  it('generates start_app_session using history.appiumConfig for connection config', () => {
     const history: SessionHistory = {
       sessionId: 'app-123',
-      type: 'ios',
+      type: 'android',
       startedAt: '2026-01-01T00:00:00.000Z',
-      capabilities: {},
+      capabilities: {
+        platformName: 'Android',
+        'appium:deviceName': 'emulator-5554',
+        'appium:app': '/app/MyApp.apk',
+      },
+      appiumConfig: { hostname: '127.0.0.1', port: 4723, path: '/' },
       steps: [{
         index: 1,
         tool: 'start_app_session',
-        params: { platform: 'iOS', deviceName: 'iPhone 14', platformVersion: '17.0', appPath: '/app/MyApp.app' },
+        params: { platform: 'Android', deviceName: 'emulator-5554' }, // no appiumHost in params
         status: 'ok',
-        durationMs: 0,
+        durationMs: 100,
         timestamp: '2026-01-01T00:00:00.000Z',
       }],
     };
     const code = generateCode(history);
-    expect(code).toContain('const browser = await remote(');
-    expect(code).toContain('"platformName": "iOS"');
-    expect(code).toContain('"appium:deviceName": "iPhone 14"');
-    expect(code).toContain('"appium:app": "/app/MyApp.app"');
+    expect(code).toContain('"hostname": "127.0.0.1"'); // from history.appiumConfig, not params fallback
+    expect(code).toContain('"port": 4723');
+    expect(code).toContain('"platformName": "Android"');
   });
 });
 
