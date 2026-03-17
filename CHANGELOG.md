@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.0](https://github.com/webdriverio/mcp/compare/v2.3.1...v2.4.0) (2026-03-17)
+
+### Features
+
+* add attach_browser tool for CDP port connection ([5ad9923](https://github.com/webdriverio/mcp/commit/5ad9923785ba1c1399a1eab730466ec758be3b0d))
+* add emulate_device tool with BiDi guard and restore support ([49e8b77](https://github.com/webdriverio/mcp/commit/49e8b770f1682a85968ce4f4e5a332566e8a3321))
+* add userDataDir param to attach_browser (default: /tmp/chrome-debug) ([7204dd0](https://github.com/webdriverio/mcp/commit/7204dd0b77798241fd19a2f4cc31a0565767b6d0))
+
 ## [2.3.1](https://github.com/webdriverio/mcp/compare/v2.3.0...v2.3.1) (2026-03-12)
 
 ### Features
