@@ -196,8 +196,9 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const sessionId = state.currentSession;
     const metadata = state.sessionMetadata.get(sessionId);
 
-    // Only delete session if not detaching
-    if (!args.detach) {
+    // Skip deleteSession for attached sessions (not created by us) or when user explicitly detaches
+    const effectiveDetach = args.detach || !!metadata?.isAttached;
+    if (!effectiveDetach) {
       await browser.deleteSession();
     }
 
@@ -206,7 +207,7 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     state.sessionMetadata.delete(sessionId);
     state.currentSession = null;
 
-    const action = args.detach ? 'detached from' : 'closed';
+    const action = effectiveDetach ? 'detached from' : 'closed';
     const note = args.detach && !metadata?.isAttached
       ? '\nNote: Session will remain active on Appium server.'
       : '';
