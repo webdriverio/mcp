@@ -8,48 +8,48 @@ function getCurrentSessionId(): string | null {
   return (getBrowser as any).__state?.currentSession ?? null;
 }
 
-export function buildSessionsIndex(): string {
-  const histories = getSessionHistory();
-  if (histories.size === 0) return 'No sessions recorded.';
-
-  const currentId = getCurrentSessionId();
-  const lines = [`Sessions (${histories.size} total):\n`];
-  for (const [id, h] of histories) {
-    const ended = h.endedAt ?? '-';
-    const current = id === currentId ? '  [current]' : '';
-    lines.push(`- ${id}  ${h.type}  started: ${h.startedAt}  ended: ${ended}  ${h.steps.length} steps${current}`);
-  }
-  return lines.join('\n');
+export interface SessionStepsPayload {
+  stepsJson: string;
+  generatedJs: string;
 }
 
-export function buildCurrentSessionSteps(): string {
+export function buildSessionsIndex(): string {
+  const histories = getSessionHistory();
   const currentId = getCurrentSessionId();
-  if (!currentId) return 'No active session.';
+  const sessions = Array.from(histories.values()).map((h) => ({
+    sessionId: h.sessionId,
+    type: h.type,
+    startedAt: h.startedAt,
+    ...(h.endedAt ? { endedAt: h.endedAt } : {}),
+    stepCount: h.steps.length,
+    isCurrent: h.sessionId === currentId,
+  }));
+  return JSON.stringify({ sessions });
+}
+
+export function buildCurrentSessionSteps(): SessionStepsPayload | null {
+  const currentId = getCurrentSessionId();
+  if (!currentId) return null;
+
   return buildSessionStepsById(currentId);
 }
 
-export function buildSessionStepsById(sessionId: string): string {
+export function buildSessionStepsById(sessionId: string): SessionStepsPayload | null {
   const history = getSessionHistory().get(sessionId);
-  if (!history) return `Session not found: ${sessionId}`;
-  return formatSessionSteps(history);
+  if (!history) return null;
+
+  return buildSessionPayload(history);
 }
 
-function formatSessionSteps(history: SessionHistory): string {
-  const header = `Session: ${history.sessionId} (${history.type}) — ${history.steps.length} steps\n`;
-
-  const stepLines = history.steps.map((step) => {
-    if (step.tool === '__session_transition__') {
-      return `--- session transitioned to ${step.params.newSessionId ?? 'unknown'} at ${step.timestamp} ---`;
-    }
-    const statusLabel = step.status === 'ok' ? '[ok]   ' : '[error]';
-    const params = Object.entries(step.params)
-      .map(([k, v]) => `${k}="${v}"`)
-      .join(' ');
-    const errorSuffix = step.error ? ` — ${step.error}` : '';
-    return `${step.index}. ${statusLabel}  ${step.tool.padEnd(24)} ${params}${errorSuffix}  ${step.durationMs}ms`;
+function buildSessionPayload(history: SessionHistory): SessionStepsPayload {
+  const stepsJson = JSON.stringify({
+    sessionId: history.sessionId,
+    type: history.type,
+    startedAt: history.startedAt,
+    ...(history.endedAt ? { endedAt: history.endedAt } : {}),
+    stepCount: history.steps.length,
+    steps: history.steps,
   });
 
-  const stepsText = stepLines.length > 0 ? stepLines.join('\n') : '(no steps yet)';
-  const jsCode = generateCode(history);
-  return `${header}\nSteps:\n${stepsText}\n\n--- Generated WebdriverIO JS ---\n${jsCode}`;
+  return { stepsJson, generatedJs: generateCode(history) };
 }

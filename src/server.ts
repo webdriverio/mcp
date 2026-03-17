@@ -146,32 +146,58 @@ registerTool(executeScriptToolDefinition, executeScriptTool);
 server.registerResource(
   'sessions',
   'wdio://sessions',
-  { description: 'Index of all browser and app sessions with step counts' },
+  { description: 'JSON index of all browser and app sessions with metadata and step counts' },
   async () => ({
-    contents: [{ uri: 'wdio://sessions', mimeType: 'text/plain', text: buildSessionsIndex() }],
+    contents: [{ uri: 'wdio://sessions', mimeType: 'application/json', text: buildSessionsIndex() }],
   }),
 );
 
 server.registerResource(
   'session-current-steps',
   'wdio://session/current/steps',
-  { description: 'Steps for the currently active session with generated WebdriverIO JS' },
-  async () => ({
-    contents: [{ uri: 'wdio://session/current/steps', mimeType: 'text/plain', text: buildCurrentSessionSteps() }],
-  }),
+  { description: 'JSON step log for the currently active session' },
+  async () => {
+    const payload = buildCurrentSessionSteps();
+    return {
+      contents: [{ uri: 'wdio://session/current/steps', mimeType: 'application/json', text: payload?.stepsJson ?? '{"error":"No active session"}' }],
+    };
+  },
+);
+
+server.registerResource(
+  'session-current-code',
+  'wdio://session/current/code',
+  { description: 'Generated WebdriverIO JS code for the currently active session' },
+  async () => {
+    const payload = buildCurrentSessionSteps();
+    return {
+      contents: [{ uri: 'wdio://session/current/code', mimeType: 'text/plain', text: payload?.generatedJs ?? '// No active session' }],
+    };
+  },
 );
 
 server.registerResource(
   'session-steps',
   new ResourceTemplate('wdio://session/{sessionId}/steps', { list: undefined }),
-  { description: 'Steps for a specific session by ID with generated WebdriverIO JS' },
-  async (uri, { sessionId }) => ({
-    contents: [{
-      uri: uri.href,
-      mimeType: 'text/plain',
-      text: buildSessionStepsById(sessionId as string),
-    }],
-  }),
+  { description: 'JSON step log for a specific session by ID' },
+  async (uri, { sessionId }) => {
+    const payload = buildSessionStepsById(sessionId as string);
+    return {
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: payload?.stepsJson ?? `{"error":"Session not found: ${sessionId}"}` }],
+    };
+  },
+);
+
+server.registerResource(
+  'session-code',
+  new ResourceTemplate('wdio://session/{sessionId}/code', { list: undefined }),
+  { description: 'Generated WebdriverIO JS code for a specific session by ID' },
+  async (uri, { sessionId }) => {
+    const payload = buildSessionStepsById(sessionId as string);
+    return {
+      contents: [{ uri: uri.href, mimeType: 'text/plain', text: payload?.generatedJs ?? `// Session not found: ${sessionId}` }],
+    };
+  },
 );
 
 async function main() {
