@@ -71,6 +71,7 @@ export const takeScreenshotTool: ToolCallback = async ({ outputPath }: { outputP
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error taking screenshot: ${(e as Error).message}` }],
     };
   }

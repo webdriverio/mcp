@@ -97,7 +97,7 @@ export function buildIOSCapabilities(
   // Add any additional custom options
   for (const [key, value] of Object.entries(options)) {
     if (
-      !['deviceName', 'platformVersion', 'automationName', 'autoAcceptAlerts', 'autoDismissAlerts', 'udid', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
+      !['deviceName', 'platformVersion', 'automationName', 'autoGrantPermissions', 'autoAcceptAlerts', 'autoDismissAlerts', 'udid', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
         key,
       )
     ) {
@@ -156,7 +156,7 @@ export function buildAndroidCapabilities(
   // Add any additional custom options
   for (const [key, value] of Object.entries(options)) {
     if (
-      !['deviceName', 'platformVersion', 'automationName', 'autoGrantPermissions', 'appWaitActivity', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
+      !['deviceName', 'platformVersion', 'automationName', 'autoGrantPermissions', 'autoAcceptAlerts', 'autoDismissAlerts', 'appWaitActivity', 'noReset', 'fullReset', 'newCommandTimeout'].includes(
         key,
       )
     ) {

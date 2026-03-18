@@ -15,14 +15,18 @@ npm start         # Run built server from lib/server.js
 
 ```
 src/
-├── server.ts                    # MCP server entry, registers all tools
+├── server.ts                    # MCP server entry, registers all tools + MCP resources
 ├── tools/
 │   ├── browser.tool.ts          # Session state + start_browser + getBrowser()
 │   ├── app-session.tool.ts      # start_app_session (iOS/Android via Appium)
 │   ├── navigate.tool.ts         # URL navigation
 │   ├── get-visible-elements.tool.ts  # Element detection (web + mobile)
-│   ├── click-element.tool.ts    # Click/tap actions
+│   ├── click.tool.ts            # Click/tap actions
 │   └── ...                      # Other tools follow same pattern
+├── recording/
+│   ├── step-recorder.ts         # withRecording HOF, appendStep, session history access
+│   ├── code-generator.ts        # SessionHistory → WebdriverIO JS code
+│   └── resources.ts             # MCP resource builders (sessions index, step log)
 ├── scripts/
 │   └── get-interactable-browser-elements.ts  # Browser-context script
 ├── locators/
@@ -32,7 +36,8 @@ src/
 ├── config/
 │   └── appium.config.ts         # iOS/Android capability builders
 └── types/
-    └── tool.ts                  # ToolDefinition interface
+    ├── tool.ts                  # ToolDefinition interface
+    └── recording.ts             # RecordedStep, SessionHistory interfaces
 ```
 
 ### Session State
@@ -80,6 +85,14 @@ export const myTool: ToolCallback = async ({ param }: { param: string }) => {
 server.tool(myToolDefinition.name, myToolDefinition.description, myToolDefinition.inputSchema, myTool);
 ```
 
+### Recording
+
+All tools are wrapped with `withRecording()` in `server.ts`. Steps accumulate in `state.sessionHistory` (keyed by sessionId).
+MCP resources expose history without tool calls:
+- `wdio://sessions` — index of all sessions (fixed URI, discoverable via ListResources)
+- `wdio://session/current/steps` — current session step log + generated JS (fixed URI)
+- `wdio://session/{sessionId}/steps` — any session by ID (URI template, NOT listed by ListResources — see `docs/architecture/mcp-resources-notes.md`)
+
 ### Build
 
 - **tsup** bundles `src/server.ts` → `lib/server.js` (ESM)
@@ -95,6 +108,9 @@ server.tool(myToolDefinition.name, myToolDefinition.description, myToolDefinitio
 | `src/tools/app-session.tool.ts`                    | Appium session creation                       |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
+| `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps every tool for step logging |
+| `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
+| `src/recording/resources.ts`                       | Builds text for `wdio://sessions` and `wdio://session/*/steps` resources |
 | `tsup.config.ts`                                   | Build configuration                           |
 
 ## Gotchas

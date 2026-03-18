@@ -74,6 +74,7 @@ export const executeScriptTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error executing script: ${e}` }],
     };
   }

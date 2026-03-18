@@ -85,6 +85,7 @@ appium
 - **Scrolling**: Smooth scrolling with configurable distances
 - **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing authenticated or pre-configured sessions
 - **Device emulation**: Apply mobile/tablet presets (iPhone 15, Pixel 7, etc.) to simulate responsive layouts without a physical device
+- **Session Recording**: All tool calls are automatically recorded and exportable as runnable WebdriverIO JS
 
 ### Mobile App Automation (iOS/Android)
 
@@ -457,6 +458,16 @@ This eliminates the need to manually handle permission popups during automated t
 - **Session Model:** Single active session (browser or mobile app)
 - **Data Format:** TOON (Token-Oriented Object Notation) for efficient LLM communication
 - **Element Detection:** XML-based page source parsing with intelligent filtering and multi-strategy locator generation
+
+### Session Recording & Code Export
+
+Every tool call is automatically recorded to a session history. You can inspect sessions and export runnable code via MCP resources — no extra tool calls needed:
+
+- `wdio://sessions` — lists all recorded sessions with type, timestamps, and step count
+- `wdio://session/current/steps` — step log for the active session, plus a generated WebdriverIO JS script ready to run with `webdriverio`
+- `wdio://session/{sessionId}/steps` — same for any past session by ID
+
+The generated script reconstructs the full session — including capabilities, navigation, clicks, and inputs — as a standalone `import { remote } from 'webdriverio'` file.
 
 ## Troubleshooting
 

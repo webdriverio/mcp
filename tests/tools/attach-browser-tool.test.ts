@@ -22,6 +22,7 @@ vi.mock('../../src/tools/browser.tool', () => {
     browsers: new Map(),
     currentSession: null as string | null,
     sessionMetadata: new Map(),
+    sessionHistory: new Map(),
   };
   const getBrowser = vi.fn(() => {
     const b = state.browsers.get(state.currentSession);
@@ -46,6 +47,7 @@ beforeEach(() => {
   const state = (getBrowser as any).__state;
   state.browsers.clear();
   state.sessionMetadata.clear();
+  state.sessionHistory.clear();
   state.currentSession = null;
   mockRemote.mockResolvedValue(mockBrowser);
 });
@@ -100,6 +102,18 @@ describe('attach_browser', () => {
   it('navigates to navigationUrl if provided', async () => {
     await callTool({ navigationUrl: 'https://app.example.com' });
     expect(mockBrowser.url).toHaveBeenCalledWith('https://app.example.com');
+  });
+
+  it('initialises sessionHistory with constructed caps and empty steps', async () => {
+    await callTool({ host: 'myhost', port: 9333, userDataDir: '/my/profile' });
+    const state = (getBrowser as any).__state;
+    const history = state.sessionHistory.get('attached-session-id');
+    expect(history).toBeDefined();
+    expect(history.steps).toEqual([]);
+    expect(history.capabilities).toMatchObject({
+      browserName: 'chrome',
+      'goog:chromeOptions': { debuggerAddress: 'myhost:9333', args: ['--user-data-dir=/my/profile'] },
+    });
   });
 
   it('returns error text when remote() throws', async () => {

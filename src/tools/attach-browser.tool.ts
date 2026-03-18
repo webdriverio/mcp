@@ -82,6 +82,19 @@ export const attachBrowserTool: ToolCallback = async ({
       capabilities: browser.capabilities,
       isAttached: true,
     });
+    state.sessionHistory.set(sessionId, {
+      sessionId,
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: {
+        browserName: 'chrome',
+        'goog:chromeOptions': {
+          debuggerAddress: `${host}:${port}`,
+          args: [`--user-data-dir=${userDataDir}`],
+        },
+      },
+      steps: [],
+    });
 
     if (activeUrl) {
       await browser.url(activeUrl);
@@ -98,6 +111,7 @@ export const attachBrowserTool: ToolCallback = async ({
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error attaching to browser: ${e}` }],
     };
   }

@@ -29,6 +29,7 @@ const clickAction = async (selector: string, timeout: number, scrollToView = tru
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error clicking element: ${e}` }],
     };
   }

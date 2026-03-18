@@ -94,6 +94,7 @@ export const getVisibleElementsTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting visible elements: ${e}` }],
     };
   }

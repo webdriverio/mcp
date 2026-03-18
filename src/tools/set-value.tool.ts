@@ -35,6 +35,7 @@ export const setValueTool: ToolCallback = async ({ selector, value, scrollToView
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error entering text: ${e}` }],
     };
   }

@@ -43,6 +43,7 @@ export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): 
 
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting cookies: ${e}` }],
     };
   }
@@ -86,6 +87,7 @@ export const setCookieTool: ToolCallback = async ({
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error setting cookie: ${e}` }],
     };
   }
@@ -119,6 +121,7 @@ export const deleteCookiesTool: ToolCallback = async ({ name}: { name?: string }
 
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error deleting cookies: ${e}` }],
     };
   }

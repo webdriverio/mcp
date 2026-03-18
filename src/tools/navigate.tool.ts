@@ -20,6 +20,7 @@ export const navigateTool: ToolCallback = async ({ url}: { url: string }) => {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error navigating: ${e}` }],
     };
   }

@@ -41,6 +41,7 @@ export const emulateDeviceTool: ToolCallback = async ({
     // Guard: mobile sessions
     if (metadata?.type === 'ios' || metadata?.type === 'android') {
       return {
+        isError: true,
         content: [{ type: 'text', text: 'Error: emulate_device is only supported for web browser sessions, not iOS/Android.' }],
       };
     }
@@ -48,6 +49,7 @@ export const emulateDeviceTool: ToolCallback = async ({
     // Guard: BiDi required
     if (!browser.isBidi) {
       return {
+        isError: true,
         content: [{
           type: 'text',
           text: 'Error: emulate_device requires a BiDi-enabled session.\nRestart the browser with: start_browser({ capabilities: { webSocketUrl: true } })',
@@ -68,7 +70,7 @@ export const emulateDeviceTool: ToolCallback = async ({
             content: [{ type: 'text', text: `Available devices (${names.length}):\n${names.join('\n')}` }],
           };
         }
-        return { content: [{ type: 'text', text: `Error listing devices: ${e}` }] };
+        return { isError: true, content: [{ type: 'text', text: `Error listing devices: ${e}` }] };
       }
       return { content: [{ type: 'text', text: 'Could not retrieve device list.' }] };
     }
@@ -101,10 +103,11 @@ export const emulateDeviceTool: ToolCallback = async ({
           }],
         };
       }
-      return { content: [{ type: 'text', text: `Error: ${e}` }] };
+      return { isError: true, content: [{ type: 'text', text: `Error: ${e}` }] };
     }
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error: ${e}` }],
     };
   }

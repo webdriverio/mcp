@@ -51,6 +51,7 @@ export const rotateDeviceTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error rotating device: ${e}` }],
     };
   }
@@ -68,6 +69,7 @@ export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> 
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error hiding keyboard: ${e}` }],
     };
   }
@@ -90,6 +92,7 @@ export const getGeolocationTool: ToolCallback = async (): Promise<CallToolResult
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting geolocation: ${e}` }],
     };
   }
@@ -117,6 +120,7 @@ export const setGeolocationTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error setting geolocation: ${e}` }],
     };
   }

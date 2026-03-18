@@ -48,6 +48,7 @@ export const getContextsTool: ToolCallback = async (): Promise<CallToolResult> =
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting contexts: ${e}` }],
     };
   }
@@ -65,6 +66,7 @@ export const getCurrentContextTool: ToolCallback = async (): Promise<CallToolRes
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting current context: ${e}` }],
     };
   }
@@ -85,14 +87,7 @@ export const switchContextTool: ToolCallback = async (args: {
       if (index >= 0 && index < contexts.length) {
         targetContext = contexts[index] as string;
       } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: Invalid context index ${context}. Available contexts: ${contexts.length}`,
-            },
-          ],
-        };
+        throw new Error(`Error: Invalid context index ${context}. Available contexts: ${contexts.length}`);
       }
     }
 
@@ -103,6 +98,7 @@ export const switchContextTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error switching context: ${e}` }],
     };
   }

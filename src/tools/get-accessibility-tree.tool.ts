@@ -88,6 +88,7 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting accessibility tree: ${e}` }],
     };
   }

@@ -44,6 +44,7 @@ export const getAppStateTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error getting app state: ${e}` }],
     };
   }

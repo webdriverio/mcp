@@ -34,6 +34,7 @@ export const scrollTool: ToolCallback = async ({ direction, pixels = 500 }: { di
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error scrolling: ${e}` }],
     };
   }

@@ -41,10 +41,12 @@ export const tapElementTool: ToolCallback = async (args: {
     }
 
     return {
+      isError: true,
       content: [{ type: 'text', text: 'Error: Must provide either selector or x,y coordinates' }],
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error tapping: ${e}` }],
     };
   }
@@ -104,6 +106,7 @@ export const swipeTool: ToolCallback = async (args: {
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error swiping: ${e}` }],
     };
   }
@@ -149,10 +152,12 @@ export const dragAndDropTool: ToolCallback = async (args: {
     }
 
     return {
+      isError: true,
       content: [{ type: 'text', text: 'Error: Must provide either targetSelector or x,y coordinates' }],
     };
   } catch (e) {
     return {
+      isError: true,
       content: [{ type: 'text', text: `Error dragging: ${e}` }],
     };
   }

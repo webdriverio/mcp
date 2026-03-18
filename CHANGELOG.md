@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.1](https://github.com/webdriverio/mcp/compare/v2.4.0...v2.4.1) (2026-03-17)
+
+### Features
+
+* implement session step recording, history lifecycle, and WebdriverIO code generation ([6c41763](https://github.com/webdriverio/mcp/commit/6c417632fe05414659119e8531bab7394d81318d))
+
+### Bug Fixes
+
+* Use browser.$() for element instead of $() ([630201b](https://github.com/webdriverio/mcp/commit/630201b140b3f6d399ef452796c3a71feca8011a))
+
 ## [2.4.0](https://github.com/webdriverio/mcp/compare/v2.3.1...v2.4.0) (2026-03-17)
 
 ### Features

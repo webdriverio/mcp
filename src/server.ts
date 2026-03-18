@@ -57,6 +57,9 @@ import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-
 import { attachBrowserTool, attachBrowserToolDefinition } from './tools/attach-browser.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import pkg from '../package.json' with { type: 'json' };
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withRecording } from './recording/step-recorder';
+import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from './recording/resources';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
 const _originalConsoleLog = console.log;
@@ -79,6 +82,7 @@ const server = new McpServer({
   instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome, Firefox, Edge, and Safari browser control plus iOS/Android native app testing via Appium.',
   capabilities: {
     tools: {},
+    resources: {},
   },
 });
 
@@ -90,23 +94,23 @@ const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
   }, callback);
 
 // Browser and App Session Management
-registerTool(startBrowserToolDefinition, startBrowserTool);
-registerTool(startAppToolDefinition, startAppTool);
+registerTool(startBrowserToolDefinition, withRecording('start_browser', startBrowserTool));
+registerTool(startAppToolDefinition, withRecording('start_app_session', startAppTool));
 registerTool(closeSessionToolDefinition, closeSessionTool);
-registerTool(attachBrowserToolDefinition, attachBrowserTool);
+registerTool(attachBrowserToolDefinition, withRecording('attach_browser', attachBrowserTool));
 registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
-registerTool(navigateToolDefinition, navigateTool);
+registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 
 // Element Discovery
 registerTool(getVisibleElementsToolDefinition, getVisibleElementsTool);
 registerTool(getAccessibilityToolDefinition, getAccessibilityTreeTool);
 
 // Scrolling
-registerTool(scrollToolDefinition, scrollTool);
+registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
 
 // Element Interaction
-registerTool(clickToolDefinition, clickTool);
-registerTool(setValueToolDefinition, setValueTool);
+registerTool(clickToolDefinition, withRecording('click_element', clickTool));
+registerTool(setValueToolDefinition, withRecording('set_value', setValueTool));
 
 // Screenshots
 registerTool(takeScreenshotToolDefinition, takeScreenshotTool);
@@ -117,9 +121,9 @@ registerTool(setCookieToolDefinition, setCookieTool);
 registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
 // Mobile Gesture Tools
-registerTool(tapElementToolDefinition, tapElementTool);
-registerTool(swipeToolDefinition, swipeTool);
-registerTool(dragAndDropToolDefinition, dragAndDropTool);
+registerTool(tapElementToolDefinition, withRecording('tap_element', tapElementTool));
+registerTool(swipeToolDefinition, withRecording('swipe', swipeTool));
+registerTool(dragAndDropToolDefinition, withRecording('drag_and_drop', dragAndDropTool));
 
 // App Lifecycle Management
 registerTool(getAppStateToolDefinition, getAppStateTool);
@@ -137,6 +141,64 @@ registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 // Script Execution (Browser JS / Appium Mobile Commands)
 registerTool(executeScriptToolDefinition, executeScriptTool);
+
+// Session Recording Resources
+server.registerResource(
+  'sessions',
+  'wdio://sessions',
+  { description: 'JSON index of all browser and app sessions with metadata and step counts' },
+  async () => ({
+    contents: [{ uri: 'wdio://sessions', mimeType: 'application/json', text: buildSessionsIndex() }],
+  }),
+);
+
+server.registerResource(
+  'session-current-steps',
+  'wdio://session/current/steps',
+  { description: 'JSON step log for the currently active session' },
+  async () => {
+    const payload = buildCurrentSessionSteps();
+    return {
+      contents: [{ uri: 'wdio://session/current/steps', mimeType: 'application/json', text: payload?.stepsJson ?? '{"error":"No active session"}' }],
+    };
+  },
+);
+
+server.registerResource(
+  'session-current-code',
+  'wdio://session/current/code',
+  { description: 'Generated WebdriverIO JS code for the currently active session' },
+  async () => {
+    const payload = buildCurrentSessionSteps();
+    return {
+      contents: [{ uri: 'wdio://session/current/code', mimeType: 'text/plain', text: payload?.generatedJs ?? '// No active session' }],
+    };
+  },
+);
+
+server.registerResource(
+  'session-steps',
+  new ResourceTemplate('wdio://session/{sessionId}/steps', { list: undefined }),
+  { description: 'JSON step log for a specific session by ID' },
+  async (uri, { sessionId }) => {
+    const payload = buildSessionStepsById(sessionId as string);
+    return {
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: payload?.stepsJson ?? `{"error":"Session not found: ${sessionId}"}` }],
+    };
+  },
+);
+
+server.registerResource(
+  'session-code',
+  new ResourceTemplate('wdio://session/{sessionId}/code', { list: undefined }),
+  { description: 'Generated WebdriverIO JS code for a specific session by ID' },
+  async (uri, { sessionId }) => {
+    const payload = buildSessionStepsById(sessionId as string);
+    return {
+      contents: [{ uri: uri.href, mimeType: 'text/plain', text: payload?.generatedJs ?? `// Session not found: ${sessionId}` }],
+    };
+  },
+);
 
 async function main() {
   const transport = new StdioServerTransport();
