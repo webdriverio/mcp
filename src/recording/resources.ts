@@ -2,10 +2,10 @@
 import type { SessionHistory } from '../types/recording';
 import { generateCode } from './code-generator';
 import { getSessionHistory } from './step-recorder';
-import { getBrowser } from '../tools/browser.tool';
+import { getState } from '../session/state';
 
 function getCurrentSessionId(): string | null {
-  return (getBrowser as any).__state?.currentSession ?? null;
+  return getState().currentSession;
 }
 
 export interface SessionStepsPayload {

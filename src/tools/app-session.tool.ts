@@ -2,10 +2,10 @@ import { remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
-import type { SessionHistory } from '../types/recording';
 import { z } from 'zod';
-import { buildAndroidCapabilities, buildIOSCapabilities, getAppiumServerConfig, } from '../config/appium.config';
-import { getBrowser } from './browser.tool';
+import { localAppiumProvider } from '../providers/local-appium.provider';
+import { registerSession } from '../session/lifecycle';
+import type { SessionMetadata } from '../session/state';
 
 export const startAppToolDefinition: ToolDefinition = {
   name: 'start_app_session',
@@ -34,20 +34,6 @@ export const startAppToolDefinition: ToolDefinition = {
   },
 };
 
-// Access shared state from browser.tool.ts
-export const getState = () => {
-  const sharedState = (getBrowser as any).__state;
-  if (!sharedState) {
-    throw new Error('Browser state not initialized');
-  }
-  return sharedState as {
-    browsers: Map<string, WebdriverIO.Browser>;
-    currentSession: string | null;
-    sessionMetadata: Map<string, { type: 'browser' | 'ios' | 'android'; capabilities: any; isAttached: boolean }>;
-    sessionHistory: Map<string, SessionHistory>;
-  };
-};
-
 export const startAppTool: ToolCallback = async (args: {
   platform: 'iOS' | 'Android';
   appPath?: string;
@@ -68,25 +54,7 @@ export const startAppTool: ToolCallback = async (args: {
   capabilities?: Record<string, unknown>;
 }): Promise<CallToolResult> => {
   try {
-    const {
-      platform,
-      appPath,
-      deviceName,
-      platformVersion,
-      automationName,
-      appiumHost,
-      appiumPort,
-      appiumPath,
-      autoGrantPermissions = true,
-      autoAcceptAlerts,
-      autoDismissAlerts,
-      appWaitActivity,
-      udid,
-      noReset,
-      fullReset,
-      newCommandTimeout = 300,
-      capabilities: userCapabilities = {},
-    } = args;
+    const { platform, appPath, deviceName, noReset } = args;
 
     // Validate: either appPath or noReset=true is required
     if (!appPath && noReset !== true) {
@@ -99,52 +67,14 @@ export const startAppTool: ToolCallback = async (args: {
     }
 
     // Get Appium server configuration
-    const serverConfig = getAppiumServerConfig({
-      hostname: appiumHost,
-      port: appiumPort,
-      path: appiumPath,
-    });
+    const serverConfig = localAppiumProvider.getConnectionConfig(args);
 
     // Build platform-specific capabilities
-    const capabilities: Record<string, any> = platform === 'iOS'
-      ? buildIOSCapabilities(appPath, {
-        deviceName,
-        platformVersion,
-        automationName: (automationName as 'XCUITest') || 'XCUITest',
-        autoGrantPermissions,
-        autoAcceptAlerts,
-        autoDismissAlerts,
-        udid,
-        noReset,
-        fullReset,
-        newCommandTimeout,
-      })
-      : buildAndroidCapabilities(appPath, {
-        deviceName,
-        platformVersion,
-        automationName: (automationName as 'UiAutomator2' | 'Espresso') || 'UiAutomator2',
-        autoGrantPermissions,
-        autoAcceptAlerts,
-        autoDismissAlerts,
-        appWaitActivity,
-        noReset,
-        fullReset,
-        newCommandTimeout,
-      });
-
-    const mergedCapabilities = {
-      ...capabilities,
-      ...userCapabilities,
-    };
-    for (const [key, value] of Object.entries(mergedCapabilities)) {
-      if (value === undefined) {
-        delete mergedCapabilities[key];
-      }
-    }
+    const mergedCapabilities = localAppiumProvider.buildCapabilities(args);
 
     // Create Appium session
     const browser = await remote({
-      protocol: 'http',
+      protocol: serverConfig.protocol,
       hostname: serverConfig.hostname,
       port: serverConfig.port,
       path: serverConfig.path,
@@ -153,43 +83,22 @@ export const startAppTool: ToolCallback = async (args: {
 
     const { sessionId } = browser;
 
-    // Store session and metadata
-    // Auto-set isAttached=true when noReset or no appPath to preserve session on close
-    const shouldAutoDetach = noReset === true || !appPath;
-    const state = getState();
-    state.browsers.set(sessionId, browser);
-    state.sessionMetadata.set(sessionId, {
-      type: platform.toLowerCase() as 'ios' | 'android',
+    // Register session via lifecycle (handles transition sentinel, state maps, currentSession)
+    const shouldAutoDetach = localAppiumProvider.shouldAutoDetach(args);
+    const sessionType = localAppiumProvider.getSessionType(args);
+    const metadata: SessionMetadata = {
+      type: sessionType,
       capabilities: mergedCapabilities,
       isAttached: shouldAutoDetach,
-    });
-
-    // If replacing an active session, close its history with transition sentinel
-    if (state.currentSession && state.currentSession !== sessionId) {
-      const outgoing = state.sessionHistory.get(state.currentSession);
-      if (outgoing) {
-        outgoing.steps.push({
-          index: outgoing.steps.length + 1,
-          tool: '__session_transition__',
-          params: { newSessionId: sessionId },
-          status: 'ok',
-          durationMs: 0,
-          timestamp: new Date().toISOString(),
-        });
-        outgoing.endedAt = new Date().toISOString();
-      }
-    }
-
-    state.sessionHistory.set(sessionId, {
+    };
+    registerSession(sessionId, browser, metadata, {
       sessionId,
-      type: platform.toLowerCase() as 'ios' | 'android',
+      type: sessionType,
       startedAt: new Date().toISOString(),
-      capabilities: mergedCapabilities as Record<string, unknown>,
+      capabilities: mergedCapabilities,
       appiumConfig: { hostname: serverConfig.hostname, port: serverConfig.port, path: serverConfig.path },
       steps: [],
     });
-
-    state.currentSession = sessionId;
 
     const appInfo = appPath ? `\nApp: ${appPath}` : '\nApp: (connected to running app)';
     const detachNote = shouldAutoDetach

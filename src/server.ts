@@ -7,21 +7,23 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import {
   closeSessionTool,
   closeSessionToolDefinition,
+  readTabs,
   startBrowserTool,
-  startBrowserToolDefinition
+  startBrowserToolDefinition,
+  switchTabTool,
+  switchTabToolDefinition,
 } from './tools/browser.tool';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
 import { clickTool, clickToolDefinition } from './tools/click.tool';
 import { setValueTool, setValueToolDefinition } from './tools/set-value.tool';
 import { scrollTool, scrollToolDefinition } from './tools/scroll.tool';
-import { getVisibleElementsTool, getVisibleElementsToolDefinition } from './tools/get-visible-elements.tool';
-import { getAccessibilityToolDefinition, getAccessibilityTreeTool } from './tools/get-accessibility-tree.tool';
-import { takeScreenshotTool, takeScreenshotToolDefinition } from './tools/take-screenshot.tool';
+import { readVisibleElements } from './tools/get-visible-elements.tool';
+import { readAccessibilityTree } from './tools/get-accessibility-tree.tool';
+import { readScreenshot } from './tools/take-screenshot.tool';
 import {
   deleteCookiesTool,
   deleteCookiesToolDefinition,
-  getCookiesTool,
-  getCookiesToolDefinition,
+  readCookies,
   setCookieTool,
   setCookieToolDefinition,
 } from './tools/cookies.tool';
@@ -34,31 +36,25 @@ import {
   tapElementTool,
   tapElementToolDefinition,
 } from './tools/gestures.tool';
-import { getAppStateTool, getAppStateToolDefinition } from './tools/app-actions.tool';
+import { readAppState } from './tools/app-actions.tool';
+import { readContexts, readCurrentContext, switchContextTool, switchContextToolDefinition, } from './tools/context.tool';
 import {
-  getContextsTool,
-  getContextsToolDefinition,
-  getCurrentContextTool,
-  getCurrentContextToolDefinition,
-  switchContextTool,
-  switchContextToolDefinition
-} from './tools/context.tool';
-import {
-  getGeolocationTool,
-  getGeolocationToolDefinition,
   hideKeyboardTool,
   hideKeyboardToolDefinition,
+  readGeolocation,
   rotateDeviceTool,
   rotateDeviceToolDefinition,
   setGeolocationTool,
   setGeolocationToolDefinition,
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
+import { executeSequenceTool, executeSequenceToolDefinition } from './tools/execute-sequence.tool';
 import { attachBrowserTool, attachBrowserToolDefinition } from './tools/attach-browser.tool';
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import { buildCurrentSessionSteps, buildSessionsIndex, buildSessionStepsById } from './recording/resources';
+import { parseBool, parseNumber, parseStringArray } from './utils/parse-variables';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
 const _originalConsoleLog = console.log;
@@ -101,9 +97,8 @@ registerTool(attachBrowserToolDefinition, withRecording('attach_browser', attach
 registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
 registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 
-// Element Discovery
-registerTool(getVisibleElementsToolDefinition, getVisibleElementsTool);
-registerTool(getAccessibilityToolDefinition, getAccessibilityTreeTool);
+// Tab Management
+registerTool(switchTabToolDefinition, switchTabTool);
 
 // Scrolling
 registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
@@ -112,11 +107,7 @@ registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
 registerTool(clickToolDefinition, withRecording('click_element', clickTool));
 registerTool(setValueToolDefinition, withRecording('set_value', setValueTool));
 
-// Screenshots
-registerTool(takeScreenshotToolDefinition, takeScreenshotTool);
-
-// Cookies
-registerTool(getCookiesToolDefinition, getCookiesTool);
+// Cookies (write operations only; read via resource)
 registerTool(setCookieToolDefinition, setCookieTool);
 registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
@@ -125,22 +116,19 @@ registerTool(tapElementToolDefinition, withRecording('tap_element', tapElementTo
 registerTool(swipeToolDefinition, withRecording('swipe', swipeTool));
 registerTool(dragAndDropToolDefinition, withRecording('drag_and_drop', dragAndDropTool));
 
-// App Lifecycle Management
-registerTool(getAppStateToolDefinition, getAppStateTool);
-
 // Context Switching (Native/WebView)
-registerTool(getContextsToolDefinition, getContextsTool);
-registerTool(getCurrentContextToolDefinition, getCurrentContextTool);
 registerTool(switchContextToolDefinition, switchContextTool);
 
 // Device Interaction
 registerTool(rotateDeviceToolDefinition, rotateDeviceTool);
 registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
-registerTool(getGeolocationToolDefinition, getGeolocationTool);
 registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 // Script Execution (Browser JS / Appium Mobile Commands)
 registerTool(executeScriptToolDefinition, executeScriptTool);
+
+// Sequence Execution
+registerTool(executeSequenceToolDefinition, withRecording('execute_sequence', executeSequenceTool));
 
 // Session Recording Resources
 server.registerResource(
@@ -213,6 +201,116 @@ server.registerResource(
         text: payload?.generatedJs ?? `// Session not found: ${sessionId}`
       }],
     };
+  },
+);
+
+// Resource: visible elements
+server.registerResource(
+  'session-current-elements',
+  new ResourceTemplate('wdio://session/current/elements{?inViewportOnly,includeContainers,includeBounds,limit,offset}', { list: undefined }),
+  { description: 'Interactable elements on the current page' },
+  async (uri, variables) => {
+    const result = await readVisibleElements({
+      inViewportOnly: parseBool(variables.inViewportOnly as string | undefined, true),
+      includeContainers: parseBool(variables.includeContainers as string | undefined, false),
+      includeBounds: parseBool(variables.includeBounds as string | undefined, false),
+      limit: parseNumber(variables.limit as string | undefined, 0),
+      offset: parseNumber(variables.offset as string | undefined, 0),
+    });
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: accessibility tree
+server.registerResource(
+  'session-current-accessibility',
+  new ResourceTemplate('wdio://session/current/accessibility{?limit,offset,roles}', { list: undefined }),
+  { description: 'Accessibility tree for the current page' },
+  async (uri, variables) => {
+    const result = await readAccessibilityTree({
+      limit: parseNumber(variables.limit as string | undefined, 100),
+      offset: parseNumber(variables.offset as string | undefined, 0),
+      roles: parseStringArray(variables.roles as string | undefined),
+    });
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: screenshot
+server.registerResource(
+  'session-current-screenshot',
+  'wdio://session/current/screenshot',
+  { description: 'Screenshot of the current page' },
+  async () => {
+    const result = await readScreenshot();
+    return { contents: [{ uri: 'wdio://session/current/screenshot', mimeType: result.mimeType, blob: result.blob }] };
+  },
+);
+
+// Resource: cookies
+server.registerResource(
+  'session-current-cookies',
+  new ResourceTemplate('wdio://session/current/cookies{?name}', { list: undefined }),
+  { description: 'Cookies for the current session' },
+  async (uri, variables) => {
+    const result = await readCookies(variables.name as string | undefined);
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: app state
+server.registerResource(
+  'session-current-app-state',
+  new ResourceTemplate('wdio://session/current/app-state/{bundleId}', { list: undefined }),
+  { description: 'App state for a given bundle ID' },
+  async (uri, variables) => {
+    const result = await readAppState(variables.bundleId as string);
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: contexts
+server.registerResource(
+  'session-current-contexts',
+  'wdio://session/current/contexts',
+  { description: 'Available contexts (NATIVE_APP, WEBVIEW)' },
+  async () => {
+    const result = await readContexts();
+    return { contents: [{ uri: 'wdio://session/current/contexts', mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: current context
+server.registerResource(
+  'session-current-context',
+  'wdio://session/current/context',
+  { description: 'Currently active context' },
+  async () => {
+    const result = await readCurrentContext();
+    return { contents: [{ uri: 'wdio://session/current/context', mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: geolocation
+server.registerResource(
+  'session-current-geolocation',
+  'wdio://session/current/geolocation',
+  { description: 'Current device geolocation' },
+  async () => {
+    const result = await readGeolocation();
+    return { contents: [{ uri: 'wdio://session/current/geolocation', mimeType: result.mimeType, text: result.text }] };
+  },
+);
+
+// Resource: browser tabs
+server.registerResource(
+  'session-current-tabs',
+  'wdio://session/current/tabs',
+  { description: 'Browser tabs in the current session' },
+
+  async () => {
+    const result = await readTabs();
+    return { contents: [{ uri: 'wdio://session/current/tabs', mimeType: result.mimeType, text: result.text }] };
   },
 );
 

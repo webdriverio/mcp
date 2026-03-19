@@ -1,24 +1,8 @@
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
-import type { ToolDefinition } from '../types/tool';
-import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 
-// Get App State Tool
-export const getAppStateToolDefinition: ToolDefinition = {
-  name: 'get_app_state',
-  description: 'gets the state of an app (not installed, not running, background, foreground)',
-  inputSchema: {
-    bundleId: z.string().describe('App bundle ID (e.g., com.example.app)'),
-  },
-};
-
-export const getAppStateTool: ToolCallback = async (args: {
-  bundleId: string;
-}): Promise<CallToolResult> => {
+export async function readAppState(bundleId: string): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
-    const { bundleId } = args;
 
     const appIdentifier = browser.isAndroid
       ? { appId: bundleId }
@@ -35,18 +19,10 @@ export const getAppStateTool: ToolCallback = async (args: {
     };
 
     return {
-      content: [
-        {
-          type: 'text',
-          text: `App state for ${bundleId}: ${stateMap[state] || 'unknown: ' + state}`,
-        },
-      ],
+      mimeType: 'text/plain',
+      text: `App state for ${bundleId}: ${stateMap[state] || 'unknown: ' + state}`,
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting app state: ${e}` }],
-    };
+    return { mimeType: 'text/plain', text: `Error getting app state: ${e}` };
   }
-};
-
+}

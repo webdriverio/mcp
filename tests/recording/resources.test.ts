@@ -1,11 +1,11 @@
 // tests/recording/resources.test.ts
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getBrowser } from '../../src/tools/browser.tool';
+import { getState } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
 import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from '../../src/recording/resources';
 
 function addHistory(sessionId: string, type: 'browser' | 'ios' | 'android', isCurrent = false, ended = false) {
-  const state = (getBrowser as any).__state;
+  const state = getState();
   const history: SessionHistory = {
     sessionId,
     type,
@@ -17,13 +17,13 @@ function addHistory(sessionId: string, type: 'browser' | 'ios' | 'android', isCu
   state.sessionHistory.set(sessionId, history);
   if (isCurrent) {
     state.currentSession = sessionId;
-    state.browsers.set(sessionId, {});
+    state.browsers.set(sessionId, {} as WebdriverIO.Browser);
   }
   return history;
 }
 
 beforeEach(() => {
-  const state = (getBrowser as any).__state;
+  const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
   state.sessionHistory.clear();

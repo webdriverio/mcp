@@ -10,20 +10,25 @@ const mockBrowser = vi.hoisted(() => ({
   emulate: mockEmulate,
 }));
 
-vi.mock('../../src/tools/browser.tool', () => {
-  const state = {
-    browsers: new Map(),
-    currentSession: 'test-session' as string | null,
-    sessionMetadata: new Map([
-      ['test-session', { type: 'browser', capabilities: {}, isAttached: false }],
-    ]),
-  };
-  const getBrowser = vi.fn(() => mockBrowser);
-  (getBrowser as any).__state = state;
-  return { getBrowser };
-});
+const mockState = vi.hoisted(() => ({
+  browsers: new Map([['test-session', mockBrowser]]) as Map<string, unknown>,
+  currentSession: 'test-session' as string | null,
+  sessionMetadata: new Map([
+    ['test-session', { type: 'browser', capabilities: {}, isAttached: false }],
+  ]),
+  sessionHistory: new Map(),
+}));
 
-import { getBrowser } from '../../src/tools/browser.tool';
+vi.mock('../../src/session/state', () => ({
+  getBrowser: vi.fn(() => {
+    const b = mockState.browsers.get(mockState.currentSession);
+    if (!b) throw new Error('No active browser session');
+    return b;
+  }),
+  getState: vi.fn(() => mockState),
+}));
+
+import { getState } from '../../src/session/state';
 import { emulateDeviceTool } from '../../src/tools/emulate-device.tool';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
@@ -35,9 +40,8 @@ beforeEach(() => {
   mockBrowser.isAndroid = false;
   mockBrowser.isIOS = false;
   mockEmulate.mockResolvedValue(mockRestoreFn);
-  const state = (getBrowser as any).__state;
-  state.currentSession = 'test-session';
-  state.sessionMetadata.set('test-session', { type: 'browser', capabilities: {}, isAttached: false });
+  mockState.currentSession = 'test-session';
+  mockState.sessionMetadata.set('test-session', { type: 'browser', capabilities: {}, isAttached: false });
 });
 
 describe('emulate_device — listing', () => {
@@ -81,7 +85,7 @@ describe('emulate_device — guards', () => {
   });
 
   it('returns error for iOS session', async () => {
-    const state = (getBrowser as any).__state;
+    const state = getState();
     state.sessionMetadata.set('test-session', { type: 'ios', capabilities: {}, isAttached: false });
     const result = await callTool({ device: 'iPhone 15' });
     expect(result.content[0].text).toContain('Error');

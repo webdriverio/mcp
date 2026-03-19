@@ -2,8 +2,10 @@ import { remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
-import type { SessionHistory } from '../types/recording';
 import { z } from 'zod';
+import { getBrowser, getState } from '../session/state';
+import { registerSession, closeSession } from '../session/lifecycle';
+import { localBrowserProvider } from '../providers/local-browser.provider';
 
 const supportedBrowsers = ['chrome', 'firefox', 'edge', 'safari'] as const;
 const browserSchema = z.enum(supportedBrowsers).default('chrome');
@@ -30,28 +32,6 @@ export const closeSessionToolDefinition: ToolDefinition = {
   },
 };
 
-const state: {
-  browsers: Map<string, WebdriverIO.Browser>;
-  currentSession: string | null;
-  sessionMetadata: Map<string, { type: 'browser' | 'ios' | 'android'; capabilities: any; isAttached: boolean }>;
-  sessionHistory: Map<string, SessionHistory>;
-} = {
-  browsers: new Map<string, WebdriverIO.Browser>(),
-  currentSession: null,
-  sessionMetadata: new Map(),
-  sessionHistory: new Map(),
-};
-
-export const getBrowser = () => {
-  const browser = state.browsers.get(state.currentSession);
-  if (!browser) {
-    throw new Error('No active browser session');
-  }
-  return browser;
-};
-// Export state for app-session.tool.ts to access
-(getBrowser as any).__state = state;
-
 export const startBrowserTool: ToolCallback = async ({
   browser = 'chrome',
   headless = true,
@@ -76,121 +56,31 @@ export const startBrowserTool: ToolCallback = async ({
   const selectedBrowser = browser;
   const headlessSupported = selectedBrowser !== 'safari';
   const effectiveHeadless = headless && headlessSupported;
-  const chromiumArgs = [
-    `--window-size=${windowWidth},${windowHeight}`,
-    '--no-sandbox',
-    '--disable-search-engine-choice-screen',
-    '--disable-infobars',
-    '--log-level=3',
-    '--use-fake-device-for-media-stream',
-    '--use-fake-ui-for-media-stream',
-    '--disable-web-security',
-    '--allow-running-insecure-content',
-  ];
 
-  // Add headless argument if enabled
-  if (effectiveHeadless) {
-    chromiumArgs.push('--headless=new');
-    chromiumArgs.push('--disable-gpu');
-    chromiumArgs.push('--disable-dev-shm-usage');
-  }
-
-  const firefoxArgs: string[] = [];
-  if (effectiveHeadless && selectedBrowser === 'firefox') {
-    firefoxArgs.push('-headless');
-  }
-
-  const capabilities: Record<string, any> = {
-    acceptInsecureCerts: true,
-  };
-
-  switch (selectedBrowser) {
-    case 'chrome':
-      capabilities.browserName = 'chrome';
-      capabilities['goog:chromeOptions'] = { args: chromiumArgs };
-      break;
-    case 'edge':
-      capabilities.browserName = 'msedge';
-      capabilities['ms:edgeOptions'] = { args: chromiumArgs };
-      break;
-    case 'firefox':
-      capabilities.browserName = 'firefox';
-      if (firefoxArgs.length > 0) {
-        capabilities['moz:firefoxOptions'] = { args: firefoxArgs };
-      }
-      break;
-    case 'safari':
-      capabilities.browserName = 'safari';
-      break;
-  }
-
-  const mergeCapabilityOptions = (defaultOptions: unknown, customOptions: unknown) => {
-    if (!defaultOptions || typeof defaultOptions !== 'object' || !customOptions || typeof customOptions !== 'object') {
-      return customOptions ?? defaultOptions;
-    }
-
-    const defaultRecord = defaultOptions as Record<string, unknown>;
-    const customRecord = customOptions as Record<string, unknown>;
-    const merged = { ...defaultRecord, ...customRecord };
-    if (Array.isArray(defaultRecord.args) || Array.isArray(customRecord.args)) {
-      merged.args = [
-        ...(Array.isArray(defaultRecord.args) ? defaultRecord.args : []),
-        ...(Array.isArray(customRecord.args) ? customRecord.args : []),
-      ];
-    }
-    return merged;
-  };
-
-  const mergedCapabilities: Record<string, unknown> = {
-    ...capabilities,
-    ...userCapabilities,
-    'goog:chromeOptions': mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),
-    'ms:edgeOptions': mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
-    'moz:firefoxOptions': mergeCapabilityOptions(capabilities['moz:firefoxOptions'], userCapabilities['moz:firefoxOptions']),
-  };
-  for (const [key, value] of Object.entries(mergedCapabilities)) {
-    if (value === undefined) {
-      delete mergedCapabilities[key];
-    }
-  }
+  const mergedCapabilities = localBrowserProvider.buildCapabilities({ browser, headless, windowWidth, windowHeight, capabilities: userCapabilities });
 
   const wdioBrowser = await remote({
     capabilities: mergedCapabilities,
   });
 
   const { sessionId } = wdioBrowser;
-  state.browsers.set(sessionId, wdioBrowser);
-  state.sessionMetadata.set(sessionId, {
-    type: 'browser',
-    capabilities: wdioBrowser.capabilities,
-    isAttached: false,
-  });
 
-  // If replacing an active session, close its history and append transition sentinel
-  if (state.currentSession && state.currentSession !== sessionId) {
-    const outgoing = state.sessionHistory.get(state.currentSession);
-    if (outgoing) {
-      outgoing.steps.push({
-        index: outgoing.steps.length + 1,
-        tool: '__session_transition__',
-        params: { newSessionId: sessionId },
-        status: 'ok',
-        durationMs: 0,
-        timestamp: new Date().toISOString(),
-      });
-      outgoing.endedAt = new Date().toISOString();
-    }
-  }
-
-  state.sessionHistory.set(sessionId, {
+  registerSession(
     sessionId,
-    type: 'browser',
-    startedAt: new Date().toISOString(),
-    capabilities: wdioBrowser.capabilities as Record<string, unknown>,
-    steps: [],
-  });
-
-  state.currentSession = sessionId;
+    wdioBrowser,
+    {
+      type: 'browser',
+      capabilities: wdioBrowser.capabilities as Record<string, unknown>,
+      isAttached: false,
+    },
+    {
+      sessionId,
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: wdioBrowser.capabilities as Record<string, unknown>,
+      steps: [],
+    },
+  );
 
   let sizeNote = '';
   try {
@@ -218,28 +108,69 @@ export const startBrowserTool: ToolCallback = async ({
   };
 };
 
-export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } = {}): Promise<CallToolResult> => {
+export async function readTabs(): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
+    const handles = await browser.getWindowHandles();
+    const currentHandle = await browser.getWindowHandle();
+    const tabs = [];
+    for (const handle of handles) {
+      await browser.switchToWindow(handle);
+      tabs.push({
+        handle,
+        title: await browser.getTitle(),
+        url: await browser.getUrl(),
+        isActive: handle === currentHandle,
+      });
+    }
+    // Switch back to the originally active tab
+    await browser.switchToWindow(currentHandle);
+    return { mimeType: 'application/json', text: JSON.stringify(tabs) };
+  } catch (e) {
+    return { mimeType: 'text/plain', text: `Error: ${e}` };
+  }
+}
+
+export const switchTabToolDefinition: ToolDefinition = {
+  name: 'switch_tab',
+  description: 'switches to a browser tab by handle or index',
+  inputSchema: {
+    handle: z.string().optional().describe('Window handle to switch to'),
+    index: z.number().int().min(0).optional().describe('0-based tab index to switch to'),
+  },
+};
+
+export const switchTabTool: ToolCallback = async ({ handle, index }: { handle?: string; index?: number }) => {
+  try {
+    const browser = getBrowser();
+    if (handle) {
+      await browser.switchToWindow(handle);
+      return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
+    } else if (index !== undefined) {
+      const handles = await browser.getWindowHandles();
+      if (index >= handles.length) {
+        return { isError: true, content: [{ type: 'text', text: `Error: index ${index} out of range (${handles.length} tabs)` }] };
+      }
+      await browser.switchToWindow(handles[index]);
+      return { content: [{ type: 'text', text: `Switched to tab ${index}: ${handles[index]}` }] };
+    }
+    return { isError: true, content: [{ type: 'text', text: 'Error: Must provide either handle or index' }] };
+  } catch (e) {
+    return { isError: true, content: [{ type: 'text', text: `Error switching tab: ${e}` }] };
+  }
+};
+
+export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } = {}): Promise<CallToolResult> => {
+  try {
+    getBrowser(); // throws if no active session
+    const state = getState();
     const sessionId = state.currentSession;
     const metadata = state.sessionMetadata.get(sessionId);
 
-    // Retain history but mark session as ended
-    const history = state.sessionHistory.get(sessionId);
-    if (history) {
-      history.endedAt = new Date().toISOString();
-    }
-
     // Skip deleteSession for attached sessions (not created by us) or when user explicitly detaches
     const effectiveDetach = args.detach || !!metadata?.isAttached;
-    if (!effectiveDetach) {
-      await browser.deleteSession();
-    }
 
-    // Always clean up local state
-    state.browsers.delete(sessionId);
-    state.sessionMetadata.delete(sessionId);
-    state.currentSession = null;
+    await closeSession(sessionId, args.detach ?? false, !!metadata?.isAttached);
 
     const action = effectiveDetach ? 'detached from' : 'closed';
     const note = args.detach && !metadata?.isAttached

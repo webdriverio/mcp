@@ -2,7 +2,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 
 export const executeScriptToolDefinition: ToolDefinition = {
   name: 'execute_script',

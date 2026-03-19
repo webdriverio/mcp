@@ -20,24 +20,28 @@ vi.mock('webdriverio', () => ({
   remote: vi.fn().mockResolvedValue(mockBrowser),
 }));
 
-vi.mock('../../src/tools/browser.tool', () => {
-  const state = {
-    browsers: new Map(),
-    currentSession: null as string | null,
-    sessionMetadata: new Map(),
-    sessionHistory: new Map(),
-  };
-  const getBrowser = vi.fn(() => {
-    const b = state.browsers.get(state.currentSession);
-    if (!b) throw new Error('No active browser session');
-    return b;
-  });
-  (getBrowser as any).__state = state;
-  return { getBrowser };
-});
+const mockState = vi.hoisted(() => ({
+  browsers: new Map(),
+  currentSession: null as string | null,
+  sessionMetadata: new Map(),
+  sessionHistory: new Map(),
+}));
+
+vi.mock('../../src/session/state', () => ({
+  getState: vi.fn(() => mockState),
+}));
+
+vi.mock('../../src/session/lifecycle', () => ({
+  registerSession: vi.fn((sessionId, browser, metadata, historyEntry) => {
+    mockState.browsers.set(sessionId, browser);
+    mockState.sessionMetadata.set(sessionId, metadata);
+    mockState.sessionHistory.set(sessionId, historyEntry);
+    mockState.currentSession = sessionId;
+  }),
+}));
 
 import { remote } from 'webdriverio';
-import { getBrowser } from '../../src/tools/browser.tool';
+import { getState } from '../../src/session/state';
 import { attachBrowserTool } from '../../src/tools/attach-browser.tool';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
@@ -48,11 +52,10 @@ const mockRemote = remote as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const state = (getBrowser as any).__state;
-  state.browsers.clear();
-  state.sessionMetadata.clear();
-  state.sessionHistory.clear();
-  state.currentSession = null;
+  mockState.browsers.clear();
+  mockState.sessionMetadata.clear();
+  mockState.sessionHistory.clear();
+  mockState.currentSession = null;
   mockRemote.mockResolvedValue(mockBrowser);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
@@ -85,7 +88,7 @@ describe('attach_browser', () => {
 
   it('registers session in state with isAttached: true', async () => {
     await callTool();
-    const state = (getBrowser as any).__state;
+    const state = getState();
     expect(state.currentSession).toBe('attached-session-id');
     expect(state.sessionMetadata.get('attached-session-id')).toMatchObject({
       type: 'browser',
@@ -171,7 +174,7 @@ describe('attach_browser', () => {
 
   it('initialises sessionHistory with constructed caps and empty steps', async () => {
     await callTool({ host: 'myhost', port: 9333 });
-    const state = (getBrowser as any).__state;
+    const state = getState();
     const history = state.sessionHistory.get('attached-session-id');
     expect(history).toBeDefined();
     expect(history.steps).toEqual([]);

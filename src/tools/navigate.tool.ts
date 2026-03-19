@@ -1,6 +1,7 @@
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 
 export const navigateToolDefinition: ToolDefinition = {
@@ -11,7 +12,7 @@ export const navigateToolDefinition: ToolDefinition = {
   },
 };
 
-export const navigateTool: ToolCallback = async ({ url}: { url: string }) => {
+export const navigateAction = async (url: string): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
     await browser.url(url);
@@ -25,3 +26,5 @@ export const navigateTool: ToolCallback = async ({ url}: { url: string }) => {
     };
   }
 };
+
+export const navigateTool: ToolCallback = async ({ url}: { url: string }) => navigateAction(url);

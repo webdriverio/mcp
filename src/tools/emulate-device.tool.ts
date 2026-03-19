@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tool';
 // This is a type-only import — it is stripped at build time by tsup and has no runtime impact.
 import type { DeviceName } from 'webdriverio/build/deviceDescriptorsSource.js';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser, getState } from '../session/state';
 
 // Stores restore functions returned by browser.emulate(), keyed by sessionId
 const restoreFunctions = new Map<string, () => Promise<void>>();
@@ -34,15 +34,18 @@ export const emulateDeviceTool: ToolCallback = async ({
 }): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
-    const state = (getBrowser as any).__state;
-    const sessionId = state.currentSession as string;
+    const state = getState();
+    const sessionId = state.currentSession;
     const metadata = state.sessionMetadata.get(sessionId);
 
     // Guard: mobile sessions
     if (metadata?.type === 'ios' || metadata?.type === 'android') {
       return {
         isError: true,
-        content: [{ type: 'text', text: 'Error: emulate_device is only supported for web browser sessions, not iOS/Android.' }],
+        content: [{
+          type: 'text',
+          text: 'Error: emulate_device is only supported for web browser sessions, not iOS/Android.'
+        }],
       };
     }
 

@@ -1,14 +1,7 @@
 // src/recording/step-recorder.ts
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { RecordedStep, SessionHistory } from '../types/recording';
-import { getBrowser } from '../tools/browser.tool';
-
-function getState() {
-  return (getBrowser as any).__state as {
-    currentSession: string | null;
-    sessionHistory: Map<string, SessionHistory>;
-  };
-}
+import { getState } from '../session/state';
 
 export function appendStep(
   toolName: string,

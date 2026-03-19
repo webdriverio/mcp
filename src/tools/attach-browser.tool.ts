@@ -3,7 +3,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getState } from '../session/state';
 
 export const attachBrowserToolDefinition: ToolDefinition = {
   name: 'attach_browser',
@@ -95,7 +95,7 @@ export const attachBrowserTool: ToolCallback = async ({
   navigationUrl?: string;
 }): Promise<CallToolResult> => {
   try {
-    const state = (getBrowser as any).__state;
+    const state = getState();
 
     await waitForCDP(host, port);
     const { activeTabUrl, allTabUrls } = await closeStaleMappers(host, port);
@@ -118,7 +118,7 @@ export const attachBrowserTool: ToolCallback = async ({
     state.currentSession = sessionId;
     state.sessionMetadata.set(sessionId, {
       type: 'browser',
-      capabilities: browser.capabilities,
+      capabilities: browser.capabilities as Record<string, unknown>,
       isAttached: true,
     });
     state.sessionHistory.set(sessionId, {

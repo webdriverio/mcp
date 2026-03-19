@@ -2,18 +2,12 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 
 // Tool Definitions for zero-argument tools
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
   description: 'hides the on-screen keyboard',
-  inputSchema: {},
-};
-
-export const getGeolocationToolDefinition: ToolDefinition = {
-  name: 'get_geolocation',
-  description: 'gets current device geolocation',
   inputSchema: {},
 };
 
@@ -35,6 +29,16 @@ export const setGeolocationToolDefinition: ToolDefinition = {
     altitude: z.number().optional().describe('Altitude in meters (optional)'),
   },
 };
+
+export async function readGeolocation(): Promise<{ mimeType: string; text: string }> {
+  try {
+    const browser = getBrowser();
+    const location = await browser.getGeoLocation();
+    return { mimeType: 'application/json', text: JSON.stringify(location) };
+  } catch (e) {
+    return { mimeType: 'text/plain', text: `Error: ${e}` };
+  }
+}
 
 // Rotate Device Tool
 export const rotateDeviceTool: ToolCallback = async (args: {
@@ -71,29 +75,6 @@ export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> 
     return {
       isError: true,
       content: [{ type: 'text', text: `Error hiding keyboard: ${e}` }],
-    };
-  }
-};
-
-// Get Geolocation Tool
-export const getGeolocationTool: ToolCallback = async (): Promise<CallToolResult> => {
-  try {
-    const browser = getBrowser();
-
-    const location = await browser.getGeoLocation();
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Location:\n  Latitude: ${location.latitude}\n  Longitude: ${location.longitude}\n  Altitude: ${location.altitude || 'N/A'}`,
-        },
-      ],
-    };
-  } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting geolocation: ${e}` }],
     };
   }
 };

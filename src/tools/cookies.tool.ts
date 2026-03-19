@@ -1,53 +1,27 @@
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { Cookie } from '@wdio/protocols';
 import type { ToolDefinition } from '../types/tool';
 
-// Tool definitions
-export const getCookiesToolDefinition: ToolDefinition = {
-  name: 'get_cookies',
-  description: 'gets all cookies or a specific cookie by name',
-  inputSchema: {
-    name: z.string().optional().describe('Optional cookie name to retrieve a specific cookie. If not provided, returns all cookies'),
-  },
-};
-
-export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
+export async function readCookies(name?: string): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
 
     if (name) {
-      // Get specific cookie by name
       const cookie = await browser.getCookies([name]);
       if (cookie.length === 0) {
-        return {
-          content: [{ type: 'text', text: `Cookie "${name}" not found` }],
-        };
+        return { mimeType: 'application/json', text: JSON.stringify(null) };
       }
-      return {
-        content: [{ type: 'text', text: JSON.stringify(cookie[0], null, 2) }],
-      };
+      return { mimeType: 'application/json', text: JSON.stringify(cookie[0]) };
     }
-    // Get all cookies
     const cookies = await browser.getCookies();
-    if (cookies.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No cookies found' }],
-      };
-    }
-    return {
-      content: [{ type: 'text', text: JSON.stringify(cookies, null, 2) }],
-    };
-
+    return { mimeType: 'application/json', text: JSON.stringify(cookies) };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting cookies: ${e}` }],
-    };
+    return { mimeType: 'application/json', text: JSON.stringify({ error: String(e) }) };
   }
-};
+}
 
 // Set a cookie
 export const setCookieToolDefinition: ToolDefinition = {

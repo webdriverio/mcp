@@ -1,7 +1,7 @@
 // tests/recording/step-recorder.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import { getBrowser } from '../../src/tools/browser.tool';
+import { getState } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
 import { appendStep, withRecording, getSessionHistory } from '../../src/recording/step-recorder';
 
@@ -9,8 +9,8 @@ const extra = {} as Parameters<ToolCallback>[1];
 type AnyToolFn = (params: Record<string, unknown>, extra: unknown) => Promise<unknown>;
 
 function setupSession(sessionId: string) {
-  const state = (getBrowser as any).__state;
-  state.browsers.set(sessionId, {});
+  const state = getState();
+  state.browsers.set(sessionId, {} as WebdriverIO.Browser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached: false });
   state.sessionHistory.set(sessionId, {
@@ -23,7 +23,7 @@ function setupSession(sessionId: string) {
 }
 
 beforeEach(() => {
-  const state = (getBrowser as any).__state;
+  const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
   state.sessionHistory.clear();

@@ -1,6 +1,7 @@
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 
 const defaultTimeout: number = 3000;
@@ -16,12 +17,12 @@ export const setValueToolDefinition: ToolDefinition = {
   },
 };
 
-export const setValueTool: ToolCallback = async ({ selector, value, scrollToView = true, timeout = defaultTimeout}: {
-  selector: string;
-  value: string;
-  scrollToView?: boolean;
-  timeout?: number
-}) => {
+export const setValueAction = async (
+  selector: string,
+  value: string,
+  scrollToView = true,
+  timeout = defaultTimeout,
+): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
     await browser.waitUntil(browser.$(selector).isExisting, { timeout });
@@ -40,3 +41,10 @@ export const setValueTool: ToolCallback = async ({ selector, value, scrollToView
     };
   }
 };
+
+export const setValueTool: ToolCallback = async ({ selector, value, scrollToView = true, timeout = defaultTimeout}: {
+  selector: string;
+  value: string;
+  scrollToView?: boolean;
+  timeout?: number
+}) => setValueAction(selector, value, scrollToView, timeout);

@@ -1,4 +1,4 @@
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
@@ -16,7 +16,7 @@ export const clickToolDefinition: ToolDefinition = {
   },
 };
 
-const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {
+export const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
     await browser.waitUntil(browser.$(selector).isExisting, { timeout });

@@ -5,15 +5,21 @@ vi.mock('../../src/scripts/get-browser-accessibility-tree', () => ({
   getBrowserAccessibilityTree: vi.fn(),
 }));
 
-vi.mock('../../src/tools/browser.tool', () => ({
+vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(() => ({ isAndroid: false, isIOS: false })),
+  getState: vi.fn(() => ({
+    browsers: new Map(),
+    currentSession: null,
+    sessionMetadata: new Map(),
+    sessionHistory: new Map(),
+  })),
 }));
 
 import { getBrowserAccessibilityTree } from '../../src/scripts/get-browser-accessibility-tree';
-import { getAccessibilityTreeTool } from '../../src/tools/get-accessibility-tree.tool';
+import { readAccessibilityTree } from '../../src/tools/get-accessibility-tree.tool';
 
-type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
-const callTool = getAccessibilityTreeTool as unknown as ToolFn;
+type ReadFn = (args: Record<string, unknown>) => Promise<{ mimeType: string; text: string }>;
+const callRead = readAccessibilityTree as unknown as ReadFn;
 
 const mockGetTree = getBrowserAccessibilityTree as ReturnType<typeof vi.fn>;
 
@@ -34,8 +40,8 @@ beforeEach(() => {
 describe('column trimming', () => {
   it('omits state columns when all nodes have empty state', async () => {
     mockGetTree.mockResolvedValue([makeNode({})]);
-    const result = await callTool({});
-    const text = result.content[0].text;
+    const result = await callRead({});
+    const text = result.text;
     expect(text).not.toMatch(/\bdisabled\b/);
     expect(text).not.toMatch(/\bchecked\b/);
     expect(text).not.toMatch(/\blevel\b/);
@@ -46,8 +52,8 @@ describe('column trimming', () => {
       makeNode({ role: 'heading', name: 'Title', level: 2 }),
       makeNode({}),
     ]);
-    const result = await callTool({});
-    const text = result.content[0].text;
+    const result = await callRead({});
+    const text = result.text;
     expect(text).toMatch(/level/);
   });
 
@@ -56,8 +62,8 @@ describe('column trimming', () => {
       makeNode({ role: 'checkbox', name: 'Accept', checked: 'true' }),
       makeNode({}),
     ]);
-    const result = await callTool({});
-    const text = result.content[0].text;
+    const result = await callRead({});
+    const text = result.text;
     expect(text).toMatch(/checked/);
   });
 });
@@ -68,8 +74,8 @@ describe('filtering', () => {
       makeNode({ name: '' }),
       makeNode({ name: 'Visible' }),
     ]);
-    const result = await callTool({});
-    const text = result.content[0].text;
+    const result = await callRead({});
+    const text = result.text;
     expect(text).toContain('Visible');
     expect(text).toMatch(/total: 1/);
   });
@@ -79,8 +85,8 @@ describe('filtering', () => {
       makeNode({ role: 'heading', name: 'Title' }),
       makeNode({ role: 'link', name: 'Click here' }),
     ]);
-    const result = await callTool({ roles: ['heading'] });
-    const text = result.content[0].text;
+    const result = await callRead({ roles: ['heading'] });
+    const text = result.text;
     expect(text).toContain('Title');
     expect(text).not.toContain('Click here');
   });
@@ -93,8 +99,8 @@ describe('pagination', () => {
       makeNode({ name: 'B' }),
       makeNode({ name: 'C' }),
     ]);
-    const result = await callTool({ limit: 2 });
-    const text = result.content[0].text;
+    const result = await callRead({ limit: 2 });
+    const text = result.text;
     expect(text).toMatch(/showing: 2/);
     expect(text).toMatch(/hasMore: true/);
   });
@@ -104,8 +110,8 @@ describe('pagination', () => {
       makeNode({ name: 'A' }),
       makeNode({ name: 'B' }),
     ]);
-    const result = await callTool({ offset: 1, limit: 0 });
-    const text = result.content[0].text;
+    const result = await callRead({ offset: 1, limit: 0 });
+    const text = result.text;
     expect(text).toMatch(/showing: 1/);
     expect(text).toContain('B');
   });

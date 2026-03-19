@@ -1,49 +1,28 @@
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 import { getBrowserAccessibilityTree } from '../scripts/get-browser-accessibility-tree';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
-import type { ToolDefinition } from '../types/tool';
 import { encode } from '@toon-format/toon';
-import { z } from 'zod';
 
-export const getAccessibilityToolDefinition: ToolDefinition = {
-  name: 'get_accessibility',
-  description: 'Gets the accessibility tree: page structure with headings, landmarks, and semantic roles. Browser-only. Use to understand page layout and context around interactable elements.',
-  inputSchema: {
-    limit: z.number().optional()
-      .describe('Maximum number of nodes to return. Default: 100. Use 0 for unlimited.'),
-    offset: z.number().optional()
-      .describe('Number of nodes to skip (for pagination). Default: 0.'),
-    roles: z.array(z.string()).optional()
-      .describe('Filter to specific roles (e.g., ["heading", "navigation", "region"]). Default: all roles.'),
-  },
-};
-
-export const getAccessibilityTreeTool: ToolCallback = async (args: {
+export async function readAccessibilityTree(params: {
   limit?: number;
   offset?: number;
   roles?: string[];
-}): Promise<CallToolResult> => {
+}): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
 
     if (browser.isAndroid || browser.isIOS) {
       return {
-        content: [{
-          type: 'text',
-          text: 'Error: get_accessibility is browser-only. For mobile apps, use get_visible_elements instead.',
-        }],
+        mimeType: 'text/plain',
+        text: 'Error: get_accessibility is browser-only. For mobile apps, use get_visible_elements instead.',
       };
     }
 
-    const { limit = 100, offset = 0, roles } = args || {};
+    const { limit = 100, offset = 0, roles } = params;
 
     let nodes = await getBrowserAccessibilityTree(browser);
 
     if (nodes.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No accessibility tree available' }],
-      };
+      return { mimeType: 'text/plain', text: 'No accessibility tree available' };
     }
 
     // Filter out nodes with no meaningful name
@@ -83,13 +62,8 @@ export const getAccessibilityTreeTool: ToolCallback = async (args: {
       .replace(/,""/g, ',')
       .replace(/"",/g, ',');
 
-    return {
-      content: [{ type: 'text', text: toon }],
-    };
+    return { mimeType: 'text/plain', text: toon };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting accessibility tree: ${e}` }],
-    };
+    return { mimeType: 'text/plain', text: `Error getting accessibility tree: ${e}` };
   }
-};
+}

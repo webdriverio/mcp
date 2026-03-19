@@ -1,7 +1,7 @@
-import { getBrowser } from './browser.tool';
-import { getState } from './app-session.tool';
+import { getBrowser, getState } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 
 export const scrollToolDefinition: ToolDefinition = {
@@ -13,7 +13,7 @@ export const scrollToolDefinition: ToolDefinition = {
   },
 };
 
-export const scrollTool: ToolCallback = async ({ direction, pixels = 500 }: { direction: 'up' | 'down'; pixels?: number }) => {
+export const scrollAction = async (direction: 'up' | 'down', pixels = 500): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
     const state = getState();
@@ -39,3 +39,6 @@ export const scrollTool: ToolCallback = async ({ direction, pixels = 500 }: { di
     };
   }
 };
+
+export const scrollTool: ToolCallback = async ({ direction, pixels = 500 }: { direction: 'up' | 'down'; pixels?: number }) =>
+  scrollAction(direction, pixels);

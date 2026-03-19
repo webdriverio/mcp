@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionHistory } from '../../src/types/recording';
 
 // No mock of browser.tool — closeSessionTool reads from the module-level state directly.
-// We inject test sessions via getBrowser().__state, which IS the module-level state object.
-import { closeSessionTool, getBrowser } from '../../src/tools/browser.tool';
+// We inject test sessions via getState(), which IS the module-level state object.
+import { closeSessionTool } from '../../src/tools/browser.tool';
+import { getState } from '../../src/session/state';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
 const callClose = closeSessionTool as unknown as ToolFn;
@@ -11,8 +12,8 @@ const callClose = closeSessionTool as unknown as ToolFn;
 const mockDeleteSession = vi.fn();
 
 function setupSession(sessionId: string, isAttached: boolean) {
-  const state = (getBrowser as any).__state;
-  state.browsers.set(sessionId, { deleteSession: mockDeleteSession });
+  const state = getState();
+  state.browsers.set(sessionId, { deleteSession: mockDeleteSession } as unknown as WebdriverIO.Browser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached });
   state.sessionHistory.set(sessionId, {
@@ -26,7 +27,7 @@ function setupSession(sessionId: string, isAttached: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const state = (getBrowser as any).__state;
+  const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
   state.sessionHistory.clear();
@@ -55,7 +56,7 @@ describe('close_session', () => {
   it('cleans up local state in both cases', async () => {
     setupSession('sess-2', true);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     expect(state.currentSession).toBeNull();
     expect(state.browsers.has('sess-2')).toBe(false);
   });
@@ -65,7 +66,7 @@ describe('close_session sessionHistory', () => {
   it('sets endedAt on the session history when session closes', async () => {
     setupSession('sess-history', false);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     const history = state.sessionHistory.get('sess-history');
     expect(history).toBeDefined();
     expect(history.endedAt).toBeDefined();
@@ -75,7 +76,7 @@ describe('close_session sessionHistory', () => {
   it('retains sessionHistory after session is closed (browsers entry removed)', async () => {
     setupSession('sess-retain', false);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     expect(state.browsers.has('sess-retain')).toBe(false);
     expect(state.sessionHistory.has('sess-retain')).toBe(true);
   });

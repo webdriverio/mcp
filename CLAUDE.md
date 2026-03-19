@@ -16,12 +16,22 @@ npm start         # Run built server from lib/server.js
 ```
 src/
 ├── server.ts                    # MCP server entry, registers all tools + MCP resources
+├── session/
+│   ├── state.ts                 # Session state maps, getBrowser(), getState(), SessionMetadata
+│   └── lifecycle.ts             # registerSession(), handleSessionTransition(), closeSession()
+├── providers/
+│   ├── types.ts                 # SessionProvider interface, ConnectionConfig
+│   ├── local-browser.provider.ts  # Chrome/Firefox/Edge/Safari capability building
+│   └── local-appium.provider.ts   # iOS/Android via appium.config.ts
 ├── tools/
-│   ├── browser.tool.ts          # Session state + start_browser + getBrowser()
+│   ├── browser.tool.ts          # start_browser, close_session, readTabs(), switch_tab
 │   ├── app-session.tool.ts      # start_app_session (iOS/Android via Appium)
-│   ├── navigate.tool.ts         # URL navigation
-│   ├── get-visible-elements.tool.ts  # Element detection (web + mobile)
-│   ├── click.tool.ts            # Click/tap actions
+│   ├── navigate.tool.ts         # navigateAction() + navigateTool
+│   ├── click.tool.ts            # clickAction() + clickTool
+│   ├── set-value.tool.ts        # setValueAction() + setValueTool
+│   ├── scroll.tool.ts           # scrollAction() + scrollTool
+│   ├── gestures.tool.ts         # tapAction(), swipeAction(), dragAndDropAction()
+│   ├── execute-sequence.tool.ts # Batch action sequencing with stability + state delta
 │   └── ...                      # Other tools follow same pattern
 ├── recording/
 │   ├── step-recorder.ts         # withRecording HOF, appendStep, session history access
@@ -34,7 +44,11 @@ src/
 │   ├── generate-all-locators.ts # Multi-strategy selector generation
 │   └── source-parsing.ts        # XML page source parsing for mobile
 ├── config/
-│   └── appium.config.ts         # iOS/Android capability builders
+│   └── appium.config.ts         # iOS/Android capability builders (used by local-appium.provider)
+├── utils/
+│   ├── parse-variables.ts       # URI template variable parsing (parseBool, parseNumber, etc.)
+│   ├── stability-detector.ts    # Page stability polling (signature-based, 200ms/500ms/5s)
+│   └── state-diff.ts            # Element before/after diff (appeared, disappeared, changed)
 └── types/
     ├── tool.ts                  # ToolDefinition interface
     └── recording.ts             # RecordedStep, SessionHistory interfaces
@@ -42,19 +56,19 @@ src/
 
 ### Session State
 
-Single active session model in `browser.tool.ts`:
+Single active session model in `src/session/state.ts`:
 
 ```typescript
-const browsers: Map<string, WebdriverIO.Browser> = new Map();
-let currentSession: string | null = null;
-const sessionMetadata: Map<string, SessionMetadata> = new Map();
-
-export function getBrowser(): WebdriverIO.Browser {
-  // Returns current active session or throws
-}
+// Private state — access via getState() or getBrowser()
+export function getBrowser(): WebdriverIO.Browser { ... }
+export function getState() { return state; }
+export interface SessionMetadata { type: 'browser' | 'ios' | 'android'; capabilities: Record<string, unknown>; isAttached: boolean; }
 ```
 
-State shared with `app-session.tool.ts` via `(getBrowser as any).__state`.
+Session lifecycle managed via `src/session/lifecycle.ts`:
+- `registerSession()` — registers browser + metadata + history, handles transition sentinel
+- `handleSessionTransition()` — appends `__session_transition__` step to outgoing session
+- `closeSession()` — terminates or detaches, marks endedAt, cleans up maps
 
 ### Tool Pattern
 
@@ -103,14 +117,21 @@ MCP resources expose history without tool calls:
 
 | File                                               | Purpose                                       |
 |----------------------------------------------------|-----------------------------------------------|
-| `src/server.ts`                                    | MCP server init, tool registration            |
-| `src/tools/browser.tool.ts`                        | Session state management, `getBrowser()`      |
+| `src/server.ts`                                    | MCP server init, tool + resource registration |
+| `src/session/state.ts`                             | Session state maps, `getBrowser()`, `getState()` |
+| `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
+| `src/tools/browser.tool.ts`                        | `start_browser`, `close_session`, `switch_tab`, `readTabs()` |
 | `src/tools/app-session.tool.ts`                    | Appium session creation                       |
+| `src/tools/execute-sequence.tool.ts`               | Batch action sequencing with stability + delta |
+| `src/providers/local-browser.provider.ts`          | Chrome/Firefox/Edge/Safari capability building |
+| `src/providers/local-appium.provider.ts`           | iOS/Android capabilities via appium.config.ts |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
 | `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps every tool for step logging |
 | `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
 | `src/recording/resources.ts`                       | Builds text for `wdio://sessions` and `wdio://session/*/steps` resources |
+| `src/utils/stability-detector.ts`                  | Page stability detection (signature polling)  |
+| `src/utils/state-diff.ts`                          | Element state diff (appeared/disappeared/changed) |
 | `tsup.config.ts`                                   | Build configuration                           |
 
 ## Gotchas
@@ -128,16 +149,6 @@ console.log = (...args) => process.stderr.write(util.format(...args) + '\n');
 
 `get-interactable-browser-elements.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
 external imports.
-
-### Mobile State Sharing Hack
-
-`app-session.tool.ts` accesses browser.tool.ts state via:
-
-```typescript
-const state = (getBrowser as any).__state;
-```
-
-This maintains single-session behavior across browser and mobile.
 
 ### Auto-Detach Behavior
 
@@ -179,6 +190,5 @@ catch (e) {
 
 See `docs/architecture/` for proposals:
 
-- `session-configuration-proposal.md` — Cloud provider pattern (BrowserStack, SauceLabs)
-- `interaction-sequencing-proposal.md` — Batch actions with state delta detection
+- `session-configuration-proposal.md` — Cloud provider pattern (BrowserStack, SauceLabs) — providers/types.ts is the extension point
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination
