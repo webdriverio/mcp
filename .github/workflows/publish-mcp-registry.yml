@@ -39,5 +39,8 @@ jobs:
             fs.writeFileSync('server.json', JSON.stringify(s, null, 2) + '\n');
           "
 
+      - name: Authenticate with MCP Registry
+        run: mcp-publisher login github-oidc
+
       - name: Publish to MCP Registry
-        run: mcp-publisher publish --token ${{ secrets.GITHUB_TOKEN }}
+        run: mcp-publisher publish
