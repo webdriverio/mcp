@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.3](https://github.com/webdriverio/mcp/compare/v2.5.2...v2.5.3) (2026-03-20)
+
+### Bug Fixes
+
+* Add authentication step for MCP Registry publishing ([610e364](https://github.com/webdriverio/mcp/commit/610e36476e2c6c057deea0befdc15cae66f2fdcf))
+* Change mcp-publisher installation method ([94d1d11](https://github.com/webdriverio/mcp/commit/94d1d11cddf6dcc47c0781a419d4869d3fa7f8cc))
+
 ## [2.5.2](https://github.com/webdriverio/mcp/compare/v2.5.1...v2.5.2) (2026-03-20)
 
 ### Features
