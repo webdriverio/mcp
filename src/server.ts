@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import pkg from '../package.json' with { type: 'json' };
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { ToolDefinition } from './types/tool';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
@@ -55,11 +55,10 @@ import {
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
 import { attachBrowserTool, attachBrowserToolDefinition } from './tools/attach-browser.tool';
+import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
-import pkg from '../package.json' with { type: 'json' };
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withRecording } from './recording/step-recorder';
-import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from './recording/resources';
+import { buildCurrentSessionSteps, buildSessionsIndex, buildSessionStepsById } from './recording/resources';
 
 // IMPORTANT: Redirect all console output to stderr to avoid messing with MCP protocol (Chrome writes to console)
 const _originalConsoleLog = console.log;
@@ -97,6 +96,7 @@ const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
 registerTool(startBrowserToolDefinition, withRecording('start_browser', startBrowserTool));
 registerTool(startAppToolDefinition, withRecording('start_app_session', startAppTool));
 registerTool(closeSessionToolDefinition, closeSessionTool);
+registerTool(launchChromeToolDefinition, withRecording('launch_chrome', launchChromeTool));
 registerTool(attachBrowserToolDefinition, withRecording('attach_browser', attachBrowserTool));
 registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
 registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
@@ -159,7 +159,11 @@ server.registerResource(
   async () => {
     const payload = buildCurrentSessionSteps();
     return {
-      contents: [{ uri: 'wdio://session/current/steps', mimeType: 'application/json', text: payload?.stepsJson ?? '{"error":"No active session"}' }],
+      contents: [{
+        uri: 'wdio://session/current/steps',
+        mimeType: 'application/json',
+        text: payload?.stepsJson ?? '{"error":"No active session"}'
+      }],
     };
   },
 );
@@ -171,7 +175,11 @@ server.registerResource(
   async () => {
     const payload = buildCurrentSessionSteps();
     return {
-      contents: [{ uri: 'wdio://session/current/code', mimeType: 'text/plain', text: payload?.generatedJs ?? '// No active session' }],
+      contents: [{
+        uri: 'wdio://session/current/code',
+        mimeType: 'text/plain',
+        text: payload?.generatedJs ?? '// No active session'
+      }],
     };
   },
 );
@@ -183,7 +191,11 @@ server.registerResource(
   async (uri, { sessionId }) => {
     const payload = buildSessionStepsById(sessionId as string);
     return {
-      contents: [{ uri: uri.href, mimeType: 'application/json', text: payload?.stepsJson ?? `{"error":"Session not found: ${sessionId}"}` }],
+      contents: [{
+        uri: uri.href,
+        mimeType: 'application/json',
+        text: payload?.stepsJson ?? `{"error":"Session not found: ${sessionId}"}`
+      }],
     };
   },
 );
@@ -195,7 +207,11 @@ server.registerResource(
   async (uri, { sessionId }) => {
     const payload = buildSessionStepsById(sessionId as string);
     return {
-      contents: [{ uri: uri.href, mimeType: 'text/plain', text: payload?.generatedJs ?? `// Session not found: ${sessionId}` }],
+      contents: [{
+        uri: uri.href,
+        mimeType: 'text/plain',
+        text: payload?.generatedJs ?? `// Session not found: ${sessionId}`
+      }],
     };
   },
 );

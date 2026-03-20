@@ -9,67 +9,106 @@ export const attachBrowserToolDefinition: ToolDefinition = {
   name: 'attach_browser',
   description: `Attach to a Chrome instance already running with --remote-debugging-port.
 
-Start Chrome first (quit any running Chrome instance before launching):
-
-  macOS — with real profile (preserves extensions, cookies, logins):
-    pkill -x "Google Chrome" && sleep 1
-    /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir="$HOME/Library/Application Support/Google/Chrome" --profile-directory=Default &
-
-  macOS — with fresh profile (lightweight, no extensions):
-    pkill -x "Google Chrome" && sleep 1
-    /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug &
-
-  Linux — with real profile:
-    google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.config/google-chrome" --profile-directory=Default &
-
-  Linux — with fresh profile:
-    google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug &
-
-Verify Chrome is ready: curl http://localhost:9222/json/version
-
-Then call attach_browser() to hand control to the AI. All other tools (navigate, click, get_visible_elements, etc.) will work on the attached session. Use close_session() to detach without closing Chrome.`,
+Use launch_chrome() first to prepare and launch Chrome with remote debugging enabled.`,
   inputSchema: {
     port: z.number().default(9222).describe('Chrome remote debugging port (default: 9222)'),
     host: z.string().default('localhost').describe('Host where Chrome is running (default: localhost)'),
-    userDataDir: z.string().default('/tmp/chrome-debug').describe('Chrome user data directory — must match the --user-data-dir used when launching Chrome. Use your real profile path (e.g. "$HOME/Library/Application Support/Google/Chrome") to preserve extensions and logins, or /tmp/chrome-debug for a fresh profile (default: /tmp/chrome-debug)'),
     navigationUrl: z.string().optional().describe('URL to navigate to immediately after attaching'),
   },
 };
 
-async function getActiveTabUrl(host: string, port: number): Promise<string | null> {
+type TabSnapshot = { activeTabUrl: string | undefined; allTabUrls: string[] };
+
+// ChromeDriver injects a BiDi-CDP Mapper page when creating a session. If the previous session
+// was detached without proper cleanup, this target remains and causes "unexpected alert open" on
+// the next attach attempt. Close any stale mappers before creating a new session.
+// Returns the active tab URL (first real page tab) and all page tab URLs — Chrome lists the
+// active/focused tab first in /json.
+async function closeStaleMappers(host: string, port: number): Promise<TabSnapshot> {
   try {
     const res = await fetch(`http://${host}:${port}/json`);
-    const tabs = await res.json() as { type: string; url: string }[];
-    const page = tabs.find((t) => t.type === 'page' && t.url && !t.url.startsWith('devtools://'));
-    return page?.url ?? null;
+    const targets = await res.json() as { id: string; title: string; type: string; url: string }[];
+    const mappers = targets.filter((t) => t.title?.includes('BiDi'));
+    await Promise.all(mappers.map((t) => fetch(`http://${host}:${port}/json/close/${t.id}`)));
+    const pages = targets.filter((t) => t.type === 'page' && !t.title?.includes('BiDi'));
+    return { activeTabUrl: pages[0]?.url, allTabUrls: pages.map((t) => t.url) };
   } catch {
-    return null;
+    return { activeTabUrl: undefined, allTabUrls: [] };
   }
+}
+
+// After CDP session init, Chrome blanks the first tab it takes over. This restores any tabs
+// that became about:blank and then switches focus to the originally active tab.
+async function restoreAndSwitchToActiveTab(
+  browser: WebdriverIO.Browser,
+  activeTabUrl: string,
+  allTabUrls: string[],
+): Promise<void> {
+  const handles = await browser.getWindowHandles();
+  const currentUrls: string[] = [];
+  for (const handle of handles) {
+    await browser.switchToWindow(handle);
+    currentUrls.push(await browser.getUrl());
+  }
+
+  // Restore blank tabs that had a known URL before attaching.
+  const missingUrls = allTabUrls.filter((u) => !currentUrls.includes(u));
+  let missingIdx = 0;
+  for (let i = 0; i < handles.length; i++) {
+    if (currentUrls[i] === 'about:blank' && missingIdx < missingUrls.length) {
+      await browser.switchToWindow(handles[i]);
+      await browser.url(missingUrls[missingIdx]);
+      currentUrls[i] = missingUrls[missingIdx++];
+    }
+  }
+
+  // Switch to the originally active tab.
+  for (let i = 0; i < handles.length; i++) {
+    if (currentUrls[i] === activeTabUrl) {
+      await browser.switchToWindow(handles[i]);
+      break;
+    }
+  }
+}
+
+async function waitForCDP(host: string, port: number, timeoutMs = 10000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://${host}:${port}/json/version`);
+      if (res.ok) return;
+    } catch {
+      // not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new Error(`Chrome did not expose CDP on ${host}:${port} within ${timeoutMs}ms`);
 }
 
 export const attachBrowserTool: ToolCallback = async ({
   port = 9222,
   host = 'localhost',
-  userDataDir = '/tmp/chrome-debug',
   navigationUrl,
 }: {
   port?: number;
   host?: string;
-  userDataDir?: string;
   navigationUrl?: string;
 }): Promise<CallToolResult> => {
   try {
     const state = (getBrowser as any).__state;
 
-    // Capture the active tab URL before WebDriver blanks it
-    const activeUrl = navigationUrl ?? await getActiveTabUrl(host, port);
+    await waitForCDP(host, port);
+    const { activeTabUrl, allTabUrls } = await closeStaleMappers(host, port);
 
     const browser = await remote({
+      connectionRetryTimeout: 30000,
+      connectionRetryCount: 3,
       capabilities: {
         browserName: 'chrome',
+        unhandledPromptBehavior: 'dismiss',
+        webSocketUrl: false,
         'goog:chromeOptions': {
           debuggerAddress: `${host}:${port}`,
-          args: [`--user-data-dir=${userDataDir}`],
         },
       },
     });
@@ -90,14 +129,15 @@ export const attachBrowserTool: ToolCallback = async ({
         browserName: 'chrome',
         'goog:chromeOptions': {
           debuggerAddress: `${host}:${port}`,
-          args: [`--user-data-dir=${userDataDir}`],
         },
       },
       steps: [],
     });
 
-    if (activeUrl) {
-      await browser.url(activeUrl);
+    if (navigationUrl) {
+      await browser.url(navigationUrl);
+    } else if (activeTabUrl) {
+      await restoreAndSwitchToActiveTab(browser, activeTabUrl, allTabUrls);
     }
 
     const title = await browser.getTitle();
