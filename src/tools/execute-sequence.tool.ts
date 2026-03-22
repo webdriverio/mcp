@@ -12,12 +12,13 @@ import { appendStep } from '../recording/step-recorder';
 import { waitForStability } from '../utils/stability-detector';
 import { captureStateDelta } from '../utils/state-diff';
 import { getInteractableBrowserElements } from '../scripts/get-interactable-browser-elements';
+import { coerceBoolean } from '../utils/zod-helpers';
 
 // Action schemas
 const clickActionSchema = z.object({
   action: z.literal('click'),
   selector: z.string(),
-  scrollToView: z.boolean().optional(),
+  scrollToView: coerceBoolean.optional(),
   timeout: z.number().optional(),
 });
 
@@ -25,7 +26,7 @@ const setValueActionSchema = z.object({
   action: z.literal('set_value'),
   selector: z.string(),
   value: z.string(),
-  scrollToView: z.boolean().optional(),
+  scrollToView: coerceBoolean.optional(),
   timeout: z.number().optional(),
 });
 
@@ -78,7 +79,7 @@ export const executeSequenceToolDefinition: ToolDefinition = {
   description: 'Execute a sequence of actions atomically. Waits for page stability between actions. Returns a state delta showing what changed.',
   inputSchema: {
     actions: z.array(actionSchema).min(1).describe('Sequence of actions to execute'),
-    waitForStability: z.boolean().optional().default(true).describe('Wait for page stability after each action'),
+    waitForStability: coerceBoolean.optional().default(true).describe('Wait for page stability after each action'),
   },
 };
 

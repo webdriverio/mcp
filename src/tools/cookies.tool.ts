@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import type { Cookie } from '@wdio/protocols';
+import { coerceBoolean } from '../utils/zod-helpers';
 
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
@@ -13,8 +14,8 @@ export const setCookieToolDefinition: ToolDefinition = {
     domain: z.string().optional().describe('Cookie domain (defaults to current domain)'),
     path: z.string().optional().describe('Cookie path (defaults to "/")'),
     expiry: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
-    httpOnly: z.boolean().optional().describe('HttpOnly flag'),
-    secure: z.boolean().optional().describe('Secure flag'),
+    httpOnly: coerceBoolean.optional().describe('HttpOnly flag'),
+    secure: coerceBoolean.optional().describe('Secure flag'),
     sameSite: z.enum(['strict', 'lax', 'none']).optional().describe('SameSite attribute'),
   },
 };

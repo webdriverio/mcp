@@ -8,6 +8,7 @@ import { registerSession, closeSession } from '../session/lifecycle';
 import { localBrowserProvider } from '../providers/local-browser.provider';
 import { localAppiumProvider } from '../providers/local-appium.provider';
 import type { SessionMetadata } from '../session/state';
+import { coerceBoolean } from '../utils/zod-helpers';
 
 const platformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
@@ -19,22 +20,22 @@ export const startSessionToolDefinition: ToolDefinition = {
   inputSchema: {
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
-    headless: z.boolean().optional().default(true).describe('Run browser in headless mode (default: true)'),
+    headless: coerceBoolean.optional().default(true).describe('Run browser in headless mode (default: true)'),
     windowWidth: z.number().min(400).max(3840).optional().default(1920).describe('Browser window width'),
     windowHeight: z.number().min(400).max(2160).optional().default(1080).describe('Browser window height'),
     deviceName: z.string().optional().describe('Mobile device/emulator/simulator name (required for ios/android)'),
     platformVersion: z.string().optional().describe('OS version (e.g., "17.0", "14")'),
     appPath: z.string().optional().describe('Path to app file (.app/.apk/.ipa)'),
     automationName: automationEnum.optional().describe('Automation driver'),
-    autoGrantPermissions: z.boolean().optional().describe('Auto-grant app permissions (default: true)'),
-    autoAcceptAlerts: z.boolean().optional().describe('Auto-accept alerts (default: true)'),
-    autoDismissAlerts: z.boolean().optional().describe('Auto-dismiss alerts (default: false)'),
+    autoGrantPermissions: coerceBoolean.optional().describe('Auto-grant app permissions (default: true)'),
+    autoAcceptAlerts: coerceBoolean.optional().describe('Auto-accept alerts (default: true)'),
+    autoDismissAlerts: coerceBoolean.optional().describe('Auto-dismiss alerts (default: false)'),
     appWaitActivity: z.string().optional().describe('Activity to wait for on Android launch'),
     udid: z.string().optional().describe('Unique Device Identifier for iOS real device'),
-    noReset: z.boolean().optional().describe('Preserve app data between sessions'),
-    fullReset: z.boolean().optional().describe('Uninstall app before/after session'),
+    noReset: coerceBoolean.optional().describe('Preserve app data between sessions'),
+    fullReset: coerceBoolean.optional().describe('Uninstall app before/after session'),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium command timeout in seconds'),
-    attach: z.boolean().optional().default(false).describe('Attach to existing Chrome instead of launching'),
+    attach: coerceBoolean.optional().default(false).describe('Attach to existing Chrome instead of launching'),
     port: z.number().optional().default(9222).describe('Chrome remote debugging port (for attach mode)'),
     host: z.string().optional().default('localhost').describe('Chrome host (for attach mode)'),
     appiumHost: z.string().optional().describe('Appium server hostname'),
@@ -77,7 +78,7 @@ export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
   description: 'Closes or detaches from the current browser or app session',
   inputSchema: {
-    detach: z.boolean().optional().describe('If true, disconnect without terminating (preserves app state). Default: false'),
+    detach: coerceBoolean.optional().describe('If true, disconnect without terminating (preserves app state). Default: false'),
   },
 };
 

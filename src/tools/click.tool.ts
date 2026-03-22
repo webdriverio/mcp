@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
+import { coerceBoolean } from '../utils/zod-helpers';
 
 const defaultTimeout: number = 3000;
 
@@ -11,7 +12,7 @@ export const clickToolDefinition: ToolDefinition = {
   description: 'clicks an element',
   inputSchema: {
     selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text")'),
-    scrollToView: z.boolean().optional().describe('Whether to scroll the element into view before clicking').default(true),
+    scrollToView: coerceBoolean.optional().describe('Whether to scroll the element into view before clicking').default(true),
     timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
   },
 };
