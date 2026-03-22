@@ -1,37 +1,186 @@
 # WebDriverIO MCP Server
 
-A Model Context Protocol (MCP) server that enables Claude Desktop to interact with web browsers and mobile applications
+A Model Context Protocol (MCP) server that enables AI assistants to interact with web browsers and mobile applications
 using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified interface.
 
 ## Installation
 
-### Setup
+[![mcp MCP server](https://glama.ai/mcp/servers/webdriverio/mcp/badges/score.svg)](https://glama.ai/mcp/servers/webdriverio/mcp)
 
-**Option 1: Configure Claude Desktop or Claude Code (Recommended)**
+Add the following configuration to your MCP client settings:
 
-Add the following configuration to your Claude MCP settings:
+**Standard config** (works in most clients):
 
 ```json
 {
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@wdio/mcp"
-      ]
+      "args": ["-y", "@wdio/mcp@latest"]
     }
   }
 }
 ```
 
-**Option 2: Global Installation**
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install%20Server-0098FF?style=flat-square)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522wdio-mcp%2522%252C%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522%2540wdio%252Fmcp%2540latest%2522%255D%257D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install%20Server-24bfa5?style=flat-square)](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522wdio-mcp%2522%252C%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522%2540wdio%252Fmcp%2540latest%2522%255D%257D)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=WebDriverIO&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkB3ZGlvL21jcEBsYXRlc3QiXX0%3D)
+
+<details>
+<summary>Claude Desktop</summary>
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows), or `~/.config/Claude/claude_desktop_config.json` (Linux):
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Claude Code</summary>
 
 ```bash
-npm i -g @wdio/mcp
+claude mcp add wdio-mcp -- npx -y @wdio/mcp@latest
+```
+</details>
+
+<details>
+<summary>Cline</summary>
+
+Add to your VS Code `settings.json` or `cline_mcp_settings.json` file:
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Go to `Cursor Settings` → `MCP` → `Add new MCP Server`, or create `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Codex</summary>
+
+Use the Codex CLI:
+
+```bash
+codex mcp add wdio-mcp npx "@wdio/mcp@latest"
 ```
 
-Then configure MCP:
+Or edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.wdio-mcp]
+command = "npx"
+args = ["@wdio/mcp@latest"]
+```
+</details>
+
+<details>
+<summary>Goose</summary>
+
+Go to `Advanced settings` → `Extensions` → `Add custom extension`, or run:
+
+```bash
+goose configure
+```
+
+Or edit `~/.config/goose/config.yaml`:
+
+```yaml
+extensions:
+  wdio-mcp:
+    name: WebDriverIO MCP
+    cmd: npx
+    args: [-y, "@wdio/mcp@latest"]
+    enabled: true
+    type: stdio
+```
+</details>
+
+<details>
+<summary>Windsurf</summary>
+
+Edit `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Zed</summary>
+
+Edit Zed settings (`~/.config/zed/settings.json`):
+
+```json
+{
+  "context_servers": {
+    "wdio-mcp": {
+      "source": "custom",
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>VS Code (Copilot)</summary>
+
+```bash
+code --add-mcp '{"name":"wdio-mcp","command":"npx","args":["-y","@wdio/mcp@latest"]}'
+```
+</details>
+
+----
+> ⚠️ **Restart Required**: After adding the configuration, fully restart your MCP client to apply the changes.
+
+### Option 2: Global Installation
+
+If you prefer to install globally:
+
+```bash
+npm install -g @wdio/mcp
+```
+
+Then use `wdio-mcp` as the command:
 
 ```json
 {
@@ -43,14 +192,7 @@ Then configure MCP:
 }
 ```
 
-> **Note:** The npm package is `@wdio/mcp`, but the executable binary is `wdio-mcp`.
-
-**Restart Claude Desktop**
-
-⚠️ You may need to fully restart Claude Desktop. On Windows, use Task Manager to ensure it's completely closed before
-restarting.
-
-📖 **Need help?** Read the [official MCP configuration guide](https://modelcontextprotocol.io/quickstart/user)
+📖 **Need help?** Follow the [MCP install guide](https://modelcontextprotocol.io/quickstart/user).
 
 ### Prerequisites For Mobile App Automation
 
