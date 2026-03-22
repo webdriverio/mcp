@@ -1,29 +1,9 @@
-import { getBrowser } from '../session/state';
-import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
-import type { Cookie } from '@wdio/protocols';
 import type { ToolDefinition } from '../types/tool';
+import { z } from 'zod';
+import type { Cookie } from '@wdio/protocols';
 
-export async function readCookies(name?: string): Promise<{ mimeType: string; text: string }> {
-  try {
-    const browser = getBrowser();
-
-    if (name) {
-      const cookie = await browser.getCookies([name]);
-      if (cookie.length === 0) {
-        return { mimeType: 'application/json', text: JSON.stringify(null) };
-      }
-      return { mimeType: 'application/json', text: JSON.stringify(cookie[0]) };
-    }
-    const cookies = await browser.getCookies();
-    return { mimeType: 'application/json', text: JSON.stringify(cookies) };
-  } catch (e) {
-    return { mimeType: 'application/json', text: JSON.stringify({ error: String(e) }) };
-  }
-}
-
-// Set a cookie
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
   description: 'sets a cookie with specified name, value, and optional attributes',
@@ -50,10 +30,9 @@ export const setCookieTool: ToolCallback = async ({
   sameSite,
 }: Cookie): Promise<CallToolResult> => {
   try {
-    const browser = getBrowser();
-
     const cookie: Cookie = { name, value, path, domain, expiry, httpOnly, secure, sameSite };
-
+    const { getBrowser } = await import('../session/state');
+    const browser = getBrowser();
     await browser.setCookies(cookie);
 
     return {
@@ -67,7 +46,6 @@ export const setCookieTool: ToolCallback = async ({
   }
 };
 
-// Delete cookies
 export const deleteCookiesToolDefinition: ToolDefinition = {
   name: 'delete_cookies',
   description: 'deletes all cookies or a specific cookie by name',
@@ -76,23 +54,21 @@ export const deleteCookiesToolDefinition: ToolDefinition = {
   },
 };
 
-export const deleteCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
+export const deleteCookiesTool: ToolCallback = async ({ name }: { name?: string }): Promise<CallToolResult> => {
   try {
+    const { getBrowser } = await import('../session/state');
     const browser = getBrowser();
 
     if (name) {
-      // Delete specific cookie by name
       await browser.deleteCookies([name]);
       return {
         content: [{ type: 'text', text: `Cookie "${name}" deleted successfully` }],
       };
     }
-    // Delete all cookies
     await browser.deleteCookies();
     return {
       content: [{ type: 'text', text: 'All cookies deleted successfully' }],
     };
-
   } catch (e) {
     return {
       isError: true,

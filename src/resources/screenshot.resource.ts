@@ -1,29 +1,25 @@
+import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
 import sharp from 'sharp';
 
 const MAX_DIMENSION = 2000;
-const MAX_FILE_SIZE_BYTES = 1024 * 1024; // 1MB
+const MAX_FILE_SIZE_BYTES = 1024 * 1024;
 
-export async function processScreenshot(screenshotBase64: string): Promise<{ data: Buffer; mimeType: string }> {
+async function processScreenshot(screenshotBase64: string): Promise<{ data: Buffer; mimeType: string }> {
   const inputBuffer = Buffer.from(screenshotBase64, 'base64');
   let image = sharp(inputBuffer);
   const metadata = await image.metadata();
 
-  // Resize if any dimension exceeds MAX_DIMENSION
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
 
   if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-    const resizeOptions = width > height
-      ? { width: MAX_DIMENSION }
-      : { height: MAX_DIMENSION };
+    const resizeOptions = width > height ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION };
     image = image.resize(resizeOptions);
   }
 
-  // Try PNG with maximum compression first
   let outputBuffer = await image.png({ compressionLevel: 9 }).toBuffer();
 
-  // If still over 1MB, convert to JPEG with progressive quality reduction
   if (outputBuffer.length > MAX_FILE_SIZE_BYTES) {
     let quality = 90;
     while (quality >= 10 && outputBuffer.length > MAX_FILE_SIZE_BYTES) {
@@ -36,7 +32,7 @@ export async function processScreenshot(screenshotBase64: string): Promise<{ dat
   return { data: outputBuffer, mimeType: 'image/png' };
 }
 
-export async function readScreenshot(): Promise<{ mimeType: string; blob: string }> {
+async function readScreenshot(): Promise<{ mimeType: string; blob: string }> {
   try {
     const browser = getBrowser();
     const screenshot = await browser.takeScreenshot();
@@ -46,3 +42,13 @@ export async function readScreenshot(): Promise<{ mimeType: string; blob: string
     return { mimeType: 'text/plain', blob: Buffer.from(`Error: ${e}`).toString('base64') };
   }
 }
+
+export const screenshotResource: ResourceDefinition = {
+  name: 'session-current-screenshot',
+  uri: 'wdio://session/current/screenshot',
+  description: 'Screenshot of the current page',
+  handler: async () => {
+    const result = await readScreenshot();
+    return { contents: [{ uri: 'wdio://session/current/screenshot', mimeType: result.mimeType, blob: result.blob }] };
+  },
+};

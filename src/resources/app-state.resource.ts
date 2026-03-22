@@ -1,6 +1,8 @@
+import type { ResourceDefinition } from '../types/resource';
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
 
-export async function readAppState(bundleId: string): Promise<{ mimeType: string; text: string }> {
+async function readAppState(bundleId: string): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
 
@@ -26,3 +28,13 @@ export async function readAppState(bundleId: string): Promise<{ mimeType: string
     return { mimeType: 'text/plain', text: `Error getting app state: ${e}` };
   }
 }
+
+export const appStateResource: ResourceDefinition = {
+  name: 'session-current-app-state',
+  template: new ResourceTemplate('wdio://session/current/app-state/{bundleId}', { list: undefined }),
+  description: 'App state for a given bundle ID',
+  handler: async (uri, variables) => {
+    const result = await readAppState(variables.bundleId as string);
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+};

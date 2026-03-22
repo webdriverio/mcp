@@ -5,6 +5,8 @@ vi.mock('../../src/scripts/get-browser-accessibility-tree', () => ({
   getBrowserAccessibilityTree: vi.fn(),
 }));
 
+import { getBrowserAccessibilityTree } from '../../src/scripts/get-browser-accessibility-tree';
+
 vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(() => ({ isAndroid: false, isIOS: false })),
   getState: vi.fn(() => ({
@@ -15,8 +17,7 @@ vi.mock('../../src/session/state', () => ({
   })),
 }));
 
-import { getBrowserAccessibilityTree } from '../../src/scripts/get-browser-accessibility-tree';
-import { readAccessibilityTree } from '../../src/tools/get-accessibility-tree.tool';
+import { readAccessibilityTree } from '../../src/resources/accessibility.resource';
 
 type ReadFn = (args: Record<string, unknown>) => Promise<{ mimeType: string; text: string }>;
 const callRead = readAccessibilityTree as unknown as ReadFn;
