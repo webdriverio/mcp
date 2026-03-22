@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getState } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
-import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from '../../src/recording/resources';
+import { buildSessionsIndex, buildCurrentSessionSteps, buildSessionStepsById } from '../../src/resources/sessions.resource';
 
 function addHistory(sessionId: string, type: 'browser' | 'ios' | 'android', isCurrent = false, ended = false) {
   const state = getState();

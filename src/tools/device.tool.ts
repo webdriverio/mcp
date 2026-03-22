@@ -4,14 +4,12 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
 
-// Tool Definitions for zero-argument tools
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
   description: 'hides the on-screen keyboard',
   inputSchema: {},
 };
 
-// Tool Definitions for tools with arguments
 export const rotateDeviceToolDefinition: ToolDefinition = {
   name: 'rotate_device',
   description: 'rotates device to portrait or landscape orientation',
@@ -30,17 +28,6 @@ export const setGeolocationToolDefinition: ToolDefinition = {
   },
 };
 
-export async function readGeolocation(): Promise<{ mimeType: string; text: string }> {
-  try {
-    const browser = getBrowser();
-    const location = await browser.getGeoLocation();
-    return { mimeType: 'application/json', text: JSON.stringify(location) };
-  } catch (e) {
-    return { mimeType: 'text/plain', text: `Error: ${e}` };
-  }
-}
-
-// Rotate Device Tool
 export const rotateDeviceTool: ToolCallback = async (args: {
   orientation: 'PORTRAIT' | 'LANDSCAPE';
 }): Promise<CallToolResult> => {
@@ -61,7 +48,6 @@ export const rotateDeviceTool: ToolCallback = async (args: {
   }
 };
 
-// Hide Keyboard Tool
 export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
@@ -79,7 +65,6 @@ export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> 
   }
 };
 
-// Set Geolocation Tool
 export const setGeolocationTool: ToolCallback = async (args: {
   latitude: number;
   longitude: number;

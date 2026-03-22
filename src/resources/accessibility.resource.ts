@@ -1,6 +1,9 @@
+import type { ResourceDefinition } from '../types/resource';
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
 import { getBrowserAccessibilityTree } from '../scripts/get-browser-accessibility-tree';
 import { encode } from '@toon-format/toon';
+import { parseNumber, parseStringArray } from '../utils/parse-variables';
 
 export async function readAccessibilityTree(params: {
   limit?: number;
@@ -13,7 +16,7 @@ export async function readAccessibilityTree(params: {
     if (browser.isAndroid || browser.isIOS) {
       return {
         mimeType: 'text/plain',
-        text: 'Error: get_accessibility is browser-only. For mobile apps, use get_visible_elements instead.',
+        text: 'Error: accessibility is browser-only. For mobile apps, use elements resource instead.',
       };
     }
 
@@ -25,7 +28,6 @@ export async function readAccessibilityTree(params: {
       return { mimeType: 'text/plain', text: 'No accessibility tree available' };
     }
 
-    // Filter out nodes with no meaningful name
     nodes = nodes.filter((n) => n.name && n.name.trim() !== '');
 
     if (roles && roles.length > 0) {
@@ -42,9 +44,8 @@ export async function readAccessibilityTree(params: {
       nodes = nodes.slice(0, limit);
     }
 
-    // Drop state columns that are empty for every node in this result set
     const stateKeys = ['level', 'disabled', 'checked', 'expanded', 'selected', 'pressed', 'required', 'readonly'] as const;
-    const usedKeys = stateKeys.filter(k => nodes.some(n => n[k] !== ''));
+    const usedKeys = stateKeys.filter((k) => nodes.some((n) => n[k] !== ''));
     const trimmed = nodes.map(({ role, name, selector, ...state }) => {
       const node: Record<string, unknown> = { role, name, selector };
       for (const k of usedKeys) node[k] = state[k];
@@ -58,12 +59,24 @@ export async function readAccessibilityTree(params: {
       nodes: trimmed,
     };
 
-    const toon = encode(result)
-      .replace(/,""/g, ',')
-      .replace(/"",/g, ',');
+    const toon = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
 
     return { mimeType: 'text/plain', text: toon };
   } catch (e) {
     return { mimeType: 'text/plain', text: `Error getting accessibility tree: ${e}` };
   }
 }
+
+export const accessibilityResource: ResourceDefinition = {
+  name: 'session-current-accessibility',
+  template: new ResourceTemplate('wdio://session/current/accessibility{?limit,offset,roles}', { list: undefined }),
+  description: 'Accessibility tree for the current page',
+  handler: async (uri, variables) => {
+    const result = await readAccessibilityTree({
+      limit: parseNumber(variables.limit as string | undefined, 100),
+      offset: parseNumber(variables.offset as string | undefined, 0),
+      roles: parseStringArray(variables.roles as string | undefined),
+    });
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+};

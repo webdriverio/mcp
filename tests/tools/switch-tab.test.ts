@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../src/session/state';
-import { switchTabTool } from '../../src/tools/browser.tool';
+import { switchTabTool } from '../../src/tools/tabs.tool';
 
 const callTool = switchTabTool as unknown as (args: Record<string, unknown>) => Promise<{
   content: { text: string }[];

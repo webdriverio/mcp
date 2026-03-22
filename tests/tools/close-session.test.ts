@@ -3,7 +3,7 @@ import type { SessionHistory } from '../../src/types/recording';
 
 // No mock of browser.tool — closeSessionTool reads from the module-level state directly.
 // We inject test sessions via getState(), which IS the module-level state object.
-import { closeSessionTool } from '../../src/tools/browser.tool';
+import { closeSessionTool } from '../../src/tools/session.tool';
 import { getState } from '../../src/session/state';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
@@ -69,8 +69,8 @@ describe('close_session sessionHistory', () => {
     const state = getState();
     const history = state.sessionHistory.get('sess-history');
     expect(history).toBeDefined();
-    expect(history.endedAt).toBeDefined();
-    expect(typeof history.endedAt).toBe('string');
+    expect(history!.endedAt).toBeDefined();
+    expect(typeof history!.endedAt).toBe('string');
   });
 
   it('retains sessionHistory after session is closed (browsers entry removed)', async () => {

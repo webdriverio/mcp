@@ -1,9 +1,12 @@
+import type { ResourceDefinition } from '../types/resource';
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
+import { parseBool, parseNumber } from '../utils/parse-variables';
 import { getInteractableBrowserElements } from '../scripts/get-interactable-browser-elements';
 import { getMobileVisibleElements } from '../scripts/get-visible-mobile-elements';
 import { encode } from '@toon-format/toon';
 
-export async function readVisibleElements(params: {
+async function readVisibleElements(params: {
   inViewportOnly?: boolean;
   includeContainers?: boolean;
   includeBounds?: boolean;
@@ -35,7 +38,6 @@ export async function readVisibleElements(params: {
 
     const total = elements.length;
 
-    // Apply pagination
     if (offset > 0) {
       elements = elements.slice(offset);
     }
@@ -50,10 +52,25 @@ export async function readVisibleElements(params: {
       elements,
     };
 
-    // TOON tabular format with post-processing: replace "" with bare commas for efficiency
     const toon = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
     return { mimeType: 'text/plain', text: toon };
   } catch (e) {
     return { mimeType: 'text/plain', text: `Error getting visible elements: ${e}` };
   }
 }
+
+export const elementsResource: ResourceDefinition = {
+  name: 'session-current-elements',
+  template: new ResourceTemplate('wdio://session/current/elements{?inViewportOnly,includeContainers,includeBounds,limit,offset}', { list: undefined }),
+  description: 'Interactable elements on the current page',
+  handler: async (uri, variables) => {
+    const result = await readVisibleElements({
+      inViewportOnly: parseBool(variables.inViewportOnly as string | undefined, true),
+      includeContainers: parseBool(variables.includeContainers as string | undefined, false),
+      includeBounds: parseBool(variables.includeBounds as string | undefined, false),
+      limit: parseNumber(variables.limit as string | undefined, 0),
+      offset: parseNumber(variables.offset as string | undefined, 0),
+    });
+    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  },
+};
