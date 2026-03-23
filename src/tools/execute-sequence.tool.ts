@@ -119,88 +119,92 @@ export const executeSequenceTool: ToolCallback = async ({
   actions: z.infer<typeof actionSchema>[];
   waitForStability?: boolean;
 }) => {
-  const browser = getBrowser();
-  const isBrowser = !browser.isAndroid && !browser.isIOS;
+  try {
+    const browser = getBrowser();
+    const isBrowser = !browser.isAndroid && !browser.isIOS;
 
-  // Capture initial URL/title for diff
-  const { url: beforeUrl, title: beforeTitle } = isBrowser
-    ? await browser.execute(() => ({ url: window.location.href, title: document.title })) as {
-      url: string;
-      title: string
+    // Capture initial URL/title for diff
+    const { url: beforeUrl, title: beforeTitle } = isBrowser
+      ? await browser.execute(() => ({ url: window.location.href, title: document.title })) as {
+        url: string;
+        title: string
+      }
+      : { url: '', title: '' };
+
+    // Capture initial elements for diff (browser only)
+    const initialBrowserElements = isBrowser ? await getInteractableBrowserElements(browser, {}) : [];
+    const initialElements = initialBrowserElements.map((el) => ({ selector: el.selector, text: el.name }));
+
+    const results: { action: string; durationMs: number }[] = [];
+
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i];
+      const start = Date.now();
+      const result = await dispatchAction(action);
+      const durationMs = Date.now() - start;
+      const isError = (result as any).isError === true;
+
+      // Record each sub-action as a step
+      appendStep(
+        action.action,
+        action as Record<string, unknown>,
+        isError ? 'error' : 'ok',
+        durationMs,
+        isError ? (result.content.find((c: any) => c.type === 'text') as any)?.text : undefined,
+      );
+
+      if (isError) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              completed: i,
+              total: actions.length,
+              failed: {
+                index: i,
+                action: action.action,
+                error: (result.content.find((c: any) => c.type === 'text') as any)?.text,
+              },
+              results,
+            }),
+          }],
+        };
+      }
+
+      results.push({ action: action.action, durationMs });
+
+      // Wait for stability after each action (except the last, we do it before diff)
+      if (shouldWait && i < actions.length - 1 && isBrowser) {
+        await waitForStability(browser);
+      }
     }
-    : { url: '', title: '' };
 
-  // Capture initial elements for diff (browser only)
-  const initialBrowserElements = isBrowser ? await getInteractableBrowserElements(browser, {}) : [];
-  const initialElements = initialBrowserElements.map((el) => ({ selector: el.selector, text: el.name }));
-
-  const results: { action: string; durationMs: number }[] = [];
-
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i];
-    const start = Date.now();
-    const result = await dispatchAction(action);
-    const durationMs = Date.now() - start;
-    const isError = (result as any).isError === true;
-
-    // Record each sub-action as a step
-    appendStep(
-      action.action,
-      action as Record<string, unknown>,
-      isError ? 'error' : 'ok',
-      durationMs,
-      isError ? (result.content.find((c: any) => c.type === 'text') as any)?.text : undefined,
-    );
-
-    if (isError) {
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            completed: i,
-            total: actions.length,
-            failed: {
-              index: i,
-              action: action.action,
-              error: (result.content.find((c: any) => c.type === 'text') as any)?.text,
-            },
-            results,
-          }),
-        }],
-      };
-    }
-
-    results.push({ action: action.action, durationMs });
-
-    // Wait for stability after each action (except the last, we do it before diff)
-    if (shouldWait && i < actions.length - 1 && isBrowser) {
+    // Final stability wait before capturing end state
+    if (shouldWait && isBrowser) {
       await waitForStability(browser);
     }
+
+    // Capture final elements for state delta (browser only)
+    const finalBrowserElements = isBrowser ? await getInteractableBrowserElements(browser, {}) : [];
+    const finalElements = finalBrowserElements.map((el) => ({ selector: el.selector, text: el.name }));
+
+    const delta = isBrowser
+      ? await captureStateDelta(browser, initialElements, finalElements, beforeUrl, beforeTitle)
+      : null;
+
+    const response: Record<string, unknown> = {
+      completed: actions.length,
+      total: actions.length,
+      results,
+    };
+    if (delta) {
+      response.delta = delta;
+    }
+
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(response) }],
+    };
+  } catch (e) {
+    return { isError: true, content: [{ type: 'text', text: `Error executing sequence: ${e}` }] };
   }
-
-  // Final stability wait before capturing end state
-  if (shouldWait && isBrowser) {
-    await waitForStability(browser);
-  }
-
-  // Capture final elements for state delta (browser only)
-  const finalBrowserElements = isBrowser ? await getInteractableBrowserElements(browser, {}) : [];
-  const finalElements = finalBrowserElements.map((el) => ({ selector: el.selector, text: el.name }));
-
-  const delta = isBrowser
-    ? await captureStateDelta(browser, initialElements, finalElements, beforeUrl, beforeTitle)
-    : null;
-
-  const response: Record<string, unknown> = {
-    completed: actions.length,
-    total: actions.length,
-    results,
-  };
-  if (delta) {
-    response.delta = delta;
-  }
-
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify(response) }],
-  };
 };

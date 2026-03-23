@@ -3,16 +3,16 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
+import type { SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
-import { registerSession, closeSession } from '../session/lifecycle';
+import { closeSession, registerSession } from '../session/lifecycle';
 import { localBrowserProvider } from '../providers/local-browser.provider';
 import { localAppiumProvider } from '../providers/local-appium.provider';
-import type { SessionMetadata } from '../session/state';
 import { coerceBoolean } from '../utils/zod-helpers';
 
 const platformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
-const automationEnum = z.enum(['XCUITest', 'UiAutomator2', 'Espresso']);
+const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
@@ -55,7 +55,7 @@ type StartSessionArgs = {
   deviceName?: string;
   platformVersion?: string;
   appPath?: string;
-  automationName?: 'XCUITest' | 'UiAutomator2' | 'Espresso';
+  automationName?: 'XCUITest' | 'UiAutomator2';
   autoGrantPermissions?: boolean;
   autoAcceptAlerts?: boolean;
   autoDismissAlerts?: boolean;
@@ -155,7 +155,13 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const headlessSupported = browser !== 'safari';
   const effectiveHeadless = headless && headlessSupported;
 
-  const mergedCapabilities = localBrowserProvider.buildCapabilities({ browser, headless, windowWidth, windowHeight, capabilities: userCapabilities });
+  const mergedCapabilities = localBrowserProvider.buildCapabilities({
+    browser,
+    headless,
+    windowWidth,
+    windowHeight,
+    capabilities: userCapabilities
+  });
 
   const wdioBrowser = await remote({ capabilities: mergedCapabilities });
   const { sessionId } = wdioBrowser;
@@ -198,10 +204,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
 }
 
 async function startMobileSession(args: StartSessionArgs): Promise<CallToolResult> {
-  const platform = args.platform;
-  const appPath = args.appPath;
-  const deviceName = args.deviceName!;
-  const noReset = args.noReset;
+  const { platform, appPath, deviceName, noReset } = args;
 
   if (!appPath && noReset !== true) {
     return {
@@ -260,7 +263,6 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
   const port = args.port ?? 9222;
   const host = args.host ?? 'localhost';
   const navigationUrl = args.navigationUrl;
-  const state = getState();
 
   await waitForCDP(host, port);
   const { activeTabUrl, allTabUrls } = await closeStaleMappers(host, port);
@@ -279,25 +281,27 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
   });
 
   const { sessionId } = browser;
-  state.browsers.set(sessionId, browser);
-  state.currentSession = sessionId;
-  state.sessionMetadata.set(sessionId, {
-    type: 'browser',
-    capabilities: browser.capabilities as Record<string, unknown>,
-    isAttached: true,
-  });
-  state.sessionHistory.set(sessionId, {
+  registerSession(
     sessionId,
-    type: 'browser',
-    startedAt: new Date().toISOString(),
-    capabilities: {
-      browserName: 'chrome',
-      'goog:chromeOptions': {
-        debuggerAddress: `${host}:${port}`,
-      },
+    browser,
+    {
+      type: 'browser',
+      capabilities: browser.capabilities as Record<string, unknown>,
+      isAttached: true,
     },
-    steps: [],
-  });
+    {
+      sessionId,
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: {
+        browserName: 'chrome',
+        'goog:chromeOptions': {
+          debuggerAddress: `${host}:${port}`,
+        },
+      },
+      steps: [],
+    },
+  );
 
   if (navigationUrl) {
     await browser.url(navigationUrl);
@@ -320,11 +324,11 @@ export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Pr
   try {
     if (args.platform === 'browser') {
       if (args.attach) {
-        return attachBrowserSession(args);
+        return await attachBrowserSession(args);
       }
-      return startBrowserSession(args);
+      return await startBrowserSession(args);
     }
-    return startMobileSession(args);
+    return await startMobileSession(args);
   } catch (e) {
     return { isError: true, content: [{ type: 'text', text: `Error starting session: ${e}` }] };
   }

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { remote } from 'webdriverio';
+import { getState } from '../../src/session/state';
+import { startSessionTool } from '../../src/tools/session.tool';
 
 // Stub fetch so getActiveTabUrl / closeStaleMappers / waitForCDP don't make real network requests
 vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -39,10 +42,6 @@ vi.mock('../../src/session/lifecycle', () => ({
     mockState.currentSession = sessionId;
   }),
 }));
-
-import { remote } from 'webdriverio';
-import { getState } from '../../src/session/state';
-import { startSessionTool } from '../../src/tools/session.tool';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
 const callTool = (args: Record<string, unknown> = {}) =>
@@ -184,7 +183,7 @@ describe('attach_browser', () => {
     });
   });
 
-  it.skip('returns error text when remote() throws', async () => {
+  it('returns error text when remote() throws', async () => {
     const err = new Error('Connection refused');
     mockRemote.mockRejectedValue(err);
     const result = await callTool({ port: 9999 });

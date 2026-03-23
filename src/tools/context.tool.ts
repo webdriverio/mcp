@@ -11,7 +11,7 @@ export const switchContextToolDefinition: ToolDefinition = {
     context: z
       .string()
       .describe(
-        'Context name to switch to (e.g., "NATIVE_APP", "WEBVIEW_com.example.app", or use index from get_contexts)',
+        'Context name to switch to (e.g., "NATIVE_APP", "WEBVIEW_com.example.app", or use index from wdio://session/current/contexts resource)',
       ),
   },
 };

@@ -12,6 +12,7 @@ const mockGetWindowHandle = vi.fn();
 const mockSwitchToWindow = vi.fn();
 
 vi.mock('../../src/session/state', async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual = await importOriginal<typeof import('../../src/session/state')>();
   return {
     ...actual,
