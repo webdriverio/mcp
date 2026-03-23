@@ -1,7 +1,5 @@
 import type { ResourceDefinition } from '../types/resource';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
-import { parseBool, parseNumber } from '../utils/parse-variables';
 import { getInteractableBrowserElements } from '../scripts/get-interactable-browser-elements';
 import { getMobileVisibleElements } from '../scripts/get-visible-mobile-elements';
 import { encode } from '@toon-format/toon';
@@ -61,16 +59,10 @@ async function readVisibleElements(params: {
 
 export const elementsResource: ResourceDefinition = {
   name: 'session-current-elements',
-  template: new ResourceTemplate('wdio://session/current/elements{?inViewportOnly,includeContainers,includeBounds,limit,offset}', { list: undefined }),
+  uri: 'wdio://session/current/elements',
   description: 'Interactable elements on the current page',
-  handler: async (uri, variables) => {
-    const result = await readVisibleElements({
-      inViewportOnly: parseBool(variables.inViewportOnly as string | undefined, true),
-      includeContainers: parseBool(variables.includeContainers as string | undefined, false),
-      includeBounds: parseBool(variables.includeBounds as string | undefined, false),
-      limit: parseNumber(variables.limit as string | undefined, 0),
-      offset: parseNumber(variables.offset as string | undefined, 0),
-    });
-    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  handler: async () => {
+    const result = await readVisibleElements({});
+    return { contents: [{ uri: 'wdio://session/current/elements', mimeType: result.mimeType, text: result.text }] };
   },
 };
