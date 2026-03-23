@@ -37,7 +37,7 @@ src/
 │   ├── emulate-device.tool.ts   # emulate_device (viewport/UA)
 │   ├── cookies.tool.ts          # set_cookie, delete_cookies
 │   ├── execute-script.tool.ts   # execute_script
-│   ├── execute-sequence.tool.ts # Batch action sequencing with stability + state delta
+│   ├── get-elements.tool.ts     # get_elements (all elements, incl. below fold)
 │   └── ...                      # Other tools follow same pattern
 ├── resources/
 │   ├── index.ts                 # ResourceDefinition exports
@@ -56,7 +56,8 @@ src/
 ├── scripts/
 │   ├── get-interactable-browser-elements.ts  # Browser-context element detection
 │   ├── get-browser-accessibility-tree.ts     # Browser-context accessibility tree
-│   └── get-visible-mobile-elements.ts        # Mobile visible element detection
+│   ├── get-visible-mobile-elements.ts        # Mobile visible element detection
+│   └── get-elements.ts                       # Filter + paginate elements (used by tool + resource)
 ├── locators/
 │   ├── element-filter.ts        # Platform-specific element classification
 │   ├── locator-generation.ts    # Multi-strategy selector generation
@@ -68,8 +69,6 @@ src/
 │   └── appium.config.ts         # iOS/Android capability builders (used by local-appium.provider)
 ├── utils/
 │   ├── parse-variables.ts       # URI template variable parsing (parseBool, parseNumber, etc.)
-│   ├── stability-detector.ts    # Page stability polling (signature-based, 200ms/500ms/5s)
-│   ├── state-diff.ts            # Element before/after diff (appeared, disappeared, changed)
 │   └── zod-helpers.ts           # coerceBoolean and other Zod utilities
 └── types/
     ├── tool.ts                  # ToolDefinition interface
@@ -136,7 +135,7 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - `wdio://session/{sessionId}/code` — generated JS for any session (URI template)
 
 **Live page state (current session):**
-- `wdio://session/current/elements` — interactable elements
+- `wdio://session/current/elements` — interactable elements (viewport-only; use `get_elements` tool with `inViewportOnly: false` for all)
 - `wdio://session/current/accessibility` — accessibility tree
 - `wdio://session/current/screenshot` — screenshot (base64)
 - `wdio://session/current/cookies` — browser cookies
@@ -160,7 +159,7 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
 | `src/tools/tabs.tool.ts`                           | `switch_tab`                                  |
-| `src/tools/execute-sequence.tool.ts`               | Batch action sequencing with stability + delta |
+| `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
 | `src/resources/`                                   | All MCP resource definitions (10 files)       |
 | `src/providers/local-browser.provider.ts`          | Chrome/Firefox/Edge/Safari capability building |
 | `src/providers/local-appium.provider.ts`           | iOS/Android capabilities via appium.config.ts |
@@ -168,8 +167,6 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/locators/`                                    | Mobile element detection + locator generation |
 | `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps tools for step logging |
 | `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
-| `src/utils/stability-detector.ts`                  | Page stability detection (signature polling)  |
-| `src/utils/state-diff.ts`                          | Element state diff (appeared/disappeared/changed) |
 | `src/utils/zod-helpers.ts`                         | `coerceBoolean` for client interop            |
 | `tsup.config.ts`                                   | Build configuration                           |
 
@@ -196,6 +193,14 @@ external imports.
 
 Sessions created with `noReset: true` or without `appPath` automatically detach on close (don't terminate on Appium
 server).
+
+### MCP Resource URI Templates
+
+The MCP SDK only supports path-segment templates `{param}` in resource URIs — NOT RFC 6570 query param syntax `{?param}`. Resources using `{?param}` silently return "Resource not found". Keep resources at fixed URIs; expose parameterised access via tools instead.
+
+### Scripts vs Tools vs Resources
+
+Computation logic belongs in `src/scripts/` (no try/catch, returns raw data). Tools wrap scripts with try/catch and return `{ isError: true, content: [...] }` on failure. Resources wrap scripts and set `mimeType` in the response.
 
 ### Error Handling
 
