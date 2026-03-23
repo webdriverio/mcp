@@ -1,9 +1,7 @@
 import type { ResourceDefinition } from '../types/resource';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
 import { getBrowserAccessibilityTree } from '../scripts/get-browser-accessibility-tree';
 import { encode } from '@toon-format/toon';
-import { parseNumber, parseStringArray } from '../utils/parse-variables';
 
 export async function readAccessibilityTree(params: {
   limit?: number;
@@ -69,14 +67,10 @@ export async function readAccessibilityTree(params: {
 
 export const accessibilityResource: ResourceDefinition = {
   name: 'session-current-accessibility',
-  template: new ResourceTemplate('wdio://session/current/accessibility{?limit,offset,roles}', { list: undefined }),
+  uri: 'wdio://session/current/accessibility',
   description: 'Accessibility tree for the current page',
-  handler: async (uri, variables) => {
-    const result = await readAccessibilityTree({
-      limit: parseNumber(variables.limit as string | undefined, 100),
-      offset: parseNumber(variables.offset as string | undefined, 0),
-      roles: parseStringArray(variables.roles as string | undefined),
-    });
-    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  handler: async () => {
+    const result = await readAccessibilityTree({});
+    return { contents: [{ uri: 'wdio://session/current/accessibility', mimeType: result.mimeType, text: result.text }] };
   },
 };

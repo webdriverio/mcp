@@ -1,5 +1,4 @@
 import type { ResourceDefinition } from '../types/resource';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { getBrowser } from '../session/state';
 
 async function readCookies(name?: string): Promise<{ mimeType: string; text: string }> {
@@ -22,10 +21,10 @@ async function readCookies(name?: string): Promise<{ mimeType: string; text: str
 
 export const cookiesResource: ResourceDefinition = {
   name: 'session-current-cookies',
-  template: new ResourceTemplate('wdio://session/current/cookies{?name}', { list: undefined }),
+  uri: 'wdio://session/current/cookies',
   description: 'Cookies for the current session',
-  handler: async (uri, variables) => {
-    const result = await readCookies(variables.name as string | undefined);
-    return { contents: [{ uri: uri.href, mimeType: result.mimeType, text: result.text }] };
+  handler: async () => {
+    const result = await readCookies();
+    return { contents: [{ uri: 'wdio://session/current/cookies', mimeType: result.mimeType, text: result.text }] };
   },
 };
