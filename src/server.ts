@@ -33,7 +33,6 @@ import {
   setGeolocationToolDefinition,
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
-import { executeSequenceTool, executeSequenceToolDefinition } from './tools/execute-sequence.tool';
 import { getElementsTool, getElementsToolDefinition } from './tools/get-elements.tool';
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
@@ -133,8 +132,6 @@ registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 registerTool(executeScriptToolDefinition, executeScriptTool);
 registerTool(getElementsToolDefinition, getElementsTool);
-
-registerTool(executeSequenceToolDefinition, withRecording('execute_sequence', executeSequenceTool));
 
 registerResource(sessionsIndexResource);
 registerResource(sessionCurrentStepsResource);
