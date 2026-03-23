@@ -18,7 +18,7 @@ export async function readAccessibilityTree(params: {
       };
     }
 
-    const { limit = 100, offset = 0, roles } = params;
+    const { limit = 0, offset = 0, roles } = params;
 
     let nodes = await getBrowserAccessibilityTree(browser);
 
@@ -68,7 +68,7 @@ export async function readAccessibilityTree(params: {
 export const accessibilityResource: ResourceDefinition = {
   name: 'session-current-accessibility',
   uri: 'wdio://session/current/accessibility',
-  description: 'Accessibility tree for the current page',
+  description: 'Accessibility tree for the current page. Returns all elements by default.',
   handler: async () => {
     const result = await readAccessibilityTree({});
     return { contents: [{ uri: 'wdio://session/current/accessibility', mimeType: result.mimeType, text: result.text }] };
