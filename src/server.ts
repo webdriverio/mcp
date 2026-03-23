@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import pkg from '../package.json' with { type: 'json' };
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { ToolDefinition } from './types/tool';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
 import { clickTool, clickToolDefinition } from './tools/click.tool';
@@ -34,25 +34,32 @@ import {
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
 import { executeSequenceTool, executeSequenceToolDefinition } from './tools/execute-sequence.tool';
+import { getElementsTool, getElementsToolDefinition } from './tools/get-elements.tool';
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import {
-  sessionsIndexResource,
-  sessionCurrentStepsResource,
-  sessionCurrentCodeResource,
-  sessionStepsResource,
+  accessibilityResource,
+  appStateResource,
+  contextResource,
+  contextsResource,
+  cookiesResource,
+  elementsResource,
+  geolocationResource,
+  screenshotResource,
   sessionCodeResource,
-} from './resources/sessions.resource';
-import { elementsResource } from './resources/elements.resource';
-import { accessibilityResource } from './resources/accessibility.resource';
-import { screenshotResource } from './resources/screenshot.resource';
-import { cookiesResource } from './resources/cookies.resource';
-import { appStateResource } from './resources/app-state.resource';
-import { contextsResource, contextResource } from './resources/contexts.resource';
-import { geolocationResource } from './resources/geolocation.resource';
-import { tabsResource } from './resources/tabs.resource';
-import { startSessionTool, startSessionToolDefinition, closeSessionTool, closeSessionToolDefinition } from './tools/session.tool';
+  sessionCurrentCodeResource,
+  sessionCurrentStepsResource,
+  sessionsIndexResource,
+  sessionStepsResource,
+  tabsResource,
+} from './resources';
+import {
+  closeSessionTool,
+  closeSessionToolDefinition,
+  startSessionTool,
+  startSessionToolDefinition
+} from './tools/session.tool';
 import { switchTabTool, switchTabToolDefinition } from './tools/tabs.tool';
 
 console.log = (...args) => console.error('[LOG]', ...args);
@@ -125,6 +132,7 @@ registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
 registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 registerTool(executeScriptToolDefinition, executeScriptTool);
+registerTool(getElementsToolDefinition, getElementsTool);
 
 registerTool(executeSequenceToolDefinition, withRecording('execute_sequence', executeSequenceTool));
 
