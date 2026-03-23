@@ -16,45 +16,81 @@ npm start         # Run built server from lib/server.js
 ```
 src/
 ├── server.ts                    # MCP server entry, registers all tools + MCP resources
+├── session/
+│   ├── state.ts                 # Session state maps, getBrowser(), getState(), SessionMetadata
+│   └── lifecycle.ts             # registerSession(), handleSessionTransition(), closeSession()
+├── providers/
+│   ├── types.ts                 # SessionProvider interface, ConnectionConfig
+│   ├── local-browser.provider.ts  # Chrome/Firefox/Edge/Safari capability building
+│   └── local-appium.provider.ts   # iOS/Android via appium.config.ts
 ├── tools/
-│   ├── browser.tool.ts          # Session state + start_browser + getBrowser()
-│   ├── app-session.tool.ts      # start_app_session (iOS/Android via Appium)
-│   ├── navigate.tool.ts         # URL navigation
-│   ├── get-visible-elements.tool.ts  # Element detection (web + mobile)
-│   ├── click.tool.ts            # Click/tap actions
+│   ├── session.tool.ts          # start_session (browser+mobile), close_session
+│   ├── tabs.tool.ts             # switch_tab
+│   ├── launch-chrome.tool.ts    # launch_chrome (remote debugging)
+│   ├── navigate.tool.ts         # navigateAction() + navigateTool
+│   ├── click.tool.ts            # clickAction() + clickTool
+│   ├── set-value.tool.ts        # setValueAction() + setValueTool
+│   ├── scroll.tool.ts           # scrollAction() + scrollTool
+│   ├── gestures.tool.ts         # tapAction(), swipeAction(), dragAndDropAction()
+│   ├── context.tool.ts          # switch_context (native/webview)
+│   ├── device.tool.ts           # rotate_device, hide_keyboard
+│   ├── emulate-device.tool.ts   # emulate_device (viewport/UA)
+│   ├── cookies.tool.ts          # set_cookie, delete_cookies
+│   ├── execute-script.tool.ts   # execute_script
+│   ├── get-elements.tool.ts     # get_elements (all elements, incl. below fold)
 │   └── ...                      # Other tools follow same pattern
+├── resources/
+│   ├── index.ts                 # ResourceDefinition exports
+│   ├── sessions.resource.ts     # wdio://sessions, wdio://session/*/steps, wdio://session/*/code
+│   ├── elements.resource.ts     # wdio://session/current/elements
+│   ├── accessibility.resource.ts# wdio://session/current/accessibility
+│   ├── screenshot.resource.ts   # wdio://session/current/screenshot
+│   ├── cookies.resource.ts      # wdio://session/current/cookies
+│   ├── tabs.resource.ts         # wdio://session/current/tabs
+│   ├── contexts.resource.ts     # wdio://session/current/contexts
+│   ├── app-state.resource.ts    # wdio://session/current/app-state
+│   └── geolocation.resource.ts  # wdio://session/current/geolocation
 ├── recording/
 │   ├── step-recorder.ts         # withRecording HOF, appendStep, session history access
-│   ├── code-generator.ts        # SessionHistory → WebdriverIO JS code
-│   └── resources.ts             # MCP resource builders (sessions index, step log)
+│   └── code-generator.ts        # SessionHistory → WebdriverIO JS code
 ├── scripts/
-│   └── get-interactable-browser-elements.ts  # Browser-context script
+│   ├── get-interactable-browser-elements.ts  # Browser-context element detection
+│   ├── get-browser-accessibility-tree.ts     # Browser-context accessibility tree
+│   ├── get-visible-mobile-elements.ts        # Mobile visible element detection
+│   └── get-elements.ts                       # Filter + paginate elements (used by tool + resource)
 ├── locators/
 │   ├── element-filter.ts        # Platform-specific element classification
-│   ├── generate-all-locators.ts # Multi-strategy selector generation
-│   └── source-parsing.ts        # XML page source parsing for mobile
+│   ├── locator-generation.ts    # Multi-strategy selector generation
+│   ├── xml-parsing.ts           # XML page source parsing for mobile
+│   ├── constants.ts             # Shared locator constants
+│   ├── types.ts                 # Locator type definitions
+│   └── index.ts                 # Public exports
 ├── config/
-│   └── appium.config.ts         # iOS/Android capability builders
+│   └── appium.config.ts         # iOS/Android capability builders (used by local-appium.provider)
+├── utils/
+│   ├── parse-variables.ts       # URI template variable parsing (parseBool, parseNumber, etc.)
+│   └── zod-helpers.ts           # coerceBoolean and other Zod utilities
 └── types/
     ├── tool.ts                  # ToolDefinition interface
+    ├── resource.ts              # ResourceDefinition interface
     └── recording.ts             # RecordedStep, SessionHistory interfaces
 ```
 
 ### Session State
 
-Single active session model in `browser.tool.ts`:
+Single active session model in `src/session/state.ts`:
 
 ```typescript
-const browsers: Map<string, WebdriverIO.Browser> = new Map();
-let currentSession: string | null = null;
-const sessionMetadata: Map<string, SessionMetadata> = new Map();
-
-export function getBrowser(): WebdriverIO.Browser {
-  // Returns current active session or throws
-}
+// Private state — access via getState() or getBrowser()
+export function getBrowser(): WebdriverIO.Browser { ... }
+export function getState() { return state; }
+export interface SessionMetadata { type: 'browser' | 'ios' | 'android'; capabilities: Record<string, unknown>; isAttached: boolean; }
 ```
 
-State shared with `app-session.tool.ts` via `(getBrowser as any).__state`.
+Session lifecycle managed via `src/session/lifecycle.ts`:
+- `registerSession()` — registers browser + metadata + history, handles transition sentinel
+- `handleSessionTransition()` — appends `__session_transition__` step to outgoing session
+- `closeSession()` — terminates or detaches, marks endedAt, cleans up maps
 
 ### Tool Pattern
 
@@ -81,17 +117,32 @@ export const myTool: ToolCallback = async ({ param }: { param: string }) => {
   }
 };
 
-// 3. Register in server.ts
-server.tool(myToolDefinition.name, myToolDefinition.description, myToolDefinition.inputSchema, myTool);
+// 3. Register in server.ts via the registerTool helper
+registerTool(myToolDefinition, myTool);
 ```
 
 ### Recording
 
-All tools are wrapped with `withRecording()` in `server.ts`. Steps accumulate in `state.sessionHistory` (keyed by sessionId).
-MCP resources expose history without tool calls:
-- `wdio://sessions` — index of all sessions (fixed URI, discoverable via ListResources)
-- `wdio://session/current/steps` — current session step log + generated JS (fixed URI)
-- `wdio://session/{sessionId}/steps` — any session by ID (URI template, NOT listed by ListResources — see `docs/architecture/mcp-resources-notes.md`)
+Selected tools are wrapped with `withRecording()` in `server.ts`. Steps accumulate in `state.sessionHistory` (keyed by sessionId).
+
+MCP resources expose live session data — all at fixed URIs discoverable via ListResources:
+
+**Session history:**
+- `wdio://sessions` — index of all sessions
+- `wdio://session/current/steps` — current session step log
+- `wdio://session/current/code` — generated WebdriverIO JS for current session
+- `wdio://session/{sessionId}/steps` — step log for any session (URI template)
+- `wdio://session/{sessionId}/code` — generated JS for any session (URI template)
+
+**Live page state (current session):**
+- `wdio://session/current/elements` — interactable elements (viewport-only; use `get_elements` tool with `inViewportOnly: false` for all)
+- `wdio://session/current/accessibility` — accessibility tree
+- `wdio://session/current/screenshot` — screenshot (base64)
+- `wdio://session/current/cookies` — browser cookies
+- `wdio://session/current/tabs` — open browser tabs
+- `wdio://session/current/contexts` — native/webview contexts (mobile)
+- `wdio://session/current/app-state` — mobile app state
+- `wdio://session/current/geolocation` — device geolocation
 
 ### Build
 
@@ -103,25 +154,34 @@ MCP resources expose history without tool calls:
 
 | File                                               | Purpose                                       |
 |----------------------------------------------------|-----------------------------------------------|
-| `src/server.ts`                                    | MCP server init, tool registration            |
-| `src/tools/browser.tool.ts`                        | Session state management, `getBrowser()`      |
-| `src/tools/app-session.tool.ts`                    | Appium session creation                       |
+| `src/server.ts`                                    | MCP server init, tool + resource registration |
+| `src/session/state.ts`                             | Session state maps, `getBrowser()`, `getState()` |
+| `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
+| `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
+| `src/tools/tabs.tool.ts`                           | `switch_tab`                                  |
+| `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
+| `src/resources/`                                   | All MCP resource definitions (10 files)       |
+| `src/providers/local-browser.provider.ts`          | Chrome/Firefox/Edge/Safari capability building |
+| `src/providers/local-appium.provider.ts`           | iOS/Android capabilities via appium.config.ts |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
-| `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps every tool for step logging |
+| `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps tools for step logging |
 | `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
-| `src/recording/resources.ts`                       | Builds text for `wdio://sessions` and `wdio://session/*/steps` resources |
+| `src/utils/zod-helpers.ts`                         | `coerceBoolean` for client interop            |
 | `tsup.config.ts`                                   | Build configuration                           |
 
 ## Gotchas
 
 ### Console Output
 
-All console methods redirect to stderr. Chrome writes to stdout which corrupts MCP stdio protocol.
+All console methods redirect to stderr via `console.error`. Chrome writes to stdout which corrupts MCP stdio protocol.
 
 ```typescript
 // In server.ts - do not remove
-console.log = (...args) => process.stderr.write(util.format(...args) + '\n');
+console.log = (...args) => console.error('[LOG]', ...args);
+console.info = (...args) => console.error('[INFO]', ...args);
+console.warn = (...args) => console.error('[WARN]', ...args);
+console.debug = (...args) => console.error('[DEBUG]', ...args);
 ```
 
 ### Browser Scripts Must Be Self-Contained
@@ -129,20 +189,18 @@ console.log = (...args) => process.stderr.write(util.format(...args) + '\n');
 `get-interactable-browser-elements.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
 external imports.
 
-### Mobile State Sharing Hack
-
-`app-session.tool.ts` accesses browser.tool.ts state via:
-
-```typescript
-const state = (getBrowser as any).__state;
-```
-
-This maintains single-session behavior across browser and mobile.
-
 ### Auto-Detach Behavior
 
 Sessions created with `noReset: true` or without `appPath` automatically detach on close (don't terminate on Appium
 server).
+
+### MCP Resource URI Templates
+
+The MCP SDK only supports path-segment templates `{param}` in resource URIs — NOT RFC 6570 query param syntax `{?param}`. Resources using `{?param}` silently return "Resource not found". Keep resources at fixed URIs; expose parameterised access via tools instead.
+
+### Scripts vs Tools vs Resources
+
+Computation logic belongs in `src/scripts/` (no try/catch, returns raw data). Tools wrap scripts with try/catch and return `{ isError: true, content: [...] }` on failure. Resources wrap scripts and set `mimeType` in the response.
 
 ### Error Handling
 
@@ -158,11 +216,12 @@ catch (e) {
 
 1. Create `src/tools/my-tool.tool.ts`
 2. Export `myToolDefinition` (Zod schema) and `myTool` (ToolCallback)
-3. Import and register in `src/server.ts`:
+3. Import and register in `src/server.ts` using the `registerTool` helper:
    ```typescript
    import { myToolDefinition, myTool } from './tools/my-tool.tool';
-   server.tool(myToolDefinition.name, myToolDefinition.description, myToolDefinition.inputSchema, myTool);
+   registerTool(myToolDefinition, myTool);
    ```
+   To wrap with recording: `registerTool(myToolDefinition, withRecording('my_tool', myTool));`
 
 ## Selector Syntax Reference
 
@@ -179,6 +238,5 @@ catch (e) {
 
 See `docs/architecture/` for proposals:
 
-- `session-configuration-proposal.md` — Cloud provider pattern (BrowserStack, SauceLabs)
-- `interaction-sequencing-proposal.md` — Batch actions with state delta detection
+- `session-configuration-proposal.md` — Cloud provider pattern (BrowserStack, SauceLabs) — providers/types.ts is the extension point
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination

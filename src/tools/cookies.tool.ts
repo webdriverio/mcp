@@ -1,55 +1,10 @@
-import { getBrowser } from './browser.tool';
-import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
-import type { Cookie } from '@wdio/protocols';
 import type { ToolDefinition } from '../types/tool';
+import { z } from 'zod';
+import type { Cookie } from '@wdio/protocols';
+import { coerceBoolean } from '../utils/zod-helpers';
 
-// Tool definitions
-export const getCookiesToolDefinition: ToolDefinition = {
-  name: 'get_cookies',
-  description: 'gets all cookies or a specific cookie by name',
-  inputSchema: {
-    name: z.string().optional().describe('Optional cookie name to retrieve a specific cookie. If not provided, returns all cookies'),
-  },
-};
-
-export const getCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
-  try {
-    const browser = getBrowser();
-
-    if (name) {
-      // Get specific cookie by name
-      const cookie = await browser.getCookies([name]);
-      if (cookie.length === 0) {
-        return {
-          content: [{ type: 'text', text: `Cookie "${name}" not found` }],
-        };
-      }
-      return {
-        content: [{ type: 'text', text: JSON.stringify(cookie[0], null, 2) }],
-      };
-    }
-    // Get all cookies
-    const cookies = await browser.getCookies();
-    if (cookies.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No cookies found' }],
-      };
-    }
-    return {
-      content: [{ type: 'text', text: JSON.stringify(cookies, null, 2) }],
-    };
-
-  } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting cookies: ${e}` }],
-    };
-  }
-};
-
-// Set a cookie
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
   description: 'sets a cookie with specified name, value, and optional attributes',
@@ -59,8 +14,8 @@ export const setCookieToolDefinition: ToolDefinition = {
     domain: z.string().optional().describe('Cookie domain (defaults to current domain)'),
     path: z.string().optional().describe('Cookie path (defaults to "/")'),
     expiry: z.number().optional().describe('Expiry date as Unix timestamp in seconds'),
-    httpOnly: z.boolean().optional().describe('HttpOnly flag'),
-    secure: z.boolean().optional().describe('Secure flag'),
+    httpOnly: coerceBoolean.optional().describe('HttpOnly flag'),
+    secure: coerceBoolean.optional().describe('Secure flag'),
     sameSite: z.enum(['strict', 'lax', 'none']).optional().describe('SameSite attribute'),
   },
 };
@@ -76,10 +31,9 @@ export const setCookieTool: ToolCallback = async ({
   sameSite,
 }: Cookie): Promise<CallToolResult> => {
   try {
-    const browser = getBrowser();
-
     const cookie: Cookie = { name, value, path, domain, expiry, httpOnly, secure, sameSite };
-
+    const { getBrowser } = await import('../session/state');
+    const browser = getBrowser();
     await browser.setCookies(cookie);
 
     return {
@@ -93,7 +47,6 @@ export const setCookieTool: ToolCallback = async ({
   }
 };
 
-// Delete cookies
 export const deleteCookiesToolDefinition: ToolDefinition = {
   name: 'delete_cookies',
   description: 'deletes all cookies or a specific cookie by name',
@@ -102,23 +55,21 @@ export const deleteCookiesToolDefinition: ToolDefinition = {
   },
 };
 
-export const deleteCookiesTool: ToolCallback = async ({ name}: { name?: string }): Promise<CallToolResult> => {
+export const deleteCookiesTool: ToolCallback = async ({ name }: { name?: string }): Promise<CallToolResult> => {
   try {
+    const { getBrowser } = await import('../session/state');
     const browser = getBrowser();
 
     if (name) {
-      // Delete specific cookie by name
       await browser.deleteCookies([name]);
       return {
         content: [{ type: 'text', text: `Cookie "${name}" deleted successfully` }],
       };
     }
-    // Delete all cookies
     await browser.deleteCookies();
     return {
       content: [{ type: 'text', text: 'All cookies deleted successfully' }],
     };
-
   } catch (e) {
     return {
       isError: true,

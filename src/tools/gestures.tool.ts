@@ -2,7 +2,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 
 // Tap Tool
 export const tapElementToolDefinition: ToolDefinition = {
@@ -18,7 +18,7 @@ export const tapElementToolDefinition: ToolDefinition = {
   },
 };
 
-export const tapElementTool: ToolCallback = async (args: {
+export const tapAction = async (args: {
   selector?: string;
   x?: number;
   y?: number;
@@ -52,6 +52,12 @@ export const tapElementTool: ToolCallback = async (args: {
   }
 };
 
+export const tapElementTool: ToolCallback = async (args: {
+  selector?: string;
+  x?: number;
+  y?: number;
+}): Promise<CallToolResult> => tapAction(args);
+
 // Swipe Tool
 export const swipeToolDefinition: ToolDefinition = {
   name: 'swipe',
@@ -82,7 +88,7 @@ const contentToFingerDirection: Record<string, 'up' | 'down' | 'left' | 'right'>
   right: 'left',
 };
 
-export const swipeTool: ToolCallback = async (args: {
+export const swipeAction = async (args: {
   direction: 'up' | 'down' | 'left' | 'right';
   duration?: number;
   percent?: number;
@@ -112,6 +118,12 @@ export const swipeTool: ToolCallback = async (args: {
   }
 };
 
+export const swipeTool: ToolCallback = async (args: {
+  direction: 'up' | 'down' | 'left' | 'right';
+  duration?: number;
+  percent?: number;
+}): Promise<CallToolResult> => swipeAction(args);
+
 // Drag and Drop Tool
 export const dragAndDropToolDefinition: ToolDefinition = {
   name: 'drag_and_drop',
@@ -125,7 +137,7 @@ export const dragAndDropToolDefinition: ToolDefinition = {
   },
 };
 
-export const dragAndDropTool: ToolCallback = async (args: {
+export const dragAndDropAction = async (args: {
   sourceSelector: string;
   targetSelector?: string;
   x?: number;
@@ -162,3 +174,11 @@ export const dragAndDropTool: ToolCallback = async (args: {
     };
   }
 };
+
+export const dragAndDropTool: ToolCallback = async (args: {
+  sourceSelector: string;
+  targetSelector?: string;
+  x?: number;
+  y?: number;
+  duration?: number;
+}): Promise<CallToolResult> => dragAndDropAction(args);
