@@ -6,7 +6,7 @@ import { encode } from '@toon-format/toon';
 export const elementsResource: ResourceDefinition = {
   name: 'session-current-elements',
   uri: 'wdio://session/current/elements',
-  description: 'Interactable elements on the current page',
+  description: 'Interactable elements on the current page. Prefer this over screenshot — returns ready-to-use selectors, faster, and far fewer tokens. Only use screenshot for visual verification or debugging.',
   handler: async () => {
     try {
       const browser = getBrowser();

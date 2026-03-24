@@ -6,8 +6,7 @@ import { z } from 'zod';
 import type { SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
-import { localBrowserProvider } from '../providers/local-browser.provider';
-import { localAppiumProvider } from '../providers/local-appium.provider';
+import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
 
 const platformEnum = z.enum(['browser', 'ios', 'android']);
@@ -18,8 +17,16 @@ export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
   description: 'Starts a browser or mobile app session. For local browser, use browser platform. For mobile apps, use ios or android platform. Use attach mode to connect to an existing Chrome instance.',
   inputSchema: {
+    provider: z.enum(['local', 'browserstack']).optional().default('local').describe('Session provider (default: local)'),
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
+    browserVersion: z.string().optional().describe('Browser version (BrowserStack only, default: latest)'),
+    os: z.string().optional().describe('Operating system (BrowserStack browser only, e.g. "Windows", "OS X")'),
+    osVersion: z.string().optional().describe('OS version (BrowserStack browser only, e.g. "11", "Sequoia")'),
+    app: z.string().optional().describe('BrowserStack app URL (bs://...) or custom_id for mobile sessions'),
+    projectName: z.string().optional().describe('BrowserStack project name for reporting'),
+    buildName: z.string().optional().describe('BrowserStack build name for reporting'),
+    sessionName: z.string().optional().describe('BrowserStack session name for reporting'),
     headless: coerceBoolean.optional().default(true).describe('Run browser in headless mode (default: true)'),
     windowWidth: z.number().min(400).max(3840).optional().default(1920).describe('Browser window width'),
     windowHeight: z.number().min(400).max(2160).optional().default(1080).describe('Browser window height'),
@@ -47,8 +54,16 @@ export const startSessionToolDefinition: ToolDefinition = {
 };
 
 type StartSessionArgs = {
+  provider?: 'local' | 'browserstack';
   platform: 'browser' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
+  browserVersion?: string;
+  os?: string;
+  osVersion?: string;
+  app?: string;
+  projectName?: string;
+  buildName?: string;
+  sessionName?: string;
   headless?: boolean;
   windowWidth?: number;
   windowHeight?: number;
@@ -155,15 +170,18 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const headlessSupported = browser !== 'safari';
   const effectiveHeadless = headless && headlessSupported;
 
-  const mergedCapabilities = localBrowserProvider.buildCapabilities({
+  const provider = getProvider(args.provider ?? 'local', 'browser');
+  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const mergedCapabilities = provider.buildCapabilities({
+    ...args as Record<string, unknown>,
     browser,
     headless,
     windowWidth,
     windowHeight,
-    capabilities: userCapabilities
+    capabilities: userCapabilities,
   });
 
-  const wdioBrowser = await remote({ capabilities: mergedCapabilities });
+  const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
   const { sessionId } = wdioBrowser;
 
   const sessionMetadata: SessionMetadata = {
@@ -206,9 +224,9 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
 }
 
 async function startMobileSession(args: StartSessionArgs): Promise<CallToolResult> {
-  const { platform, appPath, deviceName, noReset } = args;
+  const { platform, appPath, app, deviceName, noReset } = args;
 
-  if (!appPath && noReset !== true) {
+  if (!appPath && !app && noReset !== true) {
     return {
       content: [{
         type: 'text',
@@ -217,20 +235,15 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     };
   }
 
-  const serverConfig = localAppiumProvider.getConnectionConfig(args as Record<string, unknown>);
-  const mergedCapabilities = localAppiumProvider.buildCapabilities(args as Record<string, unknown>);
+  const provider = getProvider(args.provider ?? 'local', args.platform);
+  const serverConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const mergedCapabilities = provider.buildCapabilities(args as Record<string, unknown>);
 
-  const browser = await remote({
-    protocol: serverConfig.protocol,
-    hostname: serverConfig.hostname,
-    port: serverConfig.port,
-    path: serverConfig.path,
-    capabilities: mergedCapabilities,
-  });
+  const browser = await remote({ ...serverConfig, capabilities: mergedCapabilities });
 
   const { sessionId } = browser;
-  const shouldAutoDetach = localAppiumProvider.shouldAutoDetach(args as Record<string, unknown>);
-  const sessionType = localAppiumProvider.getSessionType(args as Record<string, unknown>);
+  const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
+  const sessionType = provider.getSessionType(args as Record<string, unknown>);
   const metadata: SessionMetadata = {
     type: sessionType,
     capabilities: mergedCapabilities,

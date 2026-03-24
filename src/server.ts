@@ -60,6 +60,12 @@ import {
   startSessionToolDefinition
 } from './tools/session.tool';
 import { switchTabTool, switchTabToolDefinition } from './tools/tabs.tool';
+import {
+  listAppsTool,
+  listAppsToolDefinition,
+  uploadAppTool,
+  uploadAppToolDefinition,
+} from './tools/browserstack.tool';
 
 console.log = (...args) => console.error('[LOG]', ...args);
 console.info = (...args) => console.error('[INFO]', ...args);
@@ -132,6 +138,9 @@ registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
 registerTool(executeScriptToolDefinition, withRecording('execute_script', executeScriptTool));
 registerTool(getElementsToolDefinition, getElementsTool);
+
+registerTool(listAppsToolDefinition, listAppsTool);
+registerTool(uploadAppToolDefinition, uploadAppTool);
 
 registerResource(sessionsIndexResource);
 registerResource(sessionCurrentStepsResource);

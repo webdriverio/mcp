@@ -6,3 +6,6 @@ lib
 
 settings.local.json
 *.tgz
+
+.mcp.json
+.env
