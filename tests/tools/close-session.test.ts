@@ -41,15 +41,27 @@ describe('close_session', () => {
     expect(mockDeleteSession).toHaveBeenCalledOnce();
   });
 
-  it('skips deleteSession when isAttached is true', async () => {
+  it('calls deleteSession when isAttached is true (force-close)', async () => {
     setupSession('sess-attached', true);
     await callClose({});
+    expect(mockDeleteSession).toHaveBeenCalledOnce();
+  });
+
+  it('returns "closed" message when isAttached is true (force-close)', async () => {
+    setupSession('sess-attached', true);
+    const result = await callClose({});
+    expect(result.content[0].text).toContain('closed');
+  });
+
+  it('skips deleteSession when detach is explicitly true', async () => {
+    setupSession('sess-attached', true);
+    await callClose({ detach: true });
     expect(mockDeleteSession).not.toHaveBeenCalled();
   });
 
-  it('returns "detached from" message when isAttached is true and detach is false', async () => {
+  it('returns "detached from" message when detach is explicitly true', async () => {
     setupSession('sess-attached', true);
-    const result = await callClose({});
+    const result = await callClose({ detach: true });
     expect(result.content[0].text).toContain('detached from');
   });
 

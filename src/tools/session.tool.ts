@@ -166,15 +166,17 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const wdioBrowser = await remote({ capabilities: mergedCapabilities });
   const { sessionId } = wdioBrowser;
 
-  registerSession(sessionId, wdioBrowser, {
+  const sessionMetadata: SessionMetadata = {
     type: 'browser',
-    capabilities: wdioBrowser.capabilities as Record<string, unknown>,
+    capabilities: mergedCapabilities,
     isAttached: false,
-  }, {
+  };
+
+  registerSession(sessionId, wdioBrowser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
-    capabilities: wdioBrowser.capabilities as Record<string, unknown>,
+    capabilities: mergedCapabilities,
     steps: [],
   });
 
@@ -267,41 +269,36 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
   await waitForCDP(host, port);
   const { activeTabUrl, allTabUrls } = await closeStaleMappers(host, port);
 
+  const capabilities = {
+    browserName: 'chrome',
+    unhandledPromptBehavior: 'dismiss',
+    webSocketUrl: false,
+    'goog:chromeOptions': {
+      debuggerAddress: `${host}:${port}`,
+    },
+  };
+
   const browser = await remote({
     connectionRetryTimeout: 30000,
     connectionRetryCount: 3,
-    capabilities: {
-      browserName: 'chrome',
-      unhandledPromptBehavior: 'dismiss',
-      webSocketUrl: false,
-      'goog:chromeOptions': {
-        debuggerAddress: `${host}:${port}`,
-      },
-    },
+    capabilities,
   });
 
   const { sessionId } = browser;
-  registerSession(
+
+  const sessionMetadata: SessionMetadata = {
+    type: 'browser',
+    capabilities,
+    isAttached: true,
+  };
+
+  registerSession(sessionId, browser, sessionMetadata, {
     sessionId,
-    browser,
-    {
-      type: 'browser',
-      capabilities: browser.capabilities as Record<string, unknown>,
-      isAttached: true,
-    },
-    {
-      sessionId,
-      type: 'browser',
-      startedAt: new Date().toISOString(),
-      capabilities: {
-        browserName: 'chrome',
-        'goog:chromeOptions': {
-          debuggerAddress: `${host}:${port}`,
-        },
-      },
-      steps: [],
-    },
-  );
+    type: 'browser',
+    startedAt: new Date().toISOString(),
+    capabilities,
+    steps: [],
+  });
 
   if (navigationUrl) {
     await browser.url(navigationUrl);
@@ -341,11 +338,17 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const sessionId = state.currentSession;
     const metadata = state.sessionMetadata.get(sessionId);
 
-    const effectiveDetach = args.detach || !!metadata?.isAttached;
-    await closeSession(sessionId, args.detach ?? false, !!metadata?.isAttached);
+    const isAttached = !!metadata?.isAttached;
+    const detach = args.detach ?? false;
 
-    const action = effectiveDetach ? 'detached from' : 'closed';
-    const note = args.detach && !metadata?.isAttached
+    // Determine if this is a force-close (auto-detached session + explicit close)
+    const force = !detach && isAttached;
+
+    const effectiveDetach = detach || isAttached;
+    await closeSession(sessionId, detach, isAttached, force);
+
+    const action = effectiveDetach && !force ? 'detached from' : 'closed';
+    const note = detach && !isAttached
       ? '\nNote: Session will remain active on Appium server.'
       : '';
 

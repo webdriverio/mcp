@@ -5,8 +5,8 @@ import type { SessionHistory, RecordedStep } from '../../src/types/recording';
 
 const START_BROWSER_STEP: RecordedStep = {
   index: 1,
-  tool: 'start_browser',
-  params: { browser: 'chrome', headless: true, windowWidth: 1920, windowHeight: 1080 },
+  tool: 'start_session',
+  params: { platform: 'browser', browser: 'chrome', headless: true, windowWidth: 1920, windowHeight: 1080 },
   status: 'ok',
   durationMs: 0,
   timestamp: '2026-01-01T00:00:00.000Z',
@@ -35,14 +35,13 @@ function makeHistory(steps: Partial<RecordedStep>[]): SessionHistory {
 }
 
 describe('generateCode - header', () => {
-  it('wraps output in remote() setup and deleteSession', () => {
+  it('wraps output in remote() setup', () => {
     const code = generateCode(makeHistory([]));
     expect(code).toContain("import { remote } from 'webdriverio';");
-    expect(code).toContain('await browser.deleteSession();');
     expect(code).toContain('browserName');
   });
 
-  it('generates start_browser using history.capabilities, not reconstructed from params', () => {
+  it('generates start_session (browser) using history.capabilities', () => {
     const history: SessionHistory = {
       sessionId: 'caps-123',
       type: 'browser',
@@ -54,8 +53,8 @@ describe('generateCode - header', () => {
       },
       steps: [{
         index: 1,
-        tool: 'start_browser',
-        params: { browser: 'chrome', headless: true },
+        tool: 'start_session',
+        params: { platform: 'browser', browser: 'chrome', headless: true },
         status: 'ok',
         durationMs: 100,
         timestamp: '2026-01-01T00:00:00.000Z',
@@ -64,10 +63,10 @@ describe('generateCode - header', () => {
     const code = generateCode(history);
     expect(code).toContain('const browser = await remote(');
     expect(code).toContain('"browserName": "chrome"');
-    expect(code).toContain('--custom-flag'); // only present in history.capabilities
+    expect(code).toContain('--custom-flag');
   });
 
-  it('generates attach_browser using history.capabilities', () => {
+  it('generates start_session (attach mode) using history.capabilities', () => {
     const history: SessionHistory = {
       sessionId: 'attach-123',
       type: 'browser',
@@ -78,8 +77,8 @@ describe('generateCode - header', () => {
       },
       steps: [{
         index: 1,
-        tool: 'attach_browser',
-        params: { port: 9222, host: 'localhost', userDataDir: '/tmp/chrome-debug' },
+        tool: 'start_session',
+        params: { platform: 'browser', attach: true, port: 9222, host: 'localhost', userDataDir: '/tmp/chrome-debug' },
         status: 'ok',
         durationMs: 100,
         timestamp: '2026-01-01T00:00:00.000Z',
@@ -91,7 +90,7 @@ describe('generateCode - header', () => {
     expect(code).toContain('--user-data-dir=/tmp/chrome-debug');
   });
 
-  it('appends browser.url() when navigationUrl is set on start_browser', () => {
+  it('appends browser.url() when navigationUrl is set on start_session (browser)', () => {
     const history: SessionHistory = {
       sessionId: 'nav-123',
       type: 'browser',
@@ -99,8 +98,8 @@ describe('generateCode - header', () => {
       capabilities: { browserName: 'chrome' },
       steps: [{
         index: 1,
-        tool: 'start_browser',
-        params: { browser: 'chrome', headless: false, windowWidth: 1920, windowHeight: 1080, navigationUrl: 'https://github.com/login' },
+        tool: 'start_session',
+        params: { platform: 'browser', browser: 'chrome', headless: false, windowWidth: 1920, windowHeight: 1080, navigationUrl: 'https://github.com/login' },
         status: 'ok',
         durationMs: 0,
         timestamp: '2026-01-01T00:00:00.000Z',
@@ -110,7 +109,7 @@ describe('generateCode - header', () => {
     expect(code).toContain("await browser.url('https://github.com/login');");
   });
 
-  it('generates start_app_session using history.appiumConfig for connection config', () => {
+  it('generates start_session (mobile) using history.appiumConfig for connection config', () => {
     const history: SessionHistory = {
       sessionId: 'app-123',
       type: 'android',
@@ -123,15 +122,15 @@ describe('generateCode - header', () => {
       appiumConfig: { hostname: '127.0.0.1', port: 4723, path: '/' },
       steps: [{
         index: 1,
-        tool: 'start_app_session',
-        params: { platform: 'Android', deviceName: 'emulator-5554' }, // no appiumHost in params
+        tool: 'start_session',
+        params: { platform: 'android', deviceName: 'emulator-5554' },
         status: 'ok',
         durationMs: 100,
         timestamp: '2026-01-01T00:00:00.000Z',
       }],
     };
     const code = generateCode(history);
-    expect(code).toContain('"hostname": "127.0.0.1"'); // from history.appiumConfig, not params fallback
+    expect(code).toContain('"hostname": "127.0.0.1"');
     expect(code).toContain('"port": 4723');
     expect(code).toContain('"platformName": "Android"');
   });

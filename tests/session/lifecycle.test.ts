@@ -5,7 +5,7 @@ import { closeSession, registerSession } from '../../src/session/lifecycle';
 import type { SessionHistory } from '../../src/types/recording';
 
 function makeBrowser(overrides: Record<string, unknown> = {}) {
-  return { deleteSession: vi.fn(), ...overrides } as unknown as WebdriverIO.Browser;
+  return { deleteSession: vi.fn().mockResolvedValue(undefined), ...overrides } as unknown as WebdriverIO.Browser;
 }
 
 beforeEach(() => {

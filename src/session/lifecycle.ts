@@ -27,16 +27,30 @@ export function registerSession(
   historyEntry: SessionHistory,
 ): void {
   const state = getState();
-  if (state.currentSession && state.currentSession !== sessionId) {
+  const oldSessionId = state.currentSession;
+  if (oldSessionId && oldSessionId !== sessionId) {
     handleSessionTransition(sessionId);
   }
   state.browsers.set(sessionId, browser);
   state.sessionMetadata.set(sessionId, metadata);
   state.sessionHistory.set(sessionId, historyEntry);
   state.currentSession = sessionId;
+
+  // If there was a previous session, terminate it to prevent orphaning
+  if (oldSessionId && oldSessionId !== sessionId) {
+    const oldBrowser = state.browsers.get(oldSessionId);
+    if (oldBrowser) {
+      // Fire and forget — don't block registration on close
+      oldBrowser.deleteSession().catch(() => {
+        // Ignore errors during force-close of orphaned session
+      });
+      state.browsers.delete(oldSessionId);
+      state.sessionMetadata.delete(oldSessionId);
+    }
+  }
 }
 
-export async function closeSession(sessionId: string, detach: boolean, isAttached: boolean): Promise<void> {
+export async function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
   const state = getState();
   const browser = state.browsers.get(sessionId);
   if (!browser) return;
@@ -46,12 +60,18 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
     history.endedAt = new Date().toISOString();
   }
 
-  // Only terminate the WebDriver session if we created it (not attached/borrowed)
-  if (!detach && !isAttached) {
+  // Terminate the WebDriver session if:
+  // - force is true (override), OR
+  // - detach is false AND isAttached is false (normal close)
+  if (force || (!detach && !isAttached)) {
     await browser.deleteSession();
   }
 
   state.browsers.delete(sessionId);
   state.sessionMetadata.delete(sessionId);
-  state.currentSession = null;
+
+  // Only clear currentSession if it matches the session being closed
+  if (state.currentSession === sessionId) {
+    state.currentSession = null;
+  }
 }
