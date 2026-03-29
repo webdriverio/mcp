@@ -35,10 +35,14 @@ function makeHistory(steps: Partial<RecordedStep>[]): SessionHistory {
 }
 
 describe('generateCode - header', () => {
-  it('wraps output in remote() setup', () => {
+  it('wraps output in remote() setup with try/finally and deleteSession', () => {
     const code = generateCode(makeHistory([]));
     expect(code).toContain("import { remote } from 'webdriverio';");
     expect(code).toContain('browserName');
+    expect(code).toContain('try {');
+    expect(code).toContain('} finally {');
+    expect(code).toContain('  await browser.deleteSession();');
+    expect(code).toContain('}');
   });
 
   it('generates start_session (browser) using history.capabilities', () => {
@@ -175,6 +179,31 @@ describe('generateCode - tool mappings', () => {
   it('swipe → mobile: swipe execute', () => {
     const code = generateCode(makeHistory([{ tool: 'swipe', params: { direction: 'up' } }]));
     expect(code).toContain("await browser.execute('mobile: swipe', { direction: 'up' });");
+  });
+
+  it('execute_script → browser.execute with single-quoted script string', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: { script: 'return document.title' },
+    }]));
+    expect(code).toContain("await browser.execute('return document.title');");
+  });
+
+  it('execute_script escapes backslashes in script string', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: { script: "return document.querySelector('[data-\\\\x]')" },
+    }]));
+    expect(code).toContain("await browser.execute('return document.querySelector(\\'[data-\\\\\\\\x]\\')');");
+  });
+
+  it('execute_script with args → browser.execute with args array', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: { script: 'arguments[0].click()', args: ['#btn'] },
+    }]));
+    expect(code).toContain("await browser.execute('arguments[0].click()',");
+    expect(code).toContain('"#btn"');
   });
 
   it('drag_and_drop (selector form) → $().dragAndDrop($())', () => {

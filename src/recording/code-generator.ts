@@ -48,7 +48,7 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       return `const browser = await remote(${indentJson(config)});`;
     }
     case 'close_session':
-      return 'await browser.deleteSession();';
+      return '// Session closed';
     case 'navigate':
       return `await browser.url('${escapeStr(p.url)}');`;
     case 'click_element':
@@ -71,12 +71,22 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         return `await browser.$('${escapeStr(p.sourceSelector)}').dragAndDrop(browser.$('${escapeStr(p.targetSelector)}'));`;
       }
       return `await browser.$('${escapeStr(p.sourceSelector)}').dragAndDrop({ x: ${p.x}, y: ${p.y} });`;
+    case 'execute_script': {
+      const scriptCode = `'${escapeStr(p.script)}'`;
+      const scriptArgs = (p.args as unknown[])?.length ? `, ${indentJson(p.args)}` : '';
+      return `await browser.execute(${scriptCode}${scriptArgs});`;
+    }
     default:
       return `// [unknown tool] ${step.tool}`;
   }
 }
 
 export function generateCode(history: SessionHistory): string {
-  const steps = history.steps.map(step => generateStep(step, history)).join('\n');
-  return `import { remote } from 'webdriverio';\n\n${steps}`;
+  const steps = history.steps
+    .map(step => generateStep(step, history))
+    .join('\n')
+    .split('\n')
+    .map(line => `  ${line}`)
+    .join('\n');
+  return `import { remote } from 'webdriverio';\n\ntry {\n${steps}\n} finally {\n  await browser.deleteSession();\n}`;
 }

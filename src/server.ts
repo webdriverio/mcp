@@ -130,7 +130,7 @@ registerTool(rotateDeviceToolDefinition, rotateDeviceTool);
 registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
 registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
-registerTool(executeScriptToolDefinition, executeScriptTool);
+registerTool(executeScriptToolDefinition, withRecording('execute_script', executeScriptTool));
 registerTool(getElementsToolDefinition, getElementsTool);
 
 registerResource(sessionsIndexResource);
