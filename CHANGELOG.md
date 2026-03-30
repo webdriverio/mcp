@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/webdriverio/mcp/compare/v3.0.0...v3.1.0) (2026-03-30)
+
+### Features
+
+* Add BrowserStack Local binary resource with supporting and enhance session handling ([447e266](https://github.com/webdriverio/mcp/commit/447e266dbbecbea73c4aaecac446c0b55d981404))
+* Introduce BrowserStack provider and tools ([2904997](https://github.com/webdriverio/mcp/commit/2904997e88432c779fa65aad0aa868e39c378b52))
+
 ## [3.0.0](https://github.com/webdriverio/mcp/compare/v2.5.3...v3.0.0) (2026-03-30)
 
 ### ⚠ BREAKING CHANGES
