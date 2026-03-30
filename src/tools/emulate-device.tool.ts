@@ -1,5 +1,5 @@
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 // DeviceName is not in webdriverio's public exports but is required to satisfy browser.emulate('device', ...) overloads.
 // This is a type-only import — it is stripped at build time by tsup and has no runtime impact.

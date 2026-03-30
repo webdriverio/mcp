@@ -1,5 +1,5 @@
 // src/recording/step-recorder.ts
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RecordedStep, SessionHistory } from '../types/recording';
 import { getState } from '../session/state';
 

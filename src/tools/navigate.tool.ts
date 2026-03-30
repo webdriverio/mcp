@@ -1,7 +1,7 @@
 import { getBrowser } from '../session/state';
 import { z } from 'zod';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 
 export const navigateToolDefinition: ToolDefinition = {

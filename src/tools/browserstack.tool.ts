@@ -1,6 +1,6 @@
 import { existsSync, createReadStream } from 'node:fs';
 import { z } from 'zod';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
 
