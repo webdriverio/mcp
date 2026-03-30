@@ -1,5 +1,28 @@
 # Changelog
 
+## [3.0.0](https://github.com/webdriverio/mcp/compare/v2.5.3...v3.0.0) (2026-03-30)
+
+### ⚠ BREAKING CHANGES
+
+* Consolidated session management tooling into 1 single tool.
+* Deleted tools: `get_visible_element`, `get_accessibility_tree`, `get_cookie`, `get_tabs`, `get_app_state`, etc. The READ tooling is mainly resources going forward.
+
+### Features
+
+* Initial commit for v3.0.0 ([37831d1](https://github.com/webdriverio/mcp/commit/37831d180d564cb0664d39dfaced928144f5a0da))
+* Re-add `get_elements` tool for retrieving interactable page elements ([e0d94c7](https://github.com/webdriverio/mcp/commit/e0d94c7737ef2520660158d2287e12f6d75bea9f))
+
+### Bug Fixes
+
+* Address issues with session management and code generation of new session tool ([9864253](https://github.com/webdriverio/mcp/commit/98642537a76bf0d4cd503ab7226ccae41ea7438e))
+* Remove ResourceTemplate usage and simplify resource handlers ([59f83a5](https://github.com/webdriverio/mcp/commit/59f83a539794601af3863f3a289a0a80f8a1e2bb))
+* Use `z.coerce` to correctly manage booleans with OpenCode and Codex ([ff37196](https://github.com/webdriverio/mcp/commit/ff371966108fc2cff011be22fd571dc6d45be51b))
+
+### Refactoring
+
+* Refine session lifecycle handling and simplify logic ([4a301fe](https://github.com/webdriverio/mcp/commit/4a301feea864474b9d2be8996763f9bb1c0ee934))
+* Separate MCP resources from tools ([e1be10f](https://github.com/webdriverio/mcp/commit/e1be10fbd2a629b388c8e8aa3162dd1b53cb1e16))
+
 ## [2.5.3](https://github.com/webdriverio/mcp/compare/v2.5.2...v2.5.3) (2026-03-20)
 
 ### Bug Fixes
