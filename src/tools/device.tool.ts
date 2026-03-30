@@ -2,22 +2,14 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from './browser.tool';
+import { getBrowser } from '../session/state';
 
-// Tool Definitions for zero-argument tools
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
   description: 'hides the on-screen keyboard',
   inputSchema: {},
 };
 
-export const getGeolocationToolDefinition: ToolDefinition = {
-  name: 'get_geolocation',
-  description: 'gets current device geolocation',
-  inputSchema: {},
-};
-
-// Tool Definitions for tools with arguments
 export const rotateDeviceToolDefinition: ToolDefinition = {
   name: 'rotate_device',
   description: 'rotates device to portrait or landscape orientation',
@@ -36,7 +28,6 @@ export const setGeolocationToolDefinition: ToolDefinition = {
   },
 };
 
-// Rotate Device Tool
 export const rotateDeviceTool: ToolCallback = async (args: {
   orientation: 'PORTRAIT' | 'LANDSCAPE';
 }): Promise<CallToolResult> => {
@@ -57,7 +48,6 @@ export const rotateDeviceTool: ToolCallback = async (args: {
   }
 };
 
-// Hide Keyboard Tool
 export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
@@ -75,30 +65,6 @@ export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> 
   }
 };
 
-// Get Geolocation Tool
-export const getGeolocationTool: ToolCallback = async (): Promise<CallToolResult> => {
-  try {
-    const browser = getBrowser();
-
-    const location = await browser.getGeoLocation();
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Location:\n  Latitude: ${location.latitude}\n  Longitude: ${location.longitude}\n  Altitude: ${location.altitude || 'N/A'}`,
-        },
-      ],
-    };
-  } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error getting geolocation: ${e}` }],
-    };
-  }
-};
-
-// Set Geolocation Tool
 export const setGeolocationTool: ToolCallback = async (args: {
   latitude: number;
   longitude: number;

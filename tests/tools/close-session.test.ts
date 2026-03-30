@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionHistory } from '../../src/types/recording';
 
 // No mock of browser.tool — closeSessionTool reads from the module-level state directly.
-// We inject test sessions via getBrowser().__state, which IS the module-level state object.
-import { closeSessionTool, getBrowser } from '../../src/tools/browser.tool';
+// We inject test sessions via getState(), which IS the module-level state object.
+import { closeSessionTool } from '../../src/tools/session.tool';
+import { getState } from '../../src/session/state';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
 const callClose = closeSessionTool as unknown as ToolFn;
@@ -11,8 +12,8 @@ const callClose = closeSessionTool as unknown as ToolFn;
 const mockDeleteSession = vi.fn();
 
 function setupSession(sessionId: string, isAttached: boolean) {
-  const state = (getBrowser as any).__state;
-  state.browsers.set(sessionId, { deleteSession: mockDeleteSession });
+  const state = getState();
+  state.browsers.set(sessionId, { deleteSession: mockDeleteSession } as unknown as WebdriverIO.Browser);
   state.currentSession = sessionId;
   state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached });
   state.sessionHistory.set(sessionId, {
@@ -26,7 +27,7 @@ function setupSession(sessionId: string, isAttached: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const state = (getBrowser as any).__state;
+  const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
   state.sessionHistory.clear();
@@ -40,22 +41,34 @@ describe('close_session', () => {
     expect(mockDeleteSession).toHaveBeenCalledOnce();
   });
 
-  it('skips deleteSession when isAttached is true', async () => {
+  it('calls deleteSession when isAttached is true (force-close)', async () => {
     setupSession('sess-attached', true);
     await callClose({});
+    expect(mockDeleteSession).toHaveBeenCalledOnce();
+  });
+
+  it('returns "closed" message when isAttached is true (force-close)', async () => {
+    setupSession('sess-attached', true);
+    const result = await callClose({});
+    expect(result.content[0].text).toContain('closed');
+  });
+
+  it('skips deleteSession when detach is explicitly true', async () => {
+    setupSession('sess-attached', true);
+    await callClose({ detach: true });
     expect(mockDeleteSession).not.toHaveBeenCalled();
   });
 
-  it('returns "detached from" message when isAttached is true and detach is false', async () => {
+  it('returns "detached from" message when detach is explicitly true', async () => {
     setupSession('sess-attached', true);
-    const result = await callClose({});
+    const result = await callClose({ detach: true });
     expect(result.content[0].text).toContain('detached from');
   });
 
   it('cleans up local state in both cases', async () => {
     setupSession('sess-2', true);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     expect(state.currentSession).toBeNull();
     expect(state.browsers.has('sess-2')).toBe(false);
   });
@@ -65,17 +78,17 @@ describe('close_session sessionHistory', () => {
   it('sets endedAt on the session history when session closes', async () => {
     setupSession('sess-history', false);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     const history = state.sessionHistory.get('sess-history');
     expect(history).toBeDefined();
-    expect(history.endedAt).toBeDefined();
-    expect(typeof history.endedAt).toBe('string');
+    expect(history!.endedAt).toBeDefined();
+    expect(typeof history!.endedAt).toBe('string');
   });
 
   it('retains sessionHistory after session is closed (browsers entry removed)', async () => {
     setupSession('sess-retain', false);
     await callClose({});
-    const state = (getBrowser as any).__state;
+    const state = getState();
     expect(state.browsers.has('sess-retain')).toBe(false);
     expect(state.sessionHistory.has('sess-retain')).toBe(true);
   });

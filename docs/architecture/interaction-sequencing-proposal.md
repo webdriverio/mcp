@@ -122,6 +122,7 @@ interface SequenceResult {
 ### Why Stability Matters
 
 After clicking a button, the page might:
+
 - Navigate (URL change)
 - Show a loading spinner
 - Fetch data and render new elements
@@ -201,7 +202,7 @@ src/
 
 1. Create `interaction.tool.ts` with basic `execute_sequence`
 2. Implement action dispatch (reuse existing tool logic)
-3. Capture before/after state using `getVisibleElements`
+3. Capture before/after state using `getElements`
 4. Compute simple delta (appeared/disappeared by selector)
 
 ### Phase 2: Stability Detection
@@ -241,6 +242,7 @@ execute_sequence({
 ```
 
 Response:
+
 ```json
 {
   "completed": 3,
@@ -271,6 +273,7 @@ execute_sequence({
 ```
 
 Response:
+
 ```json
 {
   "completed": 2,
@@ -300,6 +303,7 @@ execute_sequence({
 ```
 
 Response:
+
 ```json
 {
   "completed": 1,
@@ -331,6 +335,7 @@ execute_sequence({
 ```
 
 Response:
+
 ```json
 {
   "completed": 3,
@@ -361,6 +366,7 @@ Some actions (like `set_value`) rarely cause async changes. Could skip stability
 ### 2. How to handle infinite loading states?
 
 Options:
+
 - Hard timeout (current approach) — returns partial delta
 - Detect specific loading patterns — report "page still loading"
 - Let AI decide — return `{ stable: false, reason: 'loading indicator visible' }`
@@ -369,7 +375,8 @@ Options:
 
 ### 3. Should delta include off-screen elements?
 
-Current `getVisibleElements` filters to viewport by default. For delta:
+Current `getElements` filters to viewport by default. For delta:
+
 - Viewport only = might miss elements that scrolled in/out
 - Full page = more accurate but larger payload
 
@@ -378,6 +385,7 @@ Current `getVisibleElements` filters to viewport by default. For delta:
 ### 4. Performance: Full diff vs. key signals
 
 Two comparison strategies:
+
 - **Full diff**: Compare all elements every poll (accurate, expensive)
 - **Key signals**: Compare signature only during polling, full diff only at end (fast, might miss rapid changes)
 
@@ -386,6 +394,7 @@ Two comparison strategies:
 ### 5. What about conditional actions?
 
 Should we support:
+
 ```typescript
 { action: 'click_element', selector: '#cookie-banner', optional: true }
 ```
@@ -399,6 +408,7 @@ Should we support:
 ### Existing Tools
 
 `execute_sequence` complements existing tools:
+
 - Simple single actions still use `click_element`, `set_value`, etc.
 - Complex workflows use `execute_sequence`
 - No breaking changes to existing tools
@@ -406,6 +416,7 @@ Should we support:
 ### Mobile Support
 
 Works identically for mobile sessions:
+
 ```typescript
 execute_sequence({
   actions: [
@@ -419,6 +430,7 @@ execute_sequence({
 ### Multi-Session (Future)
 
 When multi-session support lands:
+
 ```typescript
 execute_sequence({
   sessionId: 'user-a',

@@ -6,6 +6,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
+import { coerceBoolean } from '../utils/zod-helpers';
 
 const USER_DATA_DIR = join(tmpdir(), 'chrome-debug');
 
@@ -29,7 +30,7 @@ After this tool succeeds, call attach_browser() to connect.`,
     mode: z.enum(['newInstance', 'freshSession']).default('newInstance').describe(
       'newInstance: open alongside existing Chrome | freshSession: clean profile'
     ),
-    copyProfileFiles: z.boolean().default(false).describe(
+    copyProfileFiles: coerceBoolean.default(false).describe(
       'Copy your Default Chrome profile (cookies, logins) into the debug session.'
     ),
   },
