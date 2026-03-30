@@ -54,7 +54,7 @@ export const startSessionToolDefinition: ToolDefinition = {
       port: z.number().optional(),
       path: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
-    browserstackLocal: coerceBoolean.optional().default(false).describe('Enable BrowserStack Local tunnel for testing against local/internal URLs (BrowserStack only, default: false). IMPORTANT: The BrowserStack Local binary daemon MUST already be running before calling start_session, otherwise all navigation to local/internal URLs will fail with ERR_TUNNEL_CONNECTION_FAILED. Read the wdio://browserstack/local-binary resource for the platform-specific download URL and the exact daemon start command. Do not set this to true without first confirming the daemon is running.'),
+    browserstackLocal: coerceBoolean.optional().default(false).describe('Enable BrowserStack Local tunnel for testing against local/internal URLs (BrowserStack only, default: false). When true, the tunnel is started automatically before the session and stopped when the session is closed.'),
     navigationUrl: z.string().optional().describe('URL to navigate to after starting'),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional capabilities to merge'),
   },
@@ -186,6 +186,10 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     capabilities: userCapabilities,
   });
 
+  const tunnelHandle = args.browserstackLocal
+    ? await provider.startTunnel?.(args as Record<string, unknown>)
+    : undefined;
+
   const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
   const { sessionId } = wdioBrowser;
 
@@ -193,6 +197,8 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     type: 'browser',
     capabilities: mergedCapabilities,
     isAttached: false,
+    provider: args.provider ?? 'local',
+    tunnelHandle,
   };
 
   registerSession(sessionId, wdioBrowser, sessionMetadata, {
@@ -244,15 +250,22 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   const serverConfig = provider.getConnectionConfig(args as Record<string, unknown>);
   const mergedCapabilities = provider.buildCapabilities(args as Record<string, unknown>);
 
+  const tunnelHandle = args.browserstackLocal
+    ? await provider.startTunnel?.(args as Record<string, unknown>)
+    : undefined;
+
   const browser = await remote({ ...serverConfig, capabilities: mergedCapabilities });
 
   const { sessionId } = browser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
   const sessionType = provider.getSessionType(args as Record<string, unknown>);
+
   const metadata: SessionMetadata = {
     type: sessionType,
     capabilities: mergedCapabilities,
     isAttached: shouldAutoDetach,
+    provider: args.provider ?? 'local',
+    tunnelHandle,
   };
 
   registerSession(sessionId, browser, metadata, {
@@ -307,6 +320,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     type: 'browser',
     capabilities,
     isAttached: true,
+    provider: 'local',
   };
 
   registerSession(sessionId, browser, sessionMetadata, {

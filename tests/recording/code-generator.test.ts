@@ -223,6 +223,84 @@ describe('generateCode - tool mappings', () => {
   });
 });
 
+describe('generateCode - BrowserStack Local tunnel', () => {
+  function makeBrowserstackLocalHistory(): SessionHistory {
+    return {
+      sessionId: 'bs-local-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {
+        browserName: 'chrome',
+        'bstack:options': {
+          local: true,
+          os: 'Windows',
+          osVersion: '11',
+        },
+      },
+      steps: [
+        {
+          index: 1,
+          tool: 'start_session',
+          params: { platform: 'browser', browser: 'chrome', browserstackLocal: true },
+          status: 'ok',
+          durationMs: 100,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'navigate',
+          params: { url: 'http://localhost:3000' },
+          status: 'ok',
+          durationMs: 50,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  it('imports browserstack-local and node:util when bstack:options.local is true', () => {
+    const code = generateCode(makeBrowserstackLocalHistory());
+    expect(code).toContain("import { Local as BrowserstackTunnel } from 'browserstack-local';");
+    expect(code).toContain("import { promisify } from 'node:util';");
+  });
+
+  it('emits tunnel setup before the try block', () => {
+    const code = generateCode(makeBrowserstackLocalHistory());
+    const tunnelSetupIdx = code.indexOf('await startTunnel(');
+    const tryIdx = code.indexOf('try {');
+    expect(tunnelSetupIdx).toBeGreaterThan(-1);
+    expect(tunnelSetupIdx).toBeLessThan(tryIdx);
+  });
+
+  it('emits tunnel teardown in the finally block after deleteSession', () => {
+    const code = generateCode(makeBrowserstackLocalHistory());
+    const deleteSessionIdx = code.indexOf('await browser.deleteSession()');
+    const stopTunnelIdx = code.indexOf('await stopTunnel()');
+    expect(stopTunnelIdx).toBeGreaterThan(-1);
+    expect(stopTunnelIdx).toBeGreaterThan(deleteSessionIdx);
+  });
+
+  it('does NOT emit tunnel code when bstack:options.local is absent', () => {
+    const history: SessionHistory = {
+      sessionId: 'bs-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome', 'bstack:options': { os: 'Windows' } },
+      steps: [{
+        index: 1,
+        tool: 'start_session',
+        params: { platform: 'browser', browser: 'chrome' },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
+    expect(code).not.toContain('BrowserstackTunnel');
+    expect(code).not.toContain('stopTunnel');
+  });
+});
+
 describe('generateCode - error and sentinel steps', () => {
   it('emits error step as a JS comment', () => {
     const code = generateCode(makeHistory([{

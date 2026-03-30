@@ -1,6 +1,15 @@
 import type { SessionHistory } from '../types/recording';
+import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState } from './state';
+import { getProvider } from '../providers/registry';
+
+function getSessionResult(history: SessionHistory | undefined): SessionResult {
+  const errorStep = history?.steps.find(s => s.status === 'error');
+  return errorStep
+    ? { status: 'failed', reason: errorStep.error }
+    : { status: 'passed' };
+}
 
 export function handleSessionTransition(newSessionId: string): void {
   const state = getState();
@@ -39,11 +48,19 @@ export function registerSession(
   // If there was a previous session, terminate it to prevent orphaning
   if (oldSessionId && oldSessionId !== sessionId) {
     const oldBrowser = state.browsers.get(oldSessionId);
+    const oldMetadata = state.sessionMetadata.get(oldSessionId);
     if (oldBrowser) {
       // Fire and forget — don't block registration on close
-      oldBrowser.deleteSession().catch(() => {
-        // Ignore errors during force-close of orphaned session
-      });
+      void (async () => {
+        if (oldMetadata?.provider) {
+          const oldHistory = state.sessionHistory.get(oldSessionId);
+          const provider = getProvider(oldMetadata.provider, oldMetadata.type);
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle).catch(() => {});
+        }
+        await oldBrowser.deleteSession().catch(() => {
+          // Ignore errors during force-close of orphaned session
+        });
+      })();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
     }
@@ -60,10 +77,20 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
     history.endedAt = new Date().toISOString();
   }
 
+  const metadata = state.sessionMetadata.get(sessionId);
+
   // Terminate the WebDriver session if:
   // - force is true (override), OR
   // - detach is false AND isAttached is false (normal close)
   if (force || (!detach && !isAttached)) {
+    if (metadata?.provider) {
+      try {
+        const provider = getProvider(metadata.provider, metadata.type);
+        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle);
+      } catch (e) {
+        console.error('[WARN] Failed to run provider onSessionClose:', e);
+      }
+    }
     await browser.deleteSession();
   }
 
