@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.0](https://github.com/webdriverio/mcp/compare/v3.1.1...v3.2.0) (2026-04-01)
+
+### Features
+
+* Integrate auto-start BrowserStack Local tunnel on session start & management ([5827a99](https://github.com/webdriverio/mcp/commit/5827a99a57d621375d25d13fec1e9608ad5f8486))
+
+### Bug Fixes
+
+* Handle existing BrowserStack tunnel gracefully in `start` method ([0084513](https://github.com/webdriverio/mcp/commit/00845133beff9a32c2c5f9c047cbc0bcfbfae5bb))
+
 ## [3.1.1](https://github.com/webdriverio/mcp/compare/v3.1.0...v3.1.1) (2026-03-30)
 
 ### Bug Fixes
