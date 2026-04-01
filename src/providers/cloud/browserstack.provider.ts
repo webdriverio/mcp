@@ -86,7 +86,16 @@ export class BrowserStackProvider implements SessionProvider {
     const key = process.env.BROWSERSTACK_ACCESS_KEY ?? '';
     const tunnel = new BrowserstackTunnel();
     const start = promisify(tunnel.start.bind(tunnel));
-    await start({ key });
+    try {
+      await start({ key });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('another browserstack local client is running') || msg.includes('server is listening on port')) {
+        console.error('[BrowserStack] Tunnel already running — reusing existing tunnel');
+        return null;
+      }
+      throw e;
+    }
     return tunnel;
   }
 
