@@ -163,7 +163,9 @@ export function shouldIncludeElement(
   } = filters;
 
   if (!matchesTagFilters(element, includeTagNames, excludeTagNames)) {
-    return false;
+    if (element.attributes?.clickable !== 'true') {
+      return false;
+    }
   }
 
   if (!matchesAttributeFilters(element, requireAttributes, minAttributeCount)) {
