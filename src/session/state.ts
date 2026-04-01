@@ -4,6 +4,8 @@ export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   capabilities: Record<string, unknown>;
   isAttached: boolean;
+  provider?: 'local' | 'browserstack';
+  tunnelHandle?: unknown;
 }
 
 const state = {

@@ -41,13 +41,19 @@ Single active session model in `src/session/state.ts`:
 // Private state — access via getState() or getBrowser()
 export function getBrowser(): WebdriverIO.Browser { ... }
 export function getState() { return state; }
-export interface SessionMetadata { type: 'browser' | 'ios' | 'android'; capabilities: Record<string, unknown>; isAttached: boolean; }
+export interface SessionMetadata {
+  type: 'browser' | 'ios' | 'android';
+  capabilities: Record<string, unknown>;
+  isAttached: boolean;
+  provider?: 'local' | 'browserstack';   // set at session start; used by lifecycle to call provider hooks
+  tunnelHandle?: unknown;                 // opaque handle returned by provider.startTunnel(), passed back to onSessionClose()
+}
 ```
 
 Session lifecycle managed via `src/session/lifecycle.ts`:
-- `registerSession()` — registers browser + metadata + history, handles transition sentinel
+- `registerSession()` — registers browser + metadata + history, handles transition sentinel; calls `provider.onSessionClose()` on orphaned sessions
 - `handleSessionTransition()` — appends `__session_transition__` step to outgoing session
-- `closeSession()` — terminates or detaches, marks endedAt, cleans up maps
+- `closeSession()` — terminates or detaches, marks endedAt, calls `provider.onSessionClose()`, cleans up maps
 
 ### Tool Pattern
 
@@ -98,8 +104,11 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - `wdio://session/current/cookies` — browser cookies
 - `wdio://session/current/tabs` — open browser tabs
 - `wdio://session/current/contexts` — native/webview contexts (mobile)
+- `wdio://session/current/context` — currently active context (mobile)
 - `wdio://session/current/app-state` — mobile app state
 - `wdio://session/current/geolocation` — device geolocation
+- `wdio://session/current/capabilities` — resolved WebDriver capabilities for the active session
+- `wdio://browserstack/local-binary` — platform-specific download URL and daemon start command for BrowserStack Local binary
 
 ### Build
 
@@ -115,7 +124,8 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/session/state.ts`                             | Session state maps, `getBrowser()`, `getState()` |
 | `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
 | `src/providers/registry.ts`                        | `getProvider()` — routes to local or cloud provider |
-| `src/providers/cloud/browserstack.provider.ts`     | BrowserStack session provider                 |
+| `src/providers/types.ts`                           | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
+| `src/providers/cloud/browserstack.provider.ts`     | BrowserStack provider — tunnel lifecycle + session result marking via `onSessionClose()` |
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
 | `src/tools/browserstack.tool.ts`                   | `list_apps`, `upload_app` — BrowserStack App Automate |

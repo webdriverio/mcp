@@ -33,6 +33,30 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
   switch (step.tool) {
     case 'start_session': {
       const platform = p.platform as string;
+      const isBrowserStack = 'bstack:options' in history.capabilities;
+      const capJson = indentJson(history.capabilities)
+        .split('\n')
+        .map((line, i) => (i > 0 ? `  ${line}` : line))
+        .join('\n');
+
+      if (isBrowserStack) {
+        const nav =
+          platform === 'browser' && p.navigationUrl
+            ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');`
+            : '';
+        return [
+          'const browser = await remote({',
+          "  protocol: 'https',",
+          "  hostname: 'hub.browserstack.com',",
+          '  port: 443,',
+          "  path: '/wd/hub',",
+          '  user: process.env.BS_USER,',
+          '  key: process.env.BS_KEY,',
+          `  capabilities: ${capJson}`,
+          `});${nav}`,
+        ].join('\n');
+      }
+
       if (platform === 'browser') {
         const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
         return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
@@ -81,12 +105,77 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
   }
 }
 
+function bsStatusUpdateLines(sessionType: 'browser' | 'ios' | 'android'): string[] {
+  const apiUrl = sessionType === 'browser'
+    ? 'https://api.browserstack.com/automate/sessions/'
+    : 'https://api-cloud.browserstack.com/app-automate/sessions/';
+  return [
+    "    const bsAuth = Buffer.from(`${process.env.BS_USER}:${process.env.BS_KEY}`).toString('base64');",
+    `    await fetch('${apiUrl}' + browser.sessionId + '.json', {`,
+    "      method: 'PUT',",
+    "      headers: { Authorization: 'Basic ' + bsAuth, 'Content-Type': 'application/json' },",
+    '      body: JSON.stringify({ status: bsStatus, ...(bsReason ? { reason: bsReason } : {}) })',
+    '    });',
+  ];
+}
+
 export function generateCode(history: SessionHistory): string {
+  const bstackOptions = history.capabilities['bstack:options'] as Record<string, unknown> | undefined;
+  const isBrowserStack = bstackOptions !== undefined;
+  const usesBrowserstackLocal = bstackOptions?.local === true;
+
   const steps = history.steps
     .map(step => generateStep(step, history))
     .join('\n')
     .split('\n')
     .map(line => `  ${line}`)
     .join('\n');
+
+  if (isBrowserStack) {
+    const bsSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const statusUpdate = bsStatusUpdateLines(history.type).join('\n');
+    const preamble = 'let browser;\nlet bsStatus = \'passed\';\nlet bsReason;';
+    const catchBlock = '} catch (e) {\n  bsStatus = \'failed\';\n  bsReason = String(e);\n  throw e;';
+    const finallyBody = `  if (browser) {\n${statusUpdate}\n    await browser.deleteSession();\n  }`;
+
+    if (usesBrowserstackLocal) {
+      const tunnelSetup = [
+        '',
+        'const tunnel = new BrowserstackTunnel();',
+        'const startTunnel = promisify(tunnel.start.bind(tunnel));',
+        'const stopTunnel = promisify(tunnel.stop.bind(tunnel));',
+        'await startTunnel({ key: process.env.BROWSERSTACK_ACCESS_KEY });',
+        '',
+      ].join('\n');
+
+      return [
+        "import { remote } from 'webdriverio';",
+        "import { Local as BrowserstackTunnel } from 'browserstack-local';",
+        "import { promisify } from 'node:util';",
+        tunnelSetup,
+        preamble,
+        'try {',
+        bsSteps,
+        catchBlock,
+        '} finally {',
+        finallyBody,
+        '  await stopTunnel();',
+        '}',
+      ].join('\n');
+    }
+
+    return [
+      "import { remote } from 'webdriverio';",
+      '',
+      preamble,
+      'try {',
+      bsSteps,
+      catchBlock,
+      '} finally {',
+      finallyBody,
+      '}',
+    ].join('\n');
+  }
+
   return `import { remote } from 'webdriverio';\n\ntry {\n${steps}\n} finally {\n  await browser.deleteSession();\n}`;
 }

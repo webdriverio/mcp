@@ -1,4 +1,6 @@
-import type { ConnectionConfig, SessionProvider } from '../types';
+import { promisify } from 'node:util';
+import { Local as BrowserstackTunnel } from 'browserstack-local';
+import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
 
 export class BrowserStackProvider implements SessionProvider {
   name = 'browserstack';
@@ -78,6 +80,52 @@ export class BrowserStackProvider implements SessionProvider {
 
   shouldAutoDetach(_options: Record<string, unknown>): boolean {
     return false;
+  }
+
+  async startTunnel(_options: Record<string, unknown>): Promise<unknown> {
+    const key = process.env.BROWSERSTACK_ACCESS_KEY ?? '';
+    const tunnel = new BrowserstackTunnel();
+    const start = promisify(tunnel.start.bind(tunnel));
+    try {
+      await start({ key });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('another browserstack local client is running') || msg.includes('server is listening on port')) {
+        console.error('[BrowserStack] Tunnel already running — reusing existing tunnel');
+        return null;
+      }
+      throw e;
+    }
+    return tunnel;
+  }
+
+  async onSessionClose(
+    sessionId: string,
+    sessionType: 'browser' | 'ios' | 'android',
+    result: SessionResult,
+    tunnelHandle?: unknown,
+  ): Promise<void> {
+    if (tunnelHandle) {
+      const tunnel = tunnelHandle as InstanceType<typeof BrowserstackTunnel>;
+      const stop = promisify(tunnel.stop.bind(tunnel));
+      await stop();
+    }
+
+    const user = process.env.BROWSERSTACK_USERNAME;
+    const key = process.env.BROWSERSTACK_ACCESS_KEY;
+    if (!user || !key) return;
+
+    const baseUrl = sessionType === 'browser'
+      ? 'https://api.browserstack.com/automate/sessions'
+      : 'https://api-cloud.browserstack.com/app-automate/sessions';
+
+    const auth = Buffer.from(`${user}:${key}`).toString('base64');
+    const body: Record<string, string> = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
+    await fetch(`${baseUrl}/${sessionId}.json`, {
+      method: 'PUT',
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
 }
 

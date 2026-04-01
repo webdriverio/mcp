@@ -48,6 +48,7 @@
     "@toon-format/toon": "^2.1.0",
     "@wdio/protocols": "^9.27.0",
     "@xmldom/xmldom": "^0.8.12",
+    "browserstack-local": "^1.5.12",
     "puppeteer-core": "^24.40.0",
     "sharp": "^0.34.5",
     "webdriverio": "^9.27.0",
