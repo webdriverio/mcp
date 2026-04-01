@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.2.1](https://github.com/webdriverio/mcp/compare/v3.2.0...v3.2.1) (2026-04-01)
+
+### Bug Fixes
+
+* Add support for external BrowserStack Local tunnel handling and dynamic connection configurations ([ef016bd](https://github.com/webdriverio/mcp/commit/ef016bd05b680a3009f01c6a60efcb09347ff9c6))
+
 ## [3.2.0](https://github.com/webdriverio/mcp/compare/v3.1.1...v3.2.0) (2026-04-01)
 
 ### Features
