@@ -54,6 +54,7 @@ import {
   sessionsIndexResource,
   sessionStepsResource,
   tabsResource,
+  networkResource,
 } from './resources';
 import {
   closeSessionTool,
@@ -161,6 +162,7 @@ registerResource(contextsResource);
 registerResource(contextResource);
 registerResource(geolocationResource);
 registerResource(tabsResource);
+registerResource(networkResource);
 
 async function main() {
   const transport = new StdioServerTransport();

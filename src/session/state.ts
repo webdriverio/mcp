@@ -8,11 +8,25 @@ export interface SessionMetadata {
   tunnelHandle?: unknown;
 }
 
+export interface NetworkEntry {
+  requestId: string;
+  url: string;
+  method: string;
+  requestHeaders: Record<string, string>;
+  requestTimestamp: number;
+  status?: number;
+  responseHeaders?: Record<string, string>;
+  responseTimestamp?: number;
+  durationMs?: number;
+  error?: string;
+}
+
 const state = {
   browsers: new Map<string, WebdriverIO.Browser>(),
   currentSession: null as string | null,
   sessionMetadata: new Map<string, SessionMetadata>(),
   sessionHistory: new Map<string, SessionHistory>(),
+  sessionNetworkLog: new Map<string, Map<string, NetworkEntry>>(),
 };
 
 export function getBrowser(): WebdriverIO.Browser {

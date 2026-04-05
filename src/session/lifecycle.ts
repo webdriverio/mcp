@@ -1,8 +1,56 @@
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
-import type { SessionMetadata } from './state';
+import type { NetworkEntry, SessionMetadata } from './state';
 import { getState } from './state';
 import { getProvider } from '../providers/registry';
+
+function headersToRecord(headers: Array<{ name: string; value: string }>): Record<string, string> {
+  return Object.fromEntries(headers.map(({ name, value }) => [name, value]));
+}
+
+async function attachNetworkListener(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
+  if (!browser.isBidi) return;
+
+  const state = getState();
+  const log = new Map<string, NetworkEntry>();
+  state.sessionNetworkLog.set(sessionId, log);
+
+  try {
+    await browser.sessionSubscribe({
+      events: ['network.beforeRequestSent', 'network.responseCompleted', 'network.fetchError'],
+    });
+  } catch {
+    return;
+  }
+
+  browser.on('network.beforeRequestSent', (params: any) => {
+    const entry: NetworkEntry = {
+      requestId: params.request.request,
+      url: params.request.url,
+      method: params.request.method,
+      requestHeaders: headersToRecord(params.request.headers ?? []),
+      requestTimestamp: params.timestamp,
+    };
+    log.set(entry.requestId, entry);
+  });
+
+  browser.on('network.responseCompleted', (params: any) => {
+    const entry = log.get(params.request.request);
+    if (!entry) return;
+    entry.status = params.response.status;
+    entry.responseHeaders = headersToRecord(params.response.headers ?? []);
+    entry.responseTimestamp = params.timestamp;
+    entry.durationMs = params.timestamp - entry.requestTimestamp;
+  });
+
+  browser.on('network.fetchError', (params: any) => {
+    const entry = log.get(params.request.request);
+    if (!entry) return;
+    entry.error = params.errorText;
+    entry.responseTimestamp = params.timestamp;
+    entry.durationMs = params.timestamp - entry.requestTimestamp;
+  });
+}
 
 function getSessionResult(history: SessionHistory | undefined): SessionResult {
   const errorStep = history?.steps.find(s => s.status === 'error');
@@ -45,6 +93,10 @@ export function registerSession(
   state.sessionHistory.set(sessionId, historyEntry);
   state.currentSession = sessionId;
 
+  if (metadata.type === 'browser') {
+    void attachNetworkListener(sessionId, browser);
+  }
+
   // If there was a previous session, terminate it to prevent orphaning
   if (oldSessionId && oldSessionId !== sessionId) {
     const oldBrowser = state.browsers.get(oldSessionId);
@@ -70,6 +122,7 @@ export function registerSession(
 export async function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
   const state = getState();
   const browser = state.browsers.get(sessionId);
+
   if (!browser) return;
 
   const history = state.sessionHistory.get(sessionId);
@@ -96,6 +149,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
 
   state.browsers.delete(sessionId);
   state.sessionMetadata.delete(sessionId);
+  state.sessionNetworkLog.delete(sessionId);
 
   // Only clear currentSession if it matches the session being closed
   if (state.currentSession === sessionId) {
