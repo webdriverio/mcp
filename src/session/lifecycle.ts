@@ -55,7 +55,8 @@ export function registerSession(
         if (oldMetadata?.provider) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle).catch(() => {});
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle).catch(() => {
+          });
         }
         await oldBrowser.deleteSession().catch(() => {
           // Ignore errors during force-close of orphaned session

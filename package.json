@@ -39,7 +39,9 @@
     "postbundle": "npm pack",
     "lint": "eslint src/ tests/ --fix && tsc --noEmit",
     "start": "node lib/server.js",
+    "start:http": "node lib/server.js --http --allowedOrigins http://localhost:8080",
     "dev": "tsx --watch src/server.ts",
+    "dev:http": "tsx --watch src/server.ts --http --allowedOrigins http://localhost:8080",
     "prepare": "husky",
     "test": "vitest run"
   },
