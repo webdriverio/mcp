@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/webdriverio/mcp/compare/v3.2.5...v3.3.0) (2026-04-23)
+
+### Features
+
+* Introduce StreamableHTTP transport at /mcp endpoint ([e00e34c](https://github.com/webdriverio/mcp/commit/e00e34c749a1ce55d5b93befd543bc6cf97164d3))
+* Reintroduce tooling for a11y, app_state, contexts, cookies, tabs and screenshot querying ([80e8bfa](https://github.com/webdriverio/mcp/commit/80e8bfa081efc77c9ce0baab5cdd17a9a3db2cd8))
+
 ## [3.2.5](https://github.com/webdriverio/mcp/compare/v3.2.4...v3.2.5) (2026-04-18)
 
 ## [3.2.4](https://github.com/webdriverio/mcp/compare/v3.2.3...v3.2.4) (2026-04-09)
