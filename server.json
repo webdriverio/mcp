@@ -6,12 +6,12 @@
     "url": "https://github.com/webdriverio/mcp",
     "source": "github"
   },
-  "version": "2.5.1",
+  "version": "3.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@wdio/mcp",
-      "version": "2.5.1",
+      "version": "3.3.0",
       "transport": {
         "type": "stdio"
       }
