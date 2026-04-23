@@ -1,7 +1,8 @@
 # WebDriverIO MCP Server
 
 A Model Context Protocol (MCP) server that enables AI assistants to interact with web browsers and mobile applications
-using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified interface.
+using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified
+interface.
 
 ## Installation
 
@@ -16,7 +17,10 @@ Add the following configuration to your MCP client settings:
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
@@ -29,18 +33,23 @@ Add the following configuration to your MCP client settings:
 <details>
 <summary>Claude Desktop</summary>
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows), or `~/.config/Claude/claude_desktop_config.json` (Linux):
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS),
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows), or `~/.config/Claude/claude_desktop_config.json` (Linux):
 
 ```json
 {
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
 ```
+
 </details>
 
 <details>
@@ -49,6 +58,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), 
 ```bash
 claude mcp add wdio-mcp -- npx -y @wdio/mcp@latest
 ```
+
 </details>
 
 <details>
@@ -62,11 +72,15 @@ Add to your VS Code `settings.json` or `cline_mcp_settings.json` file:
     "wdio-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
 ```
+
 </details>
 
 <details>
@@ -79,11 +93,15 @@ Go to `Cursor Settings` → `MCP` → `Add new MCP Server`, or create `.cursor/m
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
 ```
+
 </details>
 
 <details>
@@ -102,6 +120,7 @@ Or edit `~/.codex/config.toml`:
 command = "npx"
 args = ["@wdio/mcp@latest"]
 ```
+
 </details>
 
 <details>
@@ -120,10 +139,11 @@ extensions:
   wdio-mcp:
     name: WebDriverIO MCP
     cmd: npx
-    args: [-y, "@wdio/mcp@latest"]
+    args: [ -y, "@wdio/mcp@latest" ]
     enabled: true
     type: stdio
 ```
+
 </details>
 
 <details>
@@ -136,11 +156,15 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
 ```
+
 </details>
 
 <details>
@@ -154,11 +178,15 @@ Edit Zed settings (`~/.config/zed/settings.json`):
     "wdio-mcp": {
       "source": "custom",
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"]
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ]
     }
   }
 }
 ```
+
 </details>
 
 <details>
@@ -167,6 +195,7 @@ Edit Zed settings (`~/.config/zed/settings.json`):
 ```bash
 code --add-mcp '{"name":"wdio-mcp","command":"npx","args":["-y","@wdio/mcp@latest"]}'
 ```
+
 </details>
 
 ----
@@ -194,6 +223,24 @@ Then use `wdio-mcp` as the command:
 
 📖 **Need help?** Follow the [MCP install guide](https://modelcontextprotocol.io/quickstart/user).
 
+### HTTP Transport (for non-subprocess clients)
+
+By default the server uses **stdio** (subprocess) transport. For clients that cannot launch subprocesses (e.g.
+llama.cpp, OpenAI Codex secure mode), enable HTTP transport:
+
+```bash
+npx @wdio/mcp --http --port 3000
+```
+
+| Flag               | Default                            | Description                                             |
+|--------------------|------------------------------------|---------------------------------------------------------|
+| `--http`           | —                                  | Enable HTTP transport mode                              |
+| `--port`           | `3000`                             | Port to listen on                                       |
+| `--allowedHosts`   | `localhost,127.0.0.1,::1`          | Allowed `Host` header values (DNS rebinding protection) |
+| `--allowedOrigins` | _(none — browser clients blocked)_ | Allowed `Origin` values for CORS. Use `*` to allow all. |
+
+Then point your MCP client at `http://localhost:3000/mcp`.
+
 ### Prerequisites For Mobile App Automation
 
 - **Appium Server**: Install globally with `npm install -g appium`
@@ -218,7 +265,8 @@ appium
 
 ## BrowserStack
 
-Run browser and mobile app tests on [BrowserStack](https://www.browserstack.com/) real devices and browsers without any local setup.
+Run browser and mobile app tests on [BrowserStack](https://www.browserstack.com/) real devices and browsers without any
+local setup.
 
 ### Prerequisites
 
@@ -236,7 +284,10 @@ Or add them to your MCP client config:
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": ["-y", "@wdio/mcp@latest"],
+      "args": [
+        "-y",
+        "@wdio/mcp@latest"
+      ],
       "env": {
         "BROWSERSTACK_USERNAME": "your_username",
         "BROWSERSTACK_ACCESS_KEY": "your_access_key"
@@ -252,17 +303,17 @@ Run a browser on a specific OS/version combination:
 
 ```javascript
 start_session({
-  provider: 'browserstack',
-  platform: 'browser',
-  browser: 'chrome',           // chrome | firefox | edge | safari
-  browserVersion: 'latest',    // default: latest
-  os: 'Windows',               // e.g. "Windows", "OS X"
-  osVersion: '11',             // e.g. "11", "Sequoia"
-  reporting: {
-    project: 'My Project',
-    build: 'v1.2.0',
-    session: 'Login flow'
-  }
+    provider: 'browserstack',
+    platform: 'browser',
+    browser: 'chrome',           // chrome | firefox | edge | safari
+    browserVersion: 'latest',    // default: latest
+    os: 'Windows',               // e.g. "Windows", "OS X"
+    osVersion: '11',             // e.g. "11", "Sequoia"
+    reporting: {
+        project: 'My Project',
+        build: 'v1.2.0',
+        session: 'Login flow'
+    }
 })
 ```
 
@@ -272,20 +323,20 @@ Test on BrowserStack real devices. First upload your app (or use an existing `bs
 
 ```javascript
 // Upload a local .apk or .ipa (returns a bs:// URL)
-upload_app({ path: '/path/to/app.apk' })
+upload_app({path: '/path/to/app.apk'})
 
 // Start a session with the returned URL
 start_session({
-  provider: 'browserstack',
-  platform: 'android',         // android | ios
-  app: 'bs://abc123...',       // bs:// URL or custom_id from upload
-  deviceName: 'Samsung Galaxy S23',
-  platformVersion: '13.0',
-  reporting: {
-    project: 'My Project',
-    build: 'v1.2.0',
-    session: 'Checkout flow'
-  }
+    provider: 'browserstack',
+    platform: 'android',         // android | ios
+    app: 'bs://abc123...',       // bs:// URL or custom_id from upload
+    deviceName: 'Samsung Galaxy S23',
+    platformVersion: '13.0',
+    reporting: {
+        project: 'My Project',
+        build: 'v1.2.0',
+        session: 'Checkout flow'
+    }
 })
 ```
 
@@ -293,20 +344,21 @@ Use `list_apps` to see previously uploaded apps:
 
 ```javascript
 list_apps()                               // own uploads, sorted by date
-list_apps({ sortBy: 'app_name' })
-list_apps({ organizationWide: true })     // all uploads in your org
+list_apps({sortBy: 'app_name'})
+list_apps({organizationWide: true})     // all uploads in your org
 ```
 
 ### BrowserStack Local
 
-To test against URLs that are only accessible on your local machine or internal network, enable the BrowserStack Local tunnel:
+To test against URLs that are only accessible on your local machine or internal network, enable the BrowserStack Local
+tunnel:
 
 ```javascript
 start_session({
-  provider: 'browserstack',
-  platform: 'browser',
-  browser: 'chrome',
-  browserstackLocal: true      // starts tunnel automatically
+    provider: 'browserstack',
+    platform: 'browser',
+    browser: 'chrome',
+    browserstackLocal: true      // starts tunnel automatically
 })
 ```
 
@@ -314,18 +366,18 @@ start_session({
 
 All session types support `reporting` labels that appear in the BrowserStack Automate dashboard:
 
-| Field                     | Description                                |
-|---------------------------|--------------------------------------------|
-| `reporting.project`       | Group sessions under a project name        |
-| `reporting.build`         | Tag sessions with a build/version label    |
-| `reporting.session`       | Name for the individual test session       |
+| Field               | Description                             |
+|---------------------|-----------------------------------------|
+| `reporting.project` | Group sessions under a project name     |
+| `reporting.build`   | Tag sessions with a build/version label |
+| `reporting.session` | Name for the individual test session    |
 
 ### BrowserStack Tools
 
-| Tool          | Description                                                                      |
-|---------------|----------------------------------------------------------------------------------|
-| `upload_app`  | Upload a local `.apk` or `.ipa` to BrowserStack; returns a `bs://` URL          |
-| `list_apps`   | List apps previously uploaded to your BrowserStack account                       |
+| Tool         | Description                                                            |
+|--------------|------------------------------------------------------------------------|
+| `upload_app` | Upload a local `.apk` or `.ipa` to BrowserStack; returns a `bs://` URL |
+| `list_apps`  | List apps previously uploaded to your BrowserStack account             |
 
 ## Features
 
@@ -336,8 +388,10 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 - **Page Analysis**: Get visible elements, accessibility trees, take screenshots
 - **Cookie Management**: Get, set, and delete cookies
 - **Scrolling**: Smooth scrolling with configurable distances
-- **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing authenticated or pre-configured sessions
-- **Device emulation**: Apply mobile/tablet presets (iPhone 15, Pixel 7, etc.) to simulate responsive layouts without a physical device
+- **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing
+  authenticated or pre-configured sessions
+- **Device emulation**: Apply mobile/tablet presets (iPhone 15, Pixel 7, etc.) to simulate responsive layouts without a
+  physical device
 - **Session Recording**: All tool calls are automatically recorded and exportable as runnable WebdriverIO JS
 
 ### Mobile App Automation (iOS/Android)
@@ -353,22 +407,25 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 
 ### Session Management
 
-| Tool             | Description                                                                              |
-|------------------|------------------------------------------------------------------------------------------|
+| Tool             | Description                                                                                                                                                            |
+|------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `start_session`  | Start a browser or app session. Use `platform: 'browser'` for web, `platform: 'ios'`/`'android'` for mobile, or `attach: true` to connect to a running Chrome instance |
-| `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`) |
-| `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating) |
-| `emulate_device` | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session |
+| `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
+| `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
+| `emulate_device` | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session                                                                                |
 
 ### Navigation & Page Interaction (Web & Mobile)
 
-| Tool            | Description                                                                                                                                                                                         |
-|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `navigate`      | Navigate to a URL                                                                                                                                                                                   |
-| `get_elements`  | Get visible, interactable elements on the page. Supports `inViewportOnly` (default: true) to filter viewport elements, and `includeContainers` (default: false) to include layout containers on mobile |
-| `scroll`        | Scroll in a direction (up/down) by specified pixels                                                                                                                                                 |
-| `execute_script` | Execute arbitrary JavaScript in the browser context                                                                                                                                                |
-| `switch_tab`    | Switch to a different browser tab by index or URL                                                                                                                                                   |
+| Tool                     | Description                                                                                                                                                                                            |
+|--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `navigate`               | Navigate to a URL                                                                                                                                                                                      |
+| `get_elements`           | Get visible, interactable elements on the page. Supports `inViewportOnly` (default: true) to filter viewport elements, and `includeContainers` (default: false) to include layout containers on mobile |
+| `get_accessibility_tree` | Get the page accessibility tree with roles, names, and selectors. Supports filtering by role and pagination. Browser-only.                                                                             |
+| `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
+| `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
+| `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
+| `execute_script`         | Execute arbitrary JavaScript in the browser, or Appium mobile commands on devices                                                                                                                      |
+| `switch_tab`             | Switch to a different browser tab by handle or 0-based index. Browser-only.                                                                                                                            |
 
 ### Element Interaction (Web & Mobile)
 
@@ -379,10 +436,11 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 
 ### Cookie Management (Web)
 
-| Tool             | Description                                            |
-|------------------|--------------------------------------------------------|
-| `set_cookie`     | Set a cookie with name, value, and optional attributes |
-| `delete_cookies` | Delete all cookies or a specific cookie                |
+| Tool             | Description                                                         |
+|------------------|---------------------------------------------------------------------|
+| `get_cookies`    | Get all cookies for the current session, or a single cookie by name |
+| `set_cookie`     | Set a cookie with name, value, and optional attributes              |
+| `delete_cookies` | Delete all cookies or a specific cookie                             |
 
 ### Mobile Gestures (iOS/Android)
 
@@ -394,38 +452,40 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 
 ### Context Switching (Hybrid Apps)
 
-| Tool             | Description                                     |
-|------------------|-------------------------------------------------|
-| `switch_context` | Switch between native and webview contexts      |
+| Tool             | Description                                                                             |
+|------------------|-----------------------------------------------------------------------------------------|
+| `get_contexts`   | List available automation contexts (NATIVE_APP, WEBVIEW_*) and the currently active one |
+| `switch_context` | Switch between native and webview contexts                                              |
 
 ### Device Control (iOS/Android)
 
-| Tool              | Description                     |
-|-------------------|---------------------------------|
-| `rotate_device`   | Rotate to portrait or landscape |
-| `hide_keyboard`   | Hide on-screen keyboard         |
-| `set_geolocation` | Set device GPS location         |
+| Tool              | Description                                                                                             |
+|-------------------|---------------------------------------------------------------------------------------------------------|
+| `get_app_state`   | Get the current lifecycle state of a mobile app (not installed / not running / background / foreground) |
+| `rotate_device`   | Rotate to portrait or landscape                                                                         |
+| `hide_keyboard`   | Hide on-screen keyboard                                                                                 |
+| `set_geolocation` | Set device GPS location                                                                                 |
 
 ### MCP Resources (read-only, no tool call needed)
 
-| Resource                                  | Description                                            |
-|-------------------------------------------|--------------------------------------------------------|
-| `wdio://sessions`                         | Index of all recorded sessions                         |
-| `wdio://session/current/steps`            | Step log for the active session                        |
-| `wdio://session/current/code`             | Generated runnable WebdriverIO JS for the active session |
-| `wdio://session/{id}/steps`               | Step log for any past session by ID                    |
-| `wdio://session/{id}/code`                | Generated JS for any past session by ID                |
-| `wdio://session/current/elements`         | Interactable elements (viewport-only by default)       |
-| `wdio://session/current/accessibility`    | Accessibility tree                                     |
-| `wdio://session/current/screenshot`       | Screenshot (base64)                                    |
-| `wdio://session/current/cookies`          | Browser cookies                                        |
-| `wdio://session/current/tabs`             | Open browser tabs                                      |
-| `wdio://session/current/contexts`         | Native/webview contexts (mobile)                       |
-| `wdio://session/current/context`          | Currently active context (mobile)                      |
-| `wdio://session/current/app-state`        | Mobile app state                                       |
-| `wdio://session/current/geolocation`      | Device geolocation                                     |
-| `wdio://session/current/capabilities`     | Resolved WebDriver capabilities for the active session |
-| `wdio://browserstack/local-binary`        | BrowserStack Local binary download URL and start command |
+| Resource                                      | Description                                              |
+|-----------------------------------------------|----------------------------------------------------------|
+| `wdio://sessions`                             | Index of all recorded sessions                           |
+| `wdio://session/current/steps`                | Step log for the active session                          |
+| `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the active session |
+| `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
+| `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
+| `wdio://session/current/elements`             | Interactable elements (viewport-only by default)         |
+| `wdio://session/current/accessibility`        | Accessibility tree                                       |
+| `wdio://session/current/screenshot`           | Screenshot (base64)                                      |
+| `wdio://session/current/cookies`              | Browser cookies                                          |
+| `wdio://session/current/tabs`                 | Open browser tabs                                        |
+| `wdio://session/current/contexts`             | Native/webview contexts (mobile)                         |
+| `wdio://session/current/context`              | Currently active context (mobile)                        |
+| `wdio://session/current/app-state/{bundleId}` | Mobile app lifecycle state for a given bundle ID         |
+| `wdio://session/current/geolocation`          | Device geolocation                                       |
+| `wdio://session/current/capabilities`         | Resolved WebDriver capabilities for the active session   |
+| `wdio://browserstack/local-binary`            | BrowserStack Local binary download URL and start command |
 
 ## Usage Examples
 
@@ -488,13 +548,13 @@ start_session({platform: 'browser', windowWidth: 1920, windowHeight: 1080})
 
 // Pass custom capabilities (e.g. Chrome extensions, profile, prefs)
 start_session({
-  platform: 'browser',
-  headless: false,
-  capabilities: {
-    'goog:chromeOptions': {
-      args: ['--user-data-dir=/tmp/wdio-mcp-profile', '--load-extension=/path/to/unpacked-extension']
+    platform: 'browser',
+    headless: false,
+    capabilities: {
+        'goog:chromeOptions': {
+            args: ['--user-data-dir=/tmp/wdio-mcp-profile', '--load-extension=/path/to/unpacked-extension']
+        }
     }
-  }
 })
 ```
 
@@ -522,7 +582,7 @@ start_session({attach: true, port: 9222, navigationUrl: 'https://app.example.com
 
 ```
 // Device emulation (requires BiDi session)
-start_browser({capabilities: {webSocketUrl: true}})
+start_session({capabilities: {webSocketUrl: true}})
 emulate_device()                         // list available presets
 emulate_device({device: 'iPhone 15'})    // activate emulation
 emulate_device({device: 'Pixel 7'})      // switch device
@@ -723,7 +783,8 @@ This eliminates the need to manually handle permission popups during automated t
 
 ### Session Recording & Code Export
 
-Every tool call is automatically recorded to a session history. You can inspect sessions and export runnable code via MCP resources — no extra tool calls needed:
+Every tool call is automatically recorded to a session history. You can inspect sessions and export runnable code via
+MCP resources — no extra tool calls needed:
 
 - `wdio://sessions` — lists all recorded sessions with type, timestamps, and step count
 - `wdio://session/current/steps` — step log for the active session
@@ -731,7 +792,9 @@ Every tool call is automatically recorded to a session history. You can inspect 
 - `wdio://session/{sessionId}/steps` — step log for any past session by ID
 - `wdio://session/{sessionId}/code` — generated JS for any past session by ID
 
-The generated script reconstructs the full session — including capabilities, navigation, clicks, and inputs — as a standalone `import { remote } from 'webdriverio'` file. For BrowserStack sessions it includes the full try/catch/finally with automatic session result marking.
+The generated script reconstructs the full session — including capabilities, navigation, clicks, and inputs — as a
+standalone `import { remote } from 'webdriverio'` file. For BrowserStack sessions it includes the full try/catch/finally
+with automatic session result marking.
 
 ## Troubleshooting
 
