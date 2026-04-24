@@ -66,6 +66,7 @@ import {
   startSessionToolDefinition
 } from './tools/session.tool';
 import { switchTabTool, switchTabToolDefinition } from './tools/tabs.tool';
+import { switchFrameTool, switchFrameToolDefinition } from './tools/switch-frame.tool';
 import { listAppsTool, listAppsToolDefinition, uploadAppTool, uploadAppToolDefinition, } from './tools/browserstack.tool';
 import { screenshotTool, screenshotToolDefinition } from './tools/screenshot.tool';
 import { accessibilityTool, accessibilityToolDefinition } from './tools/accessibility.tool';
@@ -125,6 +126,7 @@ function createServer(): McpServer {
   registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
+  registerTool(switchFrameToolDefinition, switchFrameTool);
 
   registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
 
