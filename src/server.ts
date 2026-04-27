@@ -99,6 +99,7 @@ function createServer(): McpServer {
     server.registerTool(definition.name, {
       description: definition.description,
       inputSchema: definition.inputSchema,
+      ...(definition.annotations && { annotations: definition.annotations }),
     }, callback);
 
   const registerResource = (definition: ResourceDefinition) => {

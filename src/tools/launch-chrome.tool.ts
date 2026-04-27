@@ -12,19 +12,8 @@ const USER_DATA_DIR = join(tmpdir(), 'chrome-debug');
 
 export const launchChromeToolDefinition: ToolDefinition = {
   name: 'launch_chrome',
-  description: `Prepares and launches Chrome with remote debugging enabled so attach_browser() can connect.
-
-Two modes:
-
-  newInstance (default): Opens a Chrome window alongside your existing one using a separate
-    profile dir. Your current Chrome session is untouched.
-
-  freshSession: Launches Chrome with an empty profile (no cookies, no logins).
-
-Use copyProfileFiles: true to carry over your cookies and logins into the debug session.
-Note: changes made during the session won't sync back to your main profile.
-
-After this tool succeeds, call attach_browser() to connect.`,
+  description: 'Launches Chrome with remote debugging enabled. Wipes and recreates a temporary profile directory on each call. Mode "newInstance" (default) runs alongside existing Chrome; "freshSession" starts with an empty profile. Set copyProfileFiles to copy cookies/logins from your Default profile — changes do not sync back. After launch, call start_session with attach: true to connect. Spawns a detached Chrome process that persists if the server exits.',
+  annotations: { title: 'Launch Chrome', destructiveHint: false },
   inputSchema: {
     port: z.number().default(9222).describe('Remote debugging port (default: 9222)'),
     mode: z.enum(['newInstance', 'freshSession']).default('newInstance').describe(

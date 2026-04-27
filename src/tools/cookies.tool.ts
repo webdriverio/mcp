@@ -7,7 +7,8 @@ import { coerceBoolean } from '../utils/zod-helpers';
 
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
-  description: 'Sets a browser cookie for the active session. The browser must already be on the target domain — cookies cannot be set cross-domain. Use to inject session tokens or feature flags without going through login flows.',
+  description: 'Sets a browser cookie on the active session. The browser must already be on the target domain — cookies cannot be set cross-domain. Use to inject session tokens or feature flags without login flows.',
+  annotations: { title: 'Set Cookie', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     name: z.string().describe('Cookie name'),
     value: z.string().describe('Cookie value'),
@@ -49,7 +50,8 @@ export const setCookieTool: ToolCallback = async ({
 
 export const deleteCookiesToolDefinition: ToolDefinition = {
   name: 'delete_cookies',
-  description: 'deletes all cookies or a specific cookie by name',
+  description: 'Deletes all cookies or a single cookie by name from the current browser session. Irreversible — deleted cookies cannot be recovered.',
+  annotations: { title: 'Delete Cookies', destructiveHint: true, idempotentHint: true },
   inputSchema: {
     name: z.string().optional().describe('Optional cookie name to delete a specific cookie. If not provided, deletes all cookies'),
   },

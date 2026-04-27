@@ -15,7 +15,8 @@ const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
-  description: 'Starts a new browser or mobile automation session. Only one active session at a time — starting a new one closes the existing one. Use platform "browser" with a browser name, or "ios"/"android" with a deviceName. Use attach mode to connect to an already-running Chrome instance via CDP.',
+  description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
+  annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
     provider: z.enum(['local', 'browserstack']).optional().default('local').describe('Session provider (default: local)'),
     platform: platformEnum.describe('Session platform type'),
@@ -95,7 +96,8 @@ type StartSessionArgs = {
 
 export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
-  description: 'Closes or detaches from the current session. Detach disconnects without terminating the process, preserving app state on the Appium server. Sessions started with noReset: true auto-detach by default.',
+  description: 'Closes the current session or detaches without terminating. Detach preserves app state on the Appium server — sessions with noReset: true auto-detach by default. Closing a browser attach session terminates chromedriver but the Chrome process spawned by launch_chrome remains running.',
+  annotations: { title: 'Close Session', destructiveHint: true },
   inputSchema: {
     detach: coerceBoolean.optional().describe('If true, disconnect without terminating (preserves app state). Default: false'),
   },

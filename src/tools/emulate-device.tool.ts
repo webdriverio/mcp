@@ -12,14 +12,8 @@ const restoreFunctions = new Map<string, () => Promise<void>>();
 
 export const emulateDeviceToolDefinition: ToolDefinition = {
   name: 'emulate_device',
-  description: `Emulate a mobile or tablet device in the current browser session (sets viewport, DPR, user-agent, touch events).
-
-Requires a BiDi-enabled session: start_browser({ capabilities: { webSocketUrl: true } })
-
-Usage:
-  emulate_device()                    — list available device presets
-  emulate_device({ device: "iPhone 15" })  — activate emulation
-  emulate_device({ device: "reset" }) — restore desktop defaults`,
+  description: 'Emulates a mobile or tablet device in the current browser session by setting viewport, DPR, user-agent, and touch events. Requires a BiDi-enabled session (start_session with capabilities: { webSocketUrl: true }). Omit device to list available presets. Pass "reset" to restore desktop defaults. Changes persist for all subsequent tool calls until reset or session close. Browser-only.',
+  annotations: { title: 'Emulate Device', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     device: z.string().optional().describe(
       'Device preset name (e.g. "iPhone 15", "Pixel 7"). Omit to list available presets. Pass "reset" to restore desktop defaults.'

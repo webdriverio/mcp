@@ -7,6 +7,7 @@ import { readAccessibilityTree } from '../resources';
 export const accessibilityToolDefinition: ToolDefinition = {
   name: 'get_accessibility_tree',
   description: 'Returns the page accessibility tree with roles, names, and selectors. Browser-only. Supports filtering by ARIA roles and pagination via limit/offset.',
+  annotations: { title: 'Get Accessibility Tree', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     limit: z.number().optional().default(0).describe('Maximum number of nodes to return (0 = no limit)'),
     offset: z.number().optional().default(0).describe('Number of nodes to skip for pagination'),

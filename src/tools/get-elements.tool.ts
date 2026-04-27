@@ -8,7 +8,8 @@ import { coerceBoolean } from '../utils/zod-helpers';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
-  description: 'Get interactable elements on the current page. Use when wdio://session/current/elements does not return the desired elements.',
+  description: 'Returns interactable elements on the current page with selectors, text, and bounding boxes. Supports filtering by element type, viewport visibility, and pagination. Use when the wdio://session/current/elements resource does not return desired elements.',
+  annotations: { title: 'Get Visible Elements', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only return elements visible in the current viewport (default: false).'),
     includeContainers: coerceBoolean.optional().default(false).describe('Include container elements like divs and sections (default: false)'),

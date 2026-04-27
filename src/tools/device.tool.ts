@@ -6,13 +6,15 @@ import { getBrowser } from '../session/state';
 
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
-  description: 'Dismisses the software keyboard on mobile. Call after text entry when the keyboard obscures elements you need to interact with next. No-op if already hidden. Mobile-only.',
+  description: 'Dismisses the on-screen keyboard on mobile. Call after text entry when the keyboard obscures elements. No-op if already hidden. Mobile-only.',
+  annotations: { title: 'Hide Keyboard', destructiveHint: false, idempotentHint: true },
   inputSchema: {},
 };
 
 export const rotateDeviceToolDefinition: ToolDefinition = {
   name: 'rotate_device',
-  description: 'Rotates a mobile device to portrait or landscape and waits for the OS rotation to complete. Use to test orientation-dependent layouts. Mobile-only; no effect in browser sessions.',
+  description: 'Rotates a mobile device to portrait or landscape orientation. Waits for the OS rotation animation to complete. Use to test orientation-dependent layouts. Mobile-only; no effect in browser sessions.',
+  annotations: { title: 'Rotate Device', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     orientation: z.enum(['PORTRAIT', 'LANDSCAPE']).describe('Device orientation'),
   },
@@ -20,7 +22,8 @@ export const rotateDeviceToolDefinition: ToolDefinition = {
 
 export const setGeolocationToolDefinition: ToolDefinition = {
   name: 'set_geolocation',
-  description: 'Overrides the device GPS coordinates for the session. Affects navigator.geolocation on web and location services on mobile. Location permissions must be granted to the app before calling this.',
+  description: 'Overrides GPS coordinates for the session. Affects navigator.geolocation in browsers and location services on mobile. Location permissions must already be granted to the app.',
+  annotations: { title: 'Set Geolocation', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
     longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),

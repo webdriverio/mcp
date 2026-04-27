@@ -7,7 +7,8 @@ import { getBrowser } from '../session/state';
 // Tap Tool
 export const tapElementToolDefinition: ToolDefinition = {
   name: 'tap_element',
-  description: 'Calls element.tap() on a matched element or taps at absolute screen coordinates. Use on iOS when element.click() (click_element) is ignored — tap is the native gesture iOS responds to. Mobile-only.',
+  description: 'Taps a matched element via element.tap() or at absolute screen coordinates (x, y). No scroll-into-view or wait — element must already be visible on screen. Use instead of click_element on iOS where element.click() is ignored. Provide selector OR both x and y. Mobile-only.',
+  annotations: { title: 'Tap Element', destructiveHint: false },
   inputSchema: {
     selector: z
       .string()
@@ -61,7 +62,8 @@ export const tapElementTool: ToolCallback = async (args: {
 // Swipe Tool
 export const swipeToolDefinition: ToolDefinition = {
   name: 'swipe',
-  description: 'Performs a full-screen swipe gesture on mobile. Direction is content movement (e.g. "up" scrolls a list upward, not the finger direction). Use to scroll past visible bounds; for moving a specific element use drag_and_drop. Mobile-only — use scroll for browsers.',
+  description: 'Performs a full-screen swipe gesture. Direction is content movement — "up" scrolls content upward (finger moves down). For browser scrolling use scroll; for dragging a specific element use drag_and_drop. No error if content cannot scroll further. Mobile-only.',
+  annotations: { title: 'Swipe Screen', destructiveHint: false },
   inputSchema: {
     direction: z.enum(['up', 'down', 'left', 'right']).describe('Swipe direction'),
     duration: z
@@ -127,7 +129,8 @@ export const swipeTool: ToolCallback = async (args: {
 // Drag and Drop Tool
 export const dragAndDropToolDefinition: ToolDefinition = {
   name: 'drag_and_drop',
-  description: 'drags an element to another element or coordinates (mobile)',
+  description: 'Drags an element to another element or to relative x/y offsets. x and y are offsets from the source element, not absolute screen coordinates (unlike tap_element). Provide targetSelector OR both x and y. Mobile-only.',
+  annotations: { title: 'Drag and Drop', destructiveHint: false },
   inputSchema: {
     sourceSelector: z.string().describe('Source element selector to drag'),
     targetSelector: z.string().optional().describe('Target element selector to drop onto'),

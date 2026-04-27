@@ -6,7 +6,8 @@ import type { ToolDefinition } from '../types/tool';
 
 export const scrollToolDefinition: ToolDefinition = {
   name: 'scroll',
-  description: 'scrolls the page by specified pixels (browser only). For mobile, use the swipe tool.',
+  description: 'Scrolls the page vertically by a pixel amount. Browser-only — for mobile scrolling use swipe. Only supports up/down; no horizontal scrolling.',
+  annotations: { title: 'Scroll Page', destructiveHint: false },
   inputSchema: {
     direction: z.enum(['up', 'down']).describe('Scroll direction'),
     pixels: z.number().optional().default(500).describe('Number of pixels to scroll'),

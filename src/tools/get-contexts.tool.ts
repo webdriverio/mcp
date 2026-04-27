@@ -6,6 +6,7 @@ import { readContexts, readCurrentContext } from '../resources';
 export const getContextsToolDefinition: ToolDefinition = {
   name: 'get_contexts',
   description: 'Returns available automation contexts and the currently active one. Use before switch_context to discover NATIVE_APP and WEBVIEW_* targets. Mobile-only.',
+  annotations: { title: 'Get Automation Contexts', readOnlyHint: true, idempotentHint: true },
   inputSchema: {},
 };
 

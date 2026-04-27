@@ -7,6 +7,7 @@ import { readAppState } from '../resources';
 export const appStateToolDefinition: ToolDefinition = {
   name: 'get_app_state',
   description: 'Returns the current state of a mobile app: not installed, not running, background, or foreground. Mobile-only.',
+  annotations: { title: 'Get App State', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     bundleId: z.string().describe('App bundle ID (iOS) or package name (Android), e.g. "com.example.app"'),
   },

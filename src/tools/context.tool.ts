@@ -6,7 +6,8 @@ import { getBrowser } from '../session/state';
 
 export const switchContextToolDefinition: ToolDefinition = {
   name: 'switch_context',
-  description: 'Switches between native and webview automation contexts in a hybrid mobile app. Required before using CSS/XPath selectors inside an embedded webview — switch to WEBVIEW_* first, then switch back to NATIVE_APP for native elements. List available contexts using get_contexts tool or wdio://session/current/contexts resource.',
+  description: 'Switches between native and webview automation contexts in a hybrid mobile app. In NATIVE_APP context, use accessibility IDs; in WEBVIEW_* context, use CSS/XPath. Changes persist for all subsequent commands. Accepts context name or 1-based index. Use get_contexts to discover available targets. Mobile-only.',
+  annotations: { title: 'Switch Context', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     context: z
       .string()

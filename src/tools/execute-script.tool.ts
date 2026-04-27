@@ -6,21 +6,8 @@ import { getBrowser } from '../session/state';
 
 export const executeScriptToolDefinition: ToolDefinition = {
   name: 'execute_script',
-  description: `Executes JavaScript in browser or mobile commands via Appium.
-
-**Option B for browser interaction** — prefer get_visible_elements or click_element/set_value with a selector instead. Use execute_script only when no dedicated tool covers the action (e.g. reading computed values, triggering custom events, scrolling to a position).
-
-**Browser:** Runs JavaScript in page context. Use 'return' to get values back.
-  - Example: execute_script({ script: "return document.title" })
-  - Example: execute_script({ script: "return window.scrollY" })
-  - Example: execute_script({ script: "arguments[0].click()", args: ["#myButton"] })
-
-**Mobile (Appium):** Executes mobile-specific commands using 'mobile: <command>' syntax.
-  - Press key (Android): execute_script({ script: "mobile: pressKey", args: [{ keycode: 4 }] }) // BACK=4, HOME=3
-  - Activate app: execute_script({ script: "mobile: activateApp", args: [{ appId: "com.example" }] })
-  - Terminate app: execute_script({ script: "mobile: terminateApp", args: [{ appId: "com.example" }] })
-  - Deep link: execute_script({ script: "mobile: deepLink", args: [{ url: "myapp://screen", package: "com.example" }] })
-  - Shell command (Android): execute_script({ script: "mobile: shell", args: [{ command: "dumpsys", args: ["battery"] }] })`,
+  description: 'Executes arbitrary JavaScript in browser page context or Appium mobile: commands. Can read/modify DOM, trigger events, terminate apps, or run Android shell commands — use only when no dedicated tool covers the action. Browser: pass JS in script, use \'return\' for values, string args matching selectors auto-resolve to elements. Mobile: use \'mobile: <command>\' syntax in script with args array (e.g. "mobile: pressKey", "mobile: activateApp"). Prefer click_element/set_value/get_elements for standard interactions.',
+  annotations: { title: 'Execute Script', destructiveHint: false },
   inputSchema: {
     script: z.string().describe('JavaScript code (browser) or mobile command string like "mobile: pressKey" (Appium)'),
     args: z.array(z.any()).optional().describe('Arguments to pass to the script. For browser: element selectors or values. For mobile commands: command-specific parameters as objects.'),

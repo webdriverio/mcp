@@ -6,6 +6,7 @@ import { readTabs } from '../resources';
 export const getTabsToolDefinition: ToolDefinition = {
   name: 'get_tabs',
   description: 'Lists all browser tabs with handle, title, URL, and which is active. Use before switch_tab to find the target handle or index. Browser-only.',
+  annotations: { title: 'Get Browser Tabs', readOnlyHint: true, idempotentHint: true },
   inputSchema: {},
 };
 

@@ -7,6 +7,7 @@ import { readCookies } from '../resources';
 export const getCookiesToolDefinition: ToolDefinition = {
   name: 'get_cookies',
   description: 'Returns all cookies for the current session, or a single cookie by name. Use to verify auth state, session tokens, or feature flags after login flows.',
+  annotations: { title: 'Get Cookies', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     name: z.string().optional().describe('Cookie name to retrieve a specific cookie. If omitted, returns all cookies.'),
   },

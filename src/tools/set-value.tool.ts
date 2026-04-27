@@ -9,7 +9,8 @@ const defaultTimeout: number = 3000;
 
 export const setValueToolDefinition: ToolDefinition = {
   name: 'set_value',
-  description: 'Clears an input or textarea and types the given text. Always replaces existing content. Fails if the element is not found or not interactable within the timeout.',
+  description: 'Clears an input or textarea then types the given text character by character. Always replaces existing content — clearValue() runs first. Triggers input, change, and key events which may fire validation or autocomplete. Scrolls into view by default.',
+  annotations: { title: 'Set Input Value', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']")'),
     value: z.string().describe('Text to enter into the element'),

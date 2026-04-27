@@ -35,6 +35,7 @@ function formatAppList(apps: BrowserStackApp[]): string {
 export const listAppsToolDefinition: ToolDefinition = {
   name: 'list_apps',
   description: 'List apps uploaded to BrowserStack App Automate. Reads BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY from environment.',
+  annotations: { title: 'List BrowserStack Apps', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     sortBy: z.enum(['app_name', 'uploaded_at']).optional().default('uploaded_at').describe('Sort order for results'),
     organizationWide: coerceBoolean.optional().default(false).describe('List apps uploaded by all users in the organization (uses recent_group_apps endpoint). Defaults to false (own uploads only).'),
@@ -77,6 +78,7 @@ export const listAppsTool: ToolCallback = async ({ sortBy = 'uploaded_at', organ
 export const uploadAppToolDefinition: ToolDefinition = {
   name: 'upload_app',
   description: 'Upload a local .apk or .ipa to BrowserStack App Automate. Returns a bs:// URL for use in start_session.',
+  annotations: { title: 'Upload App to BrowserStack', destructiveHint: false },
   inputSchema: {
     path: z.string().describe('Absolute path to the .apk or .ipa file'),
     customId: z.string().optional().describe('Optional custom ID for the app (used to reference it later)'),
