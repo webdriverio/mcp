@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.4.0](https://github.com/webdriverio/mcp/compare/v3.3.0...v3.4.0) (2026-04-27)
+
+### Features
+
+* add switch_frame tool for iframe navigation ([ae867a5](https://github.com/webdriverio/mcp/commit/ae867a5988171289095b9591e0d3eea87ffe28a0))
+
+### Bug Fixes
+
+* Include `protocol` in appium configuration for local provider ([e1596df](https://github.com/webdriverio/mcp/commit/e1596df5a12ff8c89e486fb24983b5a9a6f94c15))
+
 ## [3.3.0](https://github.com/webdriverio/mcp/compare/v3.2.5...v3.3.0) (2026-04-23)
 
 ### Features
