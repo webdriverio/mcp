@@ -6,6 +6,7 @@ export interface AppiumServerConfig {
   hostname: string;
   port: number;
   path: string;
+  protocol: string;
 }
 
 export interface IOSCapabilityOptions {
@@ -46,6 +47,7 @@ export function getAppiumServerConfig(overrides?: Partial<AppiumServerConfig>): 
     hostname: overrides?.hostname || process.env.APPIUM_URL || '127.0.0.1',
     port: overrides?.port || Number(process.env.APPIUM_URL_PORT) || 4723,
     path: overrides?.path || process.env.APPIUM_PATH || '/',
+    protocol: overrides?.protocol || process.env.APPIUM_PROTOCOL || 'http',
   };
 }
 

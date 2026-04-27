@@ -53,6 +53,7 @@ export const startSessionToolDefinition: ToolDefinition = {
       host: z.string().optional(),
       port: z.number().optional(),
       path: z.string().optional(),
+      protocol: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
     browserstackLocal: z.union([coerceBoolean, z.literal('external')]).optional().default(false).describe('Enable BrowserStack Local tunnel routing (BrowserStack only, default: false). true = auto-start tunnel before session and stop on close. "external" = tunnel already running externally, set local: true in capabilities only.'),
     navigationUrl: z.string().optional().describe('URL to navigate to after starting'),
@@ -86,7 +87,7 @@ type StartSessionArgs = {
   newCommandTimeout?: number;
   attach?: boolean;
   attachConfig?: { port?: number; host?: string };
-  appiumConfig?: { host?: string; port?: number; path?: string };
+  appiumConfig?: { host?: string; port?: number; path?: string; protocol?: string };
   browserstackLocal?: boolean | 'external';
   navigationUrl?: string;
   capabilities?: Record<string, unknown>;
