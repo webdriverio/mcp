@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.1](https://github.com/webdriverio/mcp/compare/v3.4.0...v3.4.1) (2026-04-30)
+
+### Refactoring
+
+* Add annotation support for tools to enhance metadata usage ([c196da2](https://github.com/webdriverio/mcp/commit/c196da2c9c0c197fbe43196b721633e5a741ea3a))
+
 ## [3.4.0](https://github.com/webdriverio/mcp/compare/v3.3.0...v3.4.0) (2026-04-27)
 
 ### Features
