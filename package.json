@@ -26,7 +26,8 @@
     }
   },
   "bin": {
-    "wdio-mcp": "lib/server.js"
+    "wdio-mcp": "lib/server.js",
+    "wdio-show-trace": "lib/show-trace.js"
   },
   "license": "MIT",
   "publishConfig": {
