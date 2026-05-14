@@ -21,9 +21,32 @@ export function mapToolToTraceAction(toolName: string): TraceAction | null {
   return TOOL_MAP[toolName] ?? null;
 }
 
+function extractSelectorLabel(selector: string): string {
+  // UiAutomator: android=new UiSelector().text("Label") or .description("Label")
+  const uiautomator = selector.match(/\.(?:text|description|textContains)\("([^"]+)"\)/);
+  if (uiautomator) return uiautomator[1];
+
+  // Accessibility ID: ~label
+  if (selector.startsWith('~')) return selector.slice(1);
+
+  // iOS predicate: -ios predicate string:label == "X" or name == "X"
+  const predicate = selector.match(/(?:label|name|value)\s*==\s*"([^"]+)"/);
+  if (predicate) return predicate[1];
+
+  // XPath attribute: [@text="X"] [@label="X"] [@name="X"] [@content-desc="X"]
+  const xpath = selector.match(/@(?:text|label|name|content-desc)="([^"]+)"/);
+  if (xpath) return xpath[1];
+
+  return selector;
+}
+
 export function formatActionTitle(action: TraceAction, params: Record<string, unknown>): string {
   const { class: cls, method } = action;
-  const firstParam = Object.values(params)[0];
-  const paramStr = firstParam !== undefined ? `"${String(firstParam).slice(0, 80)}"` : '';
-  return paramStr ? `${cls}.${method}(${paramStr})` : `${cls}.${method}()`;
+  const firstKey = Object.keys(params)[0];
+  const firstVal = Object.values(params)[0];
+  if (firstVal === undefined) return `${cls}.${method}()`;
+
+  const raw = String(firstVal);
+  const label = firstKey === 'selector' ? extractSelectorLabel(raw) : raw;
+  return `${cls}.${method}("${label.slice(0, 80)}")`;
 }

@@ -11,6 +11,7 @@ export function createTraceSession(
   browserName: string,
   viewport: { width: number; height: number },
   title: string,
+  sessionType: 'browser' | 'ios' | 'android' = 'browser',
 ): TraceSession {
   const prefix = sessionId.slice(0, 8);
   const session: TraceSession = {
@@ -24,6 +25,9 @@ export function createTraceSession(
     screenshots: [],
     browserName,
     viewport,
+    sessionType,
+    lastAfterEndTime: 0,
+    screenshotChain: Promise.resolve(),
   };
 
   session.events.push({

@@ -65,4 +65,8 @@ export interface TraceSession {
   screenshots: TraceScreenshot[];
   browserName: string;
   viewport: { width: number; height: number };
+  sessionType: 'browser' | 'ios' | 'android';
+  lastAfterEndTime: number;
+  // Sequential chain of pending screenshot captures — awaited before zip export
+  screenshotChain: Promise<void>;
 }

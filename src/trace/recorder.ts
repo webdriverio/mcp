@@ -5,11 +5,25 @@ import { createTraceSession, getMonotonicMs, getTraceSession } from './state.js'
 import { formatActionTitle, mapToolToTraceAction } from './tool-mapping.js';
 import type { TraceSession } from './types.js';
 
-export function startTrace(sessionId: string, capabilities: Record<string, unknown>): void {
-  const browserName = String(capabilities.browserName ?? 'chromium');
-  const viewport = { width: 1280, height: 720 };
-  const title = String(capabilities['browserName'] ?? browserName);
-  createTraceSession(sessionId, browserName, viewport, title);
+export function startTrace(sessionId: string, capabilities: Record<string, unknown>, sessionType: 'browser' | 'ios' | 'android' = 'browser'): void {
+  let browserName: string;
+  let viewport: { width: number; height: number };
+  let title: string;
+
+  if (sessionType === 'browser') {
+    browserName = String(capabilities.browserName ?? 'chromium');
+    viewport = { width: 1280, height: 720 };
+    title = String(capabilities.browserName ?? browserName);
+  } else {
+    // Vibium player is Playwright-derived and expects a known browserName; use 'chromium' as safe fallback
+    browserName = 'chromium';
+    const deviceName = String(capabilities['appium:deviceName'] ?? capabilities.deviceName ?? 'device');
+    const platformVersion = capabilities['appium:platformVersion'] ?? capabilities.platformVersion ?? '';
+    title = `${sessionType} - ${deviceName}${platformVersion ? ` (${platformVersion})` : ''}`;
+    viewport = sessionType === 'ios' ? { width: 390, height: 844 } : { width: 412, height: 915 };
+  }
+
+  createTraceSession(sessionId, browserName, viewport, title, sessionType);
 }
 
 export function endTrace(_sessionId: string): void {
@@ -39,11 +53,13 @@ export async function recordInitialNavigation(sessionId: string, url: string): P
 
   await captureScreenshot(traceSession);
 
+  const navEndTime = getMonotonicMs(traceSession);
   traceSession.events.push({
     type: 'after',
     callId,
-    endTime: getMonotonicMs(traceSession),
+    endTime: navEndTime,
   });
+  traceSession.lastAfterEndTime = navEndTime;
 }
 
 export function withTrace(toolName: string, callback: ToolCallback): ToolCallback {
@@ -54,13 +70,24 @@ export function withTrace(toolName: string, callback: ToolCallback): ToolCallbac
     if (!sessionId) return callback(params, extra);
 
     const metadata = state.sessionMetadata.get(sessionId);
-    if (!metadata?.trace || metadata.type !== 'browser') return callback(params, extra);
+    if (!metadata?.trace) return callback(params, extra);
 
     const traceSession = getTraceSession(sessionId);
     if (!traceSession) return callback(params, extra);
 
     const action = mapToolToTraceAction(toolName);
     if (!action) return callback(params, extra);
+
+    // Capture pre-action screenshot synchronously (what the agent sees before acting).
+    // The 200–1300ms screenshot duration also acts as a natural settle window,
+    // letting the previous action's animations clear before the next tap fires.
+    await captureScreenshot(traceSession);
+
+    // Appium round-trips are slow; add a static settle delay so animations
+    // from the previous action finish before the next one fires.
+    if (traceSession.sessionType !== 'browser') {
+      await new Promise<void>((r) => setTimeout(r, 50));
+    }
 
     const callId = `call@${++traceSession.callCounter}`;
     const startTime = getMonotonicMs(traceSession);
@@ -87,26 +114,36 @@ export function withTrace(toolName: string, callback: ToolCallback): ToolCallbac
       }
     } catch (e) {
       actionError = String(e);
+      const errorEndTime = getMonotonicMs(traceSession);
       traceSession.events.push({
         type: 'after',
         callId,
-        endTime: getMonotonicMs(traceSession),
+        endTime: errorEndTime,
         error: { message: actionError },
       });
+      traceSession.lastAfterEndTime = errorEndTime;
       throw e;
     }
 
-    await captureScreenshot(traceSession);
-
+    const endTime = getMonotonicMs(traceSession);
     traceSession.events.push({
       type: 'after',
       callId,
-      endTime: getMonotonicMs(traceSession),
+      endTime,
       ...(actionError ? { error: { message: actionError } } : {}),
     });
+    traceSession.lastAfterEndTime = endTime;
 
     return result;
   };
+}
+
+// Captures a final screenshot at session end (shows the last screen state).
+export function captureTraceScreenshot(sessionId: string): void {
+  const traceSession = getTraceSession(sessionId);
+  if (!traceSession) return;
+  const p = captureScreenshot(traceSession);
+  traceSession.screenshotChain = traceSession.screenshotChain.then(() => p);
 }
 
 async function captureScreenshot(traceSession: TraceSession): Promise<void> {
@@ -129,7 +166,9 @@ async function captureScreenshot(traceSession: TraceSession): Promise<void> {
       sha1: resourceName,
       width,
       height,
-      timestamp: getMonotonicMs(traceSession),
+      // Stamp at the previous action's endTime so the player shows this frame
+      // as the result of that action, not as the "before" state of the next one.
+      timestamp: traceSession.lastAfterEndTime,
     });
   } catch {
     // Screenshot failures must not mask the action result

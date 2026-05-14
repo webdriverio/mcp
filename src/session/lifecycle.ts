@@ -5,7 +5,7 @@ import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState } from './state';
 import { getProvider } from '../providers/registry';
-import { endTrace } from '../trace/recorder.js';
+import { endTrace, captureTraceScreenshot } from '../trace/recorder.js';
 import { getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
 
@@ -87,9 +87,11 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
 
   if (metadata?.trace) {
     endTrace(sessionId);
+    captureTraceScreenshot(sessionId); // final screenshot — captures the last screen state
     const traceSession = getTraceSession(sessionId);
     if (traceSession) {
       try {
+        await traceSession.screenshotChain;
         const traceDir = join(process.cwd(), '.trace');
         mkdirSync(traceDir, { recursive: true });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

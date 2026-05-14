@@ -90,6 +90,7 @@ describe('withTrace', () => {
     await (withTrace('navigate', tool) as AnyToolFn)({ url: 'https://x.com' }, extra);
 
     const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
     const frame = session.events.find((e) => e.type === 'screencast-frame');
     expect(frame).toBeDefined();
     expect(session.screenshots).toHaveLength(1);
@@ -121,18 +122,29 @@ describe('withTrace', () => {
     expect(after?.error?.message).toBe('something failed');
   });
 
-  it('no-ops for mobile sessions even when trace is true', async () => {
+  it('traces mobile sessions when trace is enabled', async () => {
     const state = getState();
     const sessionId = 'sess-mobile';
+    const mockBrowser = {
+      takeScreenshot: vi.fn().mockResolvedValue(TINY_PNG),
+    } as unknown as WebdriverIO.Browser;
+
+    state.browsers.set(sessionId, mockBrowser);
     state.currentSession = sessionId;
     state.sessionMetadata.set(sessionId, { type: 'ios', capabilities: {}, isAttached: false, trace: true });
+
+    createTraceSession(sessionId, 'chromium', { width: 390, height: 844 }, 'ios - iPhone 15', 'ios');
 
     const tool = vi.fn().mockResolvedValue(SUCCESS_RESULT) as unknown as ToolCallback;
     const wrapped = withTrace('tap_element', tool) as AnyToolFn;
     await wrapped({ selector: '~btn' }, extra);
 
     expect(tool).toHaveBeenCalledOnce();
-    expect(getTraceSession(sessionId)).toBeUndefined();
+    const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
+    expect(session.events.filter((e) => e.type === 'before')).toHaveLength(1);
+    expect(session.events.filter((e) => e.type === 'after')).toHaveLength(1);
+    expect(session.screenshots).toHaveLength(1);
   });
 
 });

@@ -217,7 +217,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   });
 
   if (args.trace) {
-    startTrace(sessionId, mergedCapabilities);
+    startTrace(sessionId, mergedCapabilities, 'browser');
   }
 
   let sizeNote = '';
@@ -280,6 +280,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     isAttached: shouldAutoDetach,
     provider: args.provider ?? 'local',
     tunnelHandle,
+    trace: args.trace ?? false,
   };
 
   registerSession(sessionId, browser, metadata, {
@@ -290,6 +291,10 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     appiumConfig: { hostname: serverConfig.hostname, port: serverConfig.port, path: serverConfig.path },
     steps: [],
   });
+
+  if (args.trace) {
+    startTrace(sessionId, mergedCapabilities, sessionType);
+  }
 
   const appInfo = appPath ? `\nApp: ${appPath}` : '\nApp: (connected to running app)';
   const detachNote = shouldAutoDetach
@@ -347,7 +352,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
   });
 
   if (args.trace) {
-    startTrace(sessionId, capabilities);
+    startTrace(sessionId, capabilities, 'browser');
   }
 
   if (navigationUrl) {
