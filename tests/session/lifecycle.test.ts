@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, readdirSync, rmSync, existsSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { SessionMetadata } from '../../src/session/state';
 import { getState } from '../../src/session/state';
 import { closeSession, registerSession } from '../../src/session/lifecycle';
 import type { SessionHistory } from '../../src/types/recording';
 import type { SessionResult } from '../../src/providers/types';
+import { createTraceSession, getTraceSession } from '../../src/trace/state';
 
 // Mock the provider registry so lifecycle tests don't depend on real providers
 const mockOnSessionClose = vi.fn().mockResolvedValue(undefined);
@@ -11,8 +15,21 @@ vi.mock('../../src/providers/registry', () => ({
   getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose })),
 }));
 
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
 function makeBrowser(overrides: Record<string, unknown> = {}) {
   return { deleteSession: vi.fn().mockResolvedValue(undefined), ...overrides } as unknown as WebdriverIO.Browser;
+}
+
+function setupTracedSession(sessionId: string) {
+  const state = getState();
+  const browser = makeBrowser({ takeScreenshot: vi.fn().mockResolvedValue(TINY_PNG) });
+  state.browsers.set(sessionId, browser);
+  state.currentSession = sessionId;
+  state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached: false, trace: true });
+  state.sessionHistory.set(sessionId, { sessionId, type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+  createTraceSession(sessionId, 'chromium', { width: 1920, height: 1080 }, 'test');
+  return browser;
 }
 
 function makeTunnel(overrides: Partial<{ stop: ReturnType<typeof vi.fn> }> = {}) {
@@ -23,12 +40,12 @@ function makeTunnel(overrides: Partial<{ stop: ReturnType<typeof vi.fn> }> = {})
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
   state.sessionHistory.clear();
   state.currentSession = null;
-  mockOnSessionClose.mockReset();
   mockOnSessionClose.mockResolvedValue(undefined);
 });
 
@@ -223,5 +240,72 @@ describe('closeSession', () => {
     await closeSession('s5', false, false);
 
     expect(mockOnSessionClose).toHaveBeenCalledWith('s5', 'browser', { status: 'failed', reason: 'page not found' }, undefined);
+  });
+});
+
+describe('closeSession trace lifecycle', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'trace-test-'));
+    vi.spyOn(process, 'cwd').mockReturnValue(tempDir);
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('writes a non-empty zip to .trace/ and removes the trace session from memory', async () => {
+    setupTracedSession('s-trace-close');
+    await closeSession('s-trace-close', false, false);
+
+    const traceDir = join(tempDir, '.trace');
+    const files = readdirSync(traceDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatch(/\.zip$/);
+    expect(statSync(join(traceDir, files[0])).size).toBeGreaterThan(0);
+    expect(getTraceSession('s-trace-close')).toBeUndefined();
+  });
+
+  it('does not create .trace/ when trace is disabled', async () => {
+    const state = getState();
+    state.browsers.set('s-no-trace', makeBrowser());
+    state.currentSession = 's-no-trace';
+    state.sessionMetadata.set('s-no-trace', { type: 'browser', capabilities: {}, isAttached: false });
+    state.sessionHistory.set('s-no-trace', { sessionId: 's-no-trace', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+
+    await closeSession('s-no-trace', false, false);
+
+    expect(existsSync(join(tempDir, '.trace'))).toBe(false);
+  });
+});
+
+describe('registerSession orphaned trace cleanup', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'trace-orphan-'));
+    vi.spyOn(process, 'cwd').mockReturnValue(tempDir);
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('finalizes trace zip for an orphaned session when a new session starts', async () => {
+    setupTracedSession('s-orphan');
+
+    const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
+    const newHistory: SessionHistory = { sessionId: 's-new', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
+    registerSession('s-new', makeBrowser(), newMeta, newHistory);
+
+    // The orphan cleanup is fire-and-forget; wait for it to settle
+    await vi.waitFor(() => {
+      expect(getTraceSession('s-orphan')).toBeUndefined();
+    });
+
+    const files = readdirSync(join(tempDir, '.trace'));
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatch(/\.zip$/);
   });
 });
