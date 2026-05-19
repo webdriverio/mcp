@@ -3,24 +3,39 @@
 > This roadmap reflects current thinking and priorities. It is not a commitment to deliver specific features by specific
 > dates. Priorities may shift based on community feedback, contributor interest, and real-world usage patterns.
 
-## Current (v2.x)
+## Current
 
 What's shipped and stable today.
 
-| Area               | Capabilities                                                                                  |
-|--------------------|-----------------------------------------------------------------------------------------------|
-| Browser automation | Chrome, Firefox, Edge, Safari; headed/headless; navigation, clicks, form filling, screenshots |
-| Mobile automation  | iOS (XCUITest) and Android (UiAutomator2) via Appium; native + hybrid app support             |
-| Element detection  | Platform-aware classification, multi-strategy locator generation, viewport filtering          |
-| Session model      | Single active session (browser or mobile), state preservation, detach mode                    |
-| Data format        | TOON output for efficient LLM token usage                                                     |
+| Area                  | Capabilities                                                                                  |
+|-----------------------|-----------------------------------------------------------------------------------------------|
+| Browser automation    | Chrome, Firefox, Edge, Safari; headed/headless; navigation, clicks, form filling, screenshots |
+| Mobile automation     | iOS (XCUITest) and Android (UiAutomator2) via Appium; native + hybrid app support             |
+| Element detection     | Platform-aware classification, multi-strategy locator generation, viewport filtering          |
+| Session model         | Single active session (browser or mobile), state preservation, detach mode                    |
+| Cloud providers       | BrowserStack browser + App Automate; provider abstraction ready for SauceLabs / LambdaTest    |
+| Test infrastructure   | Vitest unit tests, ESLint + TypeScript checks, CI pipeline on every PR                        |
+| Trace recording (v1)  | Synchronous Playwright-compatible trace zip; screenshot per action; auto-saved on session close; playable at player.vibium.dev |
 
 ---
 
 ## Next
 
-High-value features actively being designed. Architecture proposals available in [
-`docs/architecture/`](docs/architecture/).
+High-value features actively being designed or in early implementation.
+
+### Trace: Mobile / Appium Support
+
+**Goal:** Extend trace recording to iOS and Android sessions.
+
+The current synchronous model (capture screenshot after each traced tool call) maps cleanly to Appium — no architectural change needed. Mobile sessions just need to opt in via `trace: true` in `start_session` and have their tools wrapped with `withTrace`.
+
+| What                           | Why it matters                                                    |
+|--------------------------------|-------------------------------------------------------------------|
+| `trace: true` for ios/android  | Same flag, same zip output, same player — no new concepts         |
+| Screenshot capture via Appium  | `browser.takeScreenshot()` works identically on mobile            |
+| Mobile-aware tool mapping      | `tap_element`, `swipe`, `scroll` already in `TOOL_MAP`; just enable the guard |
+
+**Dependency:** None — the synchronous model works without BiDi.
 
 ### Interaction Sequencing
 
@@ -38,19 +53,29 @@ gets back a state delta showing what changed.
 
 See: [`docs/architecture/interaction-sequencing-proposal.md`](docs/architecture/interaction-sequencing-proposal.md)
 
-### Testing and Quality
-
-| What                     | Why it matters                                            |
-|--------------------------|-----------------------------------------------------------|
-| Unit test infrastructure | No tests exist today — foundation for confident iteration |
-| CI pipeline              | Automated linting, type checking, and tests on every PR   |
-| Tool contract tests      | Verify each tool's input validation and error handling    |
-
 ---
 
 ## Later
 
 Features with clear use cases and initial designs, but dependent on foundational work landing first.
+
+### Trace: WebDriver BiDi Mode
+
+**Goal:** Opt-in async trace recording driven by WebDriver BiDi events instead of synchronous post-action capture.
+
+The v1 trace records a screenshot after each tool call completes. This is simple and works, but it misses events that happen between tool calls (network requests, console errors, intermediate renders) and adds latency on every action.
+
+BiDi mode subscribes to browser events asynchronously — screenshots, network activity, and console output arrive as they happen, decoupled from the tool call cycle.
+
+| What                          | Why it matters                                                          |
+|-------------------------------|-------------------------------------------------------------------------|
+| Async screenshot capture      | Screenshots taken on page state changes, not on tool boundaries — more accurate filmstrip |
+| `trace.network` population    | Real HAR-format network log from BiDi `network.*` events                |
+| Console event recording       | Browser console errors/warnings captured as trace events               |
+| Lower per-action latency      | No synchronous `takeScreenshot()` blocking each tool call               |
+| Graceful fallback             | Sessions on browsers without BiDi support fall back to v1 synchronous mode |
+
+**Dependency:** Requires Chrome/Edge with BiDi enabled (WebdriverIO `webSocketUrl: true`). Safari and Firefox BiDi support is partial — fallback needed. Not applicable to mobile/Appium sessions (which keep the synchronous model).
 
 ### Multi-Session Support
 
@@ -70,22 +95,6 @@ tools, allowing named sessions to run in parallel.
 
 See: [`docs/architecture/multi-session-proposal.md`](docs/architecture/multi-session-proposal.md)
 
-### Session Configuration / Provider Pattern
-
-**Goal:** Make session creation extensible for cloud providers (BrowserStack, SauceLabs, custom Selenium Grids).
-
-| What                         | Why it matters                                                     |
-|------------------------------|--------------------------------------------------------------------|
-| Provider abstraction         | Swap between local and cloud execution without changing tool calls |
-| Unified `start_session` tool | Single entry point replaces `start_browser` + `start_app_session`  |
-| Cloud provider integrations  | BrowserStack, SauceLabs, LambdaTest — run on real device farms     |
-| Credential management        | Environment variables with parameter overrides for cloud auth      |
-
-**Dependency:** Refactors session creation — should land before or alongside Multi-Session to avoid double-refactoring
-`getBrowser()`.
-
-See: [`docs/architecture/session-configuration-proposal.md`](docs/architecture/session-configuration-proposal.md)
-
 ---
 
 ## Ideas
@@ -96,7 +105,6 @@ Not committed. Exploring feasibility and demand.
 |----------------------|-------------------------------------------------------------------|
 | Visual regression    | Screenshot comparison with diff highlighting                      |
 | Record and replay    | Capture interaction sequences for deterministic re-execution      |
-| Network interception | Monitor/mock API calls during automation                          |
 | File upload/download | Handle file dialogs and download verification                     |
 | iframe support       | Navigate and interact within nested frames                        |
 | Assertion helpers    | Built-in verification tools (element visible, text matches, etc.) |
@@ -115,20 +123,25 @@ Not committed. Exploring feasibility and demand.
 ## Dependency Map
 
 ```
-                    ┌─────────────────────────┐
-                    │  Interaction Sequencing  │
-                    │   (execute_sequence)     │
-                    └────────────┬────────────┘
-                                 │ enhances
-                                 ▼
-┌───────────────────┐    ┌──────────────────┐
-│ Session Config /  │───▶│  Multi-Session   │
-│ Provider Pattern  │    │  (sessionId)     │
-└───────────────────┘    └──────────────────┘
-        │                        │
-        ▼                        ▼
-┌─────────────────────────────────────────┐
-│         Cloud Provider Support          │
-│   (BrowserStack, SauceLabs, Grids)      │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│             Trace Recording (v1) ✓               │
+│   synchronous, screenshot-per-action, browser    │
+└──────────┬──────────────────────┬───────────────┘
+           │                      │
+           ▼                      ▼
+┌──────────────────┐   ┌─────────────────────────┐
+│  Mobile Tracing  │   │   Trace: BiDi Mode       │
+│  (Appium, easy)  │   │   (async, browser only)  │
+└──────────────────┘   └─────────────────────────┘
+
+┌─────────────────────────┐
+│  Interaction Sequencing  │
+│   (execute_sequence)     │
+└────────────┬────────────┘
+             │ enhances
+             ▼
+┌──────────────────────┐
+│  Multi-Session       │
+│  (sessionId)         │
+└──────────────────────┘
 ```

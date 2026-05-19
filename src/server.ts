@@ -41,6 +41,7 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
+import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
   appStateResource,
@@ -120,26 +121,29 @@ function createServer(): McpServer {
     }
   };
 
+  const instrument = (name: string, cb: ToolCallback): ToolCallback =>
+    withTrace(name, withRecording(name, cb));
+
   registerTool(startSessionToolDefinition, withRecording('start_session', startSessionTool));
   registerTool(closeSessionToolDefinition, closeSessionTool);
-  registerTool(launchChromeToolDefinition, withRecording('launch_chrome', launchChromeTool));
+  registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
   registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
-  registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
+  registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
   registerTool(switchFrameToolDefinition, switchFrameTool);
 
-  registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
+  registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
 
-  registerTool(clickToolDefinition, withRecording('click_element', clickTool));
-  registerTool(setValueToolDefinition, withRecording('set_value', setValueTool));
+  registerTool(clickToolDefinition, instrument('click_element', clickTool));
+  registerTool(setValueToolDefinition, instrument('set_value', setValueTool));
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
-  registerTool(tapElementToolDefinition, withRecording('tap_element', tapElementTool));
-  registerTool(swipeToolDefinition, withRecording('swipe', swipeTool));
-  registerTool(dragAndDropToolDefinition, withRecording('drag_and_drop', dragAndDropTool));
+  registerTool(tapElementToolDefinition, instrument('tap_element', tapElementTool));
+  registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
+  registerTool(dragAndDropToolDefinition, instrument('drag_and_drop', dragAndDropTool));
 
   registerTool(switchContextToolDefinition, switchContextTool);
 
@@ -147,7 +151,7 @@ function createServer(): McpServer {
   registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
   registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
-  registerTool(executeScriptToolDefinition, withRecording('execute_script', executeScriptTool));
+  registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
   registerTool(getElementsToolDefinition, getElementsTool);
 
   registerTool(listAppsToolDefinition, listAppsTool);

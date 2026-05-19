@@ -797,6 +797,44 @@ The generated script reconstructs the full session — including capabilities, n
 standalone `import { remote } from 'webdriverio'` file. For BrowserStack sessions it includes the full try/catch/finally
 with automatic session result marking.
 
+### Trace Recording
+
+Passing `trace: true` to `start_session` produces a Playwright-compatible `.trace` zip in the `.trace/` directory when
+the session closes. The zip is playable at [player.vibium.dev](https://player.vibium.dev) and shows a filmstrip of
+screenshots alongside the action timeline.
+
+**How screenshots are timed**
+
+Appium's `takeScreenshot` round-trip takes 700–1300 ms on a local emulator, which is long enough for the previous
+action's animations to settle. We exploit this: each screenshot is captured **before** the next action fires, so what
+the Appium server returns is already the settled result of the prior action.
+
+The tricky part is making the trace player show that screenshot under the right action. The player associates a
+`screencast-frame` event with whichever action's time window contains the frame's `timestamp` field. If the timestamp
+is set to "now" (capture time), it falls before the current action's `startTime` and the player labels it as the
+*before* state of the next action — one action out of sync.
+
+The fix: stamp each `screencast-frame` with `lastAfterEndTime` — the `endTime` of the action that just completed. That
+places the frame inside the previous action's window, so the player shows it as the result of that action, not the
+precursor to the next one.
+
+```
+Timeline (monotonic ms):
+
+  prev.endTime ← frame timestamp stamped here
+        │
+        │   [screenshot captured here — shows settled state after prev action]
+        │
+  curr.startTime
+        │
+        │   [action executes]
+        │
+  curr.endTime ← next frame will be stamped here
+```
+
+The final screenshot at session close is stamped with the last action's `endTime`, so it renders under that action
+rather than appearing as an orphaned frame after the timeline ends.
+
 ## Troubleshooting
 
 **Browser automation not working?**

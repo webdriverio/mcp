@@ -8,6 +8,7 @@ import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 
 const platformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
@@ -45,6 +46,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     noReset: coerceBoolean.optional().describe('Preserve app data between sessions'),
     fullReset: coerceBoolean.optional().describe('Uninstall app before/after session'),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium command timeout in seconds'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording — produces a Playwright-compatible zip saved to .trace/ on close_session, playable at player.vibium.dev.'),
     attach: coerceBoolean.optional().default(false).describe('Attach to existing Chrome instead of launching'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -86,6 +88,7 @@ type StartSessionArgs = {
   noReset?: boolean;
   fullReset?: boolean;
   newCommandTimeout?: number;
+  trace?: boolean;
   attach?: boolean;
   attachConfig?: { port?: number; host?: string };
   appiumConfig?: { host?: string; port?: number; path?: string; protocol?: string };
@@ -202,6 +205,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     isAttached: false,
     provider: args.provider ?? 'local',
     tunnelHandle,
+    trace: args.trace ?? false,
   };
 
   registerSession(sessionId, wdioBrowser, sessionMetadata, {
@@ -212,6 +216,10 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     steps: [],
   });
 
+  if (args.trace) {
+    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
+  }
+
   let sizeNote = '';
   try {
     await wdioBrowser.setWindowSize(windowWidth, windowHeight);
@@ -221,6 +229,9 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
 
   if (navigationUrl) {
     await wdioBrowser.url(navigationUrl);
+    if (args.trace) {
+      await recordInitialNavigation(sessionId, navigationUrl);
+    }
   }
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
@@ -269,6 +280,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     isAttached: shouldAutoDetach,
     provider: args.provider ?? 'local',
     tunnelHandle,
+    trace: args.trace ?? false,
   };
 
   registerSession(sessionId, browser, metadata, {
@@ -279,6 +291,10 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     appiumConfig: { hostname: serverConfig.hostname, port: serverConfig.port, path: serverConfig.path },
     steps: [],
   });
+
+  if (args.trace) {
+    startTrace(sessionId, mergedCapabilities, sessionType);
+  }
 
   const appInfo = appPath ? `\nApp: ${appPath}` : '\nApp: (connected to running app)';
   const detachNote = shouldAutoDetach
@@ -324,6 +340,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     capabilities,
     isAttached: true,
     provider: 'local',
+    trace: args.trace ?? false,
   };
 
   registerSession(sessionId, browser, sessionMetadata, {
@@ -334,10 +351,20 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     steps: [],
   });
 
+  if (args.trace) {
+    startTrace(sessionId, capabilities, 'browser', { width: 1920, height: 1080 });
+  }
+
   if (navigationUrl) {
     await browser.url(navigationUrl);
+    if (args.trace) {
+      await recordInitialNavigation(sessionId, navigationUrl);
+    }
   } else if (activeTabUrl) {
     await restoreAndSwitchToActiveTab(browser, activeTabUrl, allTabUrls);
+    if (args.trace) {
+      await recordInitialNavigation(sessionId, activeTabUrl);
+    }
   }
 
   const title = await browser.getTitle();

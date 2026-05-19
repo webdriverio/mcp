@@ -3,6 +3,9 @@
 
 node_modules
 lib
+build
+
+.trace
 
 settings.local.json
 *.tgz

@@ -6,6 +6,7 @@ export interface SessionMetadata {
   isAttached: boolean;
   provider?: 'local' | 'browserstack';
   tunnelHandle?: unknown;
+  trace?: boolean;
 }
 
 const state = {

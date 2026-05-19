@@ -1,8 +1,34 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState } from './state';
 import { getProvider } from '../providers/registry';
+import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
+import { deleteTraceSession, getTraceSession } from '../trace/state.js';
+import { buildTraceZip } from '../trace/zip-writer.js';
+
+async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
+  endTrace(sessionId);
+  captureTraceScreenshot(sessionId, browser);
+  const traceSession = getTraceSession(sessionId);
+  if (!traceSession) return;
+  try {
+    await traceSession.screenshotChain;
+    const traceDir = join(process.cwd(), '.trace');
+    mkdirSync(traceDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const outPath = join(traceDir, `${timestamp}-${sessionId.slice(0, 8)}.zip`);
+    const zipBuffer = await buildTraceZip(traceSession);
+    writeFileSync(outPath, zipBuffer);
+    console.error(`[TRACE] Saved to ${outPath}`);
+  } catch (e) {
+    console.error('[TRACE] Failed to save trace:', e);
+  } finally {
+    deleteTraceSession(sessionId);
+  }
+}
 
 function getSessionResult(history: SessionHistory | undefined): SessionResult {
   const errorStep = history?.steps.find(s => s.status === 'error');
@@ -52,6 +78,9 @@ export function registerSession(
     if (oldBrowser) {
       // Fire and forget — don't block registration on close
       void (async () => {
+        if (oldMetadata?.trace) {
+          await finalizeTrace(oldSessionId, oldBrowser);
+        }
         if (oldMetadata?.provider) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
@@ -79,6 +108,10 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
   }
 
   const metadata = state.sessionMetadata.get(sessionId);
+
+  if (metadata?.trace) {
+    await finalizeTrace(sessionId, browser);
+  }
 
   // Terminate the WebDriver session if:
   // - force is true (override), OR
