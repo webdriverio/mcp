@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.1](https://github.com/webdriverio/mcp/compare/v3.5.0...v3.5.1) (2026-05-25)
+
+### Bug Fixes
+
+* Use correct version resolution (like src/server.ts) in the tracing state ([a1cae64](https://github.com/webdriverio/mcp/commit/a1cae64ece408d5ddd6194f2d69774845f0da02c))
+
 ## [3.5.0](https://github.com/webdriverio/mcp/compare/v3.4.4...v3.5.0) (2026-05-19)
 
 ### Features
