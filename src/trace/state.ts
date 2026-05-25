@@ -1,9 +1,7 @@
-import { createRequire } from 'node:module';
 import type { TraceSession } from './types.js';
+import pkg from '../../package.json' with { type: 'json' };
 
-const require = createRequire(import.meta.url);
-const { version: LIBRARY_VERSION } = require('../../package.json') as { version: string };
-
+const libraryVersion = pkg.version;
 const traceSessions = new Map<string, TraceSession>();
 
 export function createTraceSession(
@@ -35,7 +33,7 @@ export function createTraceSession(
     type: 'context-options',
     origin: 'library',
     libraryName: '@wdio/mcp',
-    libraryVersion: LIBRARY_VERSION,
+    libraryVersion,
     browserName,
     platform: process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'windows' : 'linux',
     wallTime: session.startWallTime,
