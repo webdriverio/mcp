@@ -122,22 +122,45 @@ Reads a `.trace` zip and re-executes the recorded steps against the live applica
 
 ---
 
-## Self-Healing on Failure
+## Two Recovery Tiers
 
-When replay fails, the agent gets:
+Failure recovery is not a single workflow. Two distinct tiers exist with different cost, speed, and model requirements:
 
-- The recorded step that failed (selector, action, params)
-- The screenshot and page state at the point of failure
-- The original trace context (what the page looked like when the test was first recorded)
+### Tier 1 — Offline trace analysis (cheap)
 
-From this context the agent can:
+The CI loop: trace runs continuously, outputs are compared against the `.vibium` spec without a live browser session. No MCP. No human in the loop.
 
-- Try an alternative selector (text-based, aria label, structural)
-- Update the trace with the corrected step
-- Continue replay from that point
-- Report an unrecoverable failure if the page structure has fundamentally changed (feature removed, flow redesigned)
+- **Input:** failing trace + `.vibium` spec
+- **What the agent does:** reads `transcript.md` (zero parsing), checks assertions, identifies the divergence step, reads the viewport snapshot at that step
+- **Output:** pass / corrected trace patch / unrecoverable failure report
+- **Model:** a small/cheap model is likely sufficient — the context is structured text, not open-ended reasoning
+- **When to use:** selector went stale, timing changed, minor assertion drift — mechanical failures where the spec intent is clear
 
-The agent does not re-run from scratch. It patches the trace in place and continues.
+The agent patches the trace in place. It does not re-run from scratch.
+
+### Tier 2 — Live MCP reproduction (expensive)
+
+When Tier 1 can't resolve the failure — because it's ambiguous whether the test or the app is wrong, or the failure mode requires seeing the live application. An agent drives a real browser session via MCP, reproduces the flow, produces a second trace, then compares the two traces at the divergence point.
+
+- **Input:** failing trace + live browser session via MCP
+- **What the agent does:** reads `transcript.md` to know the steps, navigates live using viewport snapshots to pick selectors, produces trace-B, diffs trace-A vs trace-B at the divergence point
+- **Output:** root cause analysis + updated spec or trace
+- **Model:** enterprise-level — live navigation + multi-trace reasoning requires strong inference
+- **When to use:** ambiguous failures, suspected app regression, new feature broke the flow
+
+The two traces are compared **only at the divergence point** — not as full sequential diffs. The agent identifies where transcript-A and transcript-B first differ (by step index and page state), then compares the viewport snapshots at that step.
+
+---
+
+## Snapshot format — viewport-only
+
+Snapshots (`snapshot-*.txt`) contain only elements **visible in the current viewport** at the time of capture. Test frameworks scroll automatically — what matters at any step is what's on screen, not the full DOM.
+
+This bounds snapshot size naturally (target: ~50 interactive elements vs. ~450 full-tree lines on a real page) and makes two-trace comparison meaningful: both snapshots represent the same visible surface, so structural diffs are genuine divergences, not DOM depth noise.
+
+**Concrete implementation requirement:** `getBrowserAccessibilityTree` needs viewport bounds filtering (equivalent to the `inViewportOnly` flag already used in `getElements`). This is the next implementation step after the current snapshot infrastructure.
+
+The `snapshot-*.txt` files in the trace zip are the concrete implementation of "original trace context" referenced elsewhere in this document. The agent receives both the *recorded* snapshot (what the page looked like at record time) and the *current* snapshot (what it looks like now) for each failed step.
 
 ---
 
