@@ -1,6 +1,7 @@
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { basicAuth } from '../../utils/auth';
 import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
 import type { Browser as WdioBrowser } from 'webdriverio';
 
@@ -22,7 +23,7 @@ export class SauceLabsProvider implements SessionProvider {
   buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
     const platform = options.platform as string;
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
-    const saucelabsLocal = options.saucelabsLocal as boolean | string | undefined;
+    const saucelabsLocal = (options.tunnel ?? options.saucelabsLocal) as boolean | string | undefined;
     const reporting = options.reporting as { project?: string; build?: string; session?: string } | undefined;
 
     const sauceOptions: Record<string, unknown> = {};
@@ -42,7 +43,7 @@ export class SauceLabsProvider implements SessionProvider {
       return {
         browserName: (options.browser as string | undefined) ?? 'chrome',
         browserVersion: (options.browserVersion as string | undefined) ?? 'latest',
-        platformName: (options.os as string | undefined) ?? 'Windows 11',
+        platformName: (options.os as string | undefined) ?? 'Linux',
         'sauce:options': sauceOptions,
         ...userCapabilities,
       };
@@ -136,7 +137,7 @@ export class SauceLabsProvider implements SessionProvider {
     const key = process.env.SAUCE_ACCESS_KEY;
     if (user && key) {
       try {
-        const auth = Buffer.from(`${user}:${key}`).toString('base64');
+        const auth = basicAuth(user, key);
         const body: Record<string, boolean> = { passed: result.status === 'passed' };
         console.error(`[SauceLabs] Setting job status for ${sessionId}: ${result.status}`);
         await fetch(`https://saucelabs.com/rest/v1/${user}/jobs/${sessionId}`, {

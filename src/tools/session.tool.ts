@@ -59,8 +59,9 @@ export const startSessionToolDefinition: ToolDefinition = {
       protocol: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1). Only used with provider: "saucelabs".'),
-    browserstackLocal: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Enable BrowserStack Local tunnel routing (BrowserStack only, default: false). true = auto-start tunnel before session and stop on close. "external" = tunnel already running externally, set local: true in capabilities only.'),
-    saucelabsLocal: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Enable Sauce Connect tunnel routing (Sauce Labs only, default: false). true = auto-start tunnel before session and stop on close. "external" = tunnel already running externally, set tunnel: true in capabilities only.'),
+    tunnel: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Enable local tunnel routing (cloud providers only, default: false). true = auto-start tunnel before session and stop on close. "external" = tunnel already running externally.'),
+    browserstackLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: use "tunnel" instead. Enable BrowserStack Local tunnel routing.'),
+    saucelabsLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: use "tunnel" instead. Enable Sauce Connect tunnel routing.'),
     navigationUrl: z.string().optional().describe('URL to navigate to after starting'),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional capabilities to merge'),
   },
@@ -95,6 +96,7 @@ type StartSessionArgs = {
   attachConfig?: { port?: number; host?: string };
   appiumConfig?: { host?: string; port?: number; path?: string; protocol?: string };
   region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';
+  tunnel?: boolean | 'external';
   browserstackLocal?: boolean | 'external';
   saucelabsLocal?: boolean | 'external';
   navigationUrl?: string;
@@ -196,7 +198,9 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     capabilities: userCapabilities,
   });
 
-  const tunnelEnabled = args.browserstackLocal === true || args.saucelabsLocal === true;
+  // Normalize tunnel flag — support legacy browserstackLocal/saucelabsLocal params
+  const effectiveTunnel = args.tunnel ?? args.browserstackLocal ?? args.saucelabsLocal ?? false;
+  const tunnelEnabled = effectiveTunnel === true;
   const tunnelHandle = tunnelEnabled
     ? await provider.startTunnel?.(args as Record<string, unknown>)
     : undefined;
@@ -269,7 +273,9 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   const serverConfig = provider.getConnectionConfig(args as Record<string, unknown>);
   const mergedCapabilities = provider.buildCapabilities(args as Record<string, unknown>);
 
-  const tunnelEnabled = args.browserstackLocal === true || args.saucelabsLocal === true;
+  // Normalize tunnel flag — support legacy browserstackLocal/saucelabsLocal params
+  const effectiveTunnel = args.tunnel ?? args.browserstackLocal ?? args.saucelabsLocal ?? false;
+  const tunnelEnabled = effectiveTunnel === true;
   const tunnelHandle = tunnelEnabled
     ? await provider.startTunnel?.(args as Record<string, unknown>)
     : undefined;

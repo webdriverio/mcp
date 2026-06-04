@@ -2,6 +2,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Local as BrowserstackTunnel } from 'browserstack-local';
+import { basicAuth } from '../../utils/auth';
 import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
 
 export class BrowserStackProvider implements SessionProvider {
@@ -24,7 +25,7 @@ export class BrowserStackProvider implements SessionProvider {
     const platform = options.platform as string;
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
 
-    const browserstackLocal = options.browserstackLocal as boolean | undefined;
+    const browserstackLocal = (options.tunnel ?? options.browserstackLocal) as boolean | string | undefined;
 
     if (platform === 'browser') {
       const bstackOptions: Record<string, unknown> = {
@@ -124,7 +125,7 @@ export class BrowserStackProvider implements SessionProvider {
       ? 'https://api.browserstack.com/automate/sessions'
       : 'https://api-cloud.browserstack.com/app-automate/sessions';
 
-    const auth = Buffer.from(`${user}:${key}`).toString('base64');
+    const auth = basicAuth(user, key);
     const body: Record<string, string> = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
     await fetch(`${baseUrl}/${sessionId}.json`, {
       method: 'PUT',

@@ -3,59 +3,106 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { basicAuth } from '../utils/auth';
 
-const BS_API = 'https://api-cloud.browserstack.com';
-const SL_API = 'https://api.eu-central-1.saucelabs.com';
+// ─── Provider API config ───────────────────────────────────────────────────────
 
-function getAuth(provider: 'browserstack' | 'saucelabs'): string | null {
-  if (provider === 'browserstack') {
-    const user = process.env.BROWSERSTACK_USERNAME;
-    const key = process.env.BROWSERSTACK_ACCESS_KEY;
-    if (!user || !key) return null;
-    return Buffer.from(`${user}:${key}`).toString('base64');
-  }
-  const user = process.env.SAUCE_USERNAME;
-  const key = process.env.SAUCE_ACCESS_KEY;
-  if (!user || !key) return null;
-  return Buffer.from(`${user}:${key}`).toString('base64');
-}
-
-// ─── BrowserStack helpers ─────────────────────────────────────────────────────
-
-export interface BrowserStackApp {
-  app_name: string;
-  app_version: string;
-  app_url: string;
-  app_id: string;
-  custom_id?: string;
-  uploaded_at: string;
-}
-
-function formatBSAppList(apps: BrowserStackApp[]): string {
-  if (apps.length === 0) return 'No apps found.';
-  return apps.map((a) => {
-    const id = a.custom_id ? ` [${a.custom_id}]` : '';
-    return `${a.app_name} v${a.app_version}${id} — ${a.app_url} (${a.uploaded_at})`;
-  }).join('\n');
-}
-
-// ─── Sauce Labs helpers ───────────────────────────────────────────────────────
-
-interface SauceLabsApp {
-  id: string;
+interface ProviderApiConfig {
+  /** Display name in error messages */
   name: string;
-  version?: string;
-  uploadTimestamp?: number;
+  /** Base URL for the API */
+  apiBase: string;
+  /** Env var names for credentials */
+  credsEnvNames: [string, string];
+  /** list_apps endpoint path (relative to apiBase) */
+  listPath: string;
+  /** Whether list endpoint supports org-wide query param (BrowserStack only) */
+  supportsOrgWide: boolean;
+  /** Parse list response into a normalized array of { name, ref, uploadedAt, customId } */
+  parseListResponse: (raw: unknown) => NormalizedApp[];
+  /** upload_app endpoint path (relative to apiBase) */
+  uploadPath: string;
+  /** FormData field name for the file */
+  uploadField: string;
+  /** Parse upload response into { appRef, appName } */
+  parseUploadResponse: (raw: unknown, fileName: string) => { appRef: string; appName: string };
+}
+
+interface NormalizedApp {
+  name: string;
+  ref: string;          // bs://... or storage:filename=...
+  uploadedAt?: string;  // ISO timestamp string
   customId?: string;
 }
 
-function formatSLAppList(apps: SauceLabsApp[]): string {
+function formatAppList(apps: NormalizedApp[]): string {
   if (apps.length === 0) return 'No apps found.';
   return apps.map((a) => {
     const id = a.customId ? ` [${a.customId}]` : '';
-    const timestamp = a.uploadTimestamp ? new Date(a.uploadTimestamp).toISOString() : 'unknown';
-    return `${a.name}${id} — storage:filename=${a.name} (${timestamp})`;
+    const ts = a.uploadedAt ?? 'unknown';
+    return `${a.name}${id} — ${a.ref} (${ts})`;
   }).join('\n');
+}
+
+const PROVIDER_CONFIGS: Record<string, ProviderApiConfig> = {
+  browserstack: {
+    name: 'BrowserStack',
+    apiBase: 'https://api-cloud.browserstack.com',
+    credsEnvNames: ['BROWSERSTACK_USERNAME', 'BROWSERSTACK_ACCESS_KEY'],
+    listPath: '/app-automate/recent_apps',
+    supportsOrgWide: true,
+    parseListResponse: (raw) => {
+      const apps = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
+      return apps.map((a) => ({
+        name: `${a.app_name}`,
+        ref: `${a.app_url}`,
+        uploadedAt: `${a.uploaded_at}`,
+        customId: a.custom_id as string | undefined,
+      }));
+    },
+    uploadPath: '/app-automate/upload',
+    uploadField: 'file',
+    parseUploadResponse: (raw, fileName) => {
+      const data = raw as { app_url: string; custom_id?: string };
+      return { appRef: data.app_url, appName: fileName };
+    },
+  },
+  saucelabs: {
+    name: 'Sauce Labs',
+    apiBase: 'https://api.eu-central-1.saucelabs.com',
+    credsEnvNames: ['SAUCE_USERNAME', 'SAUCE_ACCESS_KEY'],
+    listPath: '/v1/storage/files',
+    supportsOrgWide: false,
+    parseListResponse: (raw) => {
+      const data = raw as { items?: { name: string; id: string; uploadTimestamp?: number; customId?: string }[] };
+      return (data.items ?? []).map((a) => ({
+        name: a.name,
+        ref: `storage:filename=${a.name}`,
+        uploadedAt: a.uploadTimestamp ? new Date(a.uploadTimestamp).toISOString() : undefined,
+        customId: a.customId,
+      }));
+    },
+    uploadPath: '/v1/storage/upload',
+    uploadField: 'payload',
+    parseUploadResponse: (raw, fileName) => {
+      const data = raw as { item?: { id: string; name: string } };
+      const name = data.item?.name ?? fileName;
+      return { appRef: `storage:filename=${name}`, appName: name };
+    },
+  },
+};
+
+function getProviderConfig(provider: string): { config: ProviderApiConfig; auth: string } | { error: string } {
+  const config = PROVIDER_CONFIGS[provider];
+  if (!config) return { error: `Unknown provider: ${provider}` };
+  const [userEnv, keyEnv] = config.credsEnvNames;
+  const user = process.env[userEnv];
+  const key = process.env[keyEnv];
+  if (!user || !key) {
+    const vars = config.credsEnvNames.join(' and ');
+    return { error: `Missing credentials: set ${vars} environment variables.` };
+  }
+  return { config, auth: basicAuth(user, key) };
 }
 
 // ─── list_apps ────────────────────────────────────────────────────────────────
@@ -81,48 +128,33 @@ type ListAppsArgs = {
 
 export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
   const { provider, sortBy = 'uploaded_at', organizationWide = false, limit = 20 } = args;
-  const auth = getAuth(provider);
-  if (!auth) {
-    const vars = provider === 'browserstack' ? 'BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY' : 'SAUCE_USERNAME and SAUCE_ACCESS_KEY';
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Missing credentials: set ${vars} environment variables.` }] };
+  const resolved = getProviderConfig(provider);
+  if ('error' in resolved) {
+    return { isError: true as const, content: [{ type: 'text' as const, text: resolved.error }] };
   }
+  const { config, auth } = resolved;
 
   try {
-    if (provider === 'browserstack') {
-      let url = `${BS_API}/app-automate/${organizationWide ? 'recent_group_apps' : 'recent_apps'}`;
-      if (organizationWide && limit) url += `?limit=${limit}`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Basic ${auth}` },
-      });
-
-      if (!res.ok) {
-        const body = await res.text();
-        return { isError: true as const, content: [{ type: 'text' as const, text: `BrowserStack API error ${res.status}: ${body}` }] };
-      }
-
-      const raw = await res.json();
-      let apps: BrowserStackApp[] = Array.isArray(raw) ? raw : [];
-      apps = sortBy === 'app_name' ? apps.sort((a, b) => a.app_name.localeCompare(b.app_name)) : apps.sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
-      return { content: [{ type: 'text' as const, text: formatBSAppList(apps) }] };
+    let url = `${config.apiBase}${config.listPath}`;
+    if (config.supportsOrgWide && organizationWide) {
+      url = `${config.apiBase}/app-automate/recent_group_apps?limit=${limit}`;
     }
 
-    // Sauce Labs
-    const res = await fetch(`${SL_API}/v1/storage/files`, {
+    const res = await fetch(url, {
       headers: { Authorization: `Basic ${auth}` },
     });
 
     if (!res.ok) {
       const body = await res.text();
-      return { isError: true as const, content: [{ type: 'text' as const, text: `Sauce Labs API error ${res.status}: ${body}` }] };
+      return { isError: true as const, content: [{ type: 'text' as const, text: `${config.name} API error ${res.status}: ${body}` }] };
     }
 
-    const raw = await res.json() as { items?: SauceLabsApp[] };
-    let apps: SauceLabsApp[] = raw.items ?? [];
+    const raw = await res.json();
+    let apps = config.parseListResponse(raw);
     apps = sortBy === 'app_name'
       ? apps.sort((a, b) => a.name.localeCompare(b.name))
-      : apps.sort((a, b) => (b.uploadTimestamp ?? 0) - (a.uploadTimestamp ?? 0));
-    return { content: [{ type: 'text' as const, text: formatSLAppList(apps) }] };
+      : apps.sort((a, b) => (b.uploadedAt ?? '').localeCompare(a.uploadedAt ?? ''));
+    return { content: [{ type: 'text' as const, text: formatAppList(apps) }] };
   } catch (e) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `Error listing apps: ${e}` }] };
   }
@@ -149,11 +181,11 @@ type UploadAppArgs = {
 
 export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
   const { provider, path, customId } = args;
-  const auth = getAuth(provider);
-  if (!auth) {
-    const vars = provider === 'browserstack' ? 'BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY' : 'SAUCE_USERNAME and SAUCE_ACCESS_KEY';
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Missing credentials: set ${vars} environment variables.` }] };
+  const resolved = getProviderConfig(provider);
+  if ('error' in resolved) {
+    return { isError: true as const, content: [{ type: 'text' as const, text: resolved.error }] };
   }
+  const { config, auth } = resolved;
 
   if (!existsSync(path)) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `File not found: ${path}` }] };
@@ -162,36 +194,12 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
   const fileName = path.split('/').pop() ?? 'app';
 
   try {
-    if (provider === 'browserstack') {
-      const form = new FormData();
-      const fileBuffer = readFileSync(path);
-      const fileBlob = new Blob([fileBuffer], { type: 'application/octet-stream' });
-      form.append('file', fileBlob, fileName);
-      if (customId) form.append('custom_id', customId);
-
-      const res = await fetch(`${BS_API}/app-automate/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Basic ${auth}` },
-        body: form,
-      });
-
-      if (!res.ok) {
-        const body = await res.text();
-        return { isError: true as const, content: [{ type: 'text' as const, text: `Upload failed ${res.status}: ${body}` }] };
-      }
-
-      const data = await res.json() as { app_url: string; custom_id?: string };
-      const customIdNote = data.custom_id ? `\nCustom ID: ${data.custom_id}` : '';
-      return { content: [{ type: 'text' as const, text: `Upload successful.\nApp URL: ${data.app_url}${customIdNote}\n\nUse this URL as the "app" parameter in start_session with provider: "browserstack".` }] };
-    }
-
-    // Sauce Labs
     const form = new FormData();
     const fileBuffer = readFileSync(path);
     const fileBlob = new Blob([fileBuffer], { type: 'application/octet-stream' });
-    form.append('payload', fileBlob, fileName);
+    form.append(config.uploadField, fileBlob, fileName);
 
-    const res = await fetch(`${SL_API}/v1/storage/upload`, {
+    const res = await fetch(`${config.apiBase}${config.uploadPath}`, {
       method: 'POST',
       headers: { Authorization: `Basic ${auth}` },
       body: form,
@@ -202,10 +210,10 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
       return { isError: true as const, content: [{ type: 'text' as const, text: `Upload failed ${res.status}: ${body}` }] };
     }
 
-    const data = await res.json() as { item?: { id: string; name: string } };
-    const appName = data.item?.name ?? fileName;
+    const raw = await res.json();
+    const { appRef } = config.parseUploadResponse(raw, fileName);
     const customIdNote = customId ? `\nCustom ID: ${customId}` : '';
-    return { content: [{ type: 'text' as const, text: `Upload successful.\nApp: storage:filename=${appName}${customIdNote}\n\nUse "storage:filename=${appName}" as the "app" parameter in start_session with provider: "saucelabs".` }] };
+    return { content: [{ type: 'text' as const, text: `Upload successful.\nApp: ${appRef}${customIdNote}\n\nUse "${appRef}" as the "app" parameter in start_session with provider: "${provider}".` }] };
   } catch (e) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `Error uploading app: ${e}` }] };
   }
