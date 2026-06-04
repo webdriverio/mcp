@@ -34,6 +34,7 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
     case 'start_session': {
       const platform = p.platform as string;
       const isBrowserStack = 'bstack:options' in history.capabilities;
+      const isSauceLabs = 'sauce:options' in history.capabilities;
       const capJson = indentJson(history.capabilities)
         .split('\n')
         .map((line, i) => (i > 0 ? `  ${line}` : line))
@@ -52,6 +53,25 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
           "  path: '/wd/hub',",
           '  user: process.env.BS_USER,',
           '  key: process.env.BS_KEY,',
+          `  capabilities: ${capJson}`,
+          `});${nav}`,
+        ].join('\n');
+      }
+
+      if (isSauceLabs) {
+        const region = ((history.capabilities['sauce:options'] as Record<string, unknown> | undefined)?.region as string) ?? 'eu-central-1';
+        const nav =
+          platform === 'browser' && p.navigationUrl
+            ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');`
+            : '';
+        return [
+          'const browser = await remote({',
+          "  protocol: 'https',",
+          `  hostname: 'ondemand.${region}.saucelabs.com',`,
+          '  port: 443,',
+          "  path: '/wd/hub',",
+          '  user: process.env.SAUCE_USERNAME,',
+          '  key: process.env.SAUCE_ACCESS_KEY,',
           `  capabilities: ${capJson}`,
           `});${nav}`,
         ].join('\n');
@@ -121,8 +141,10 @@ function bsStatusUpdateLines(sessionType: 'browser' | 'ios' | 'android'): string
 
 export function generateCode(history: SessionHistory): string {
   const bstackOptions = history.capabilities['bstack:options'] as Record<string, unknown> | undefined;
+  const sauceOptions = history.capabilities['sauce:options'] as Record<string, unknown> | undefined;
   const isBrowserStack = bstackOptions !== undefined;
-  const usesBrowserstackLocal = bstackOptions?.local === true;
+  const isSauceLabs = sauceOptions !== undefined;
+  const usesLocalTunnel = isBrowserStack ? bstackOptions?.local === true : (sauceOptions?.tunnel === true);
 
   const steps = history.steps
     .map(step => generateStep(step, history))
@@ -138,7 +160,7 @@ export function generateCode(history: SessionHistory): string {
     const catchBlock = '} catch (e) {\n  bsStatus = \'failed\';\n  bsReason = String(e);\n  throw e;';
     const finallyBody = `  if (browser) {\n${statusUpdate}\n    await browser.deleteSession();\n  }`;
 
-    if (usesBrowserstackLocal) {
+    if (usesLocalTunnel) {
       const tunnelSetup = [
         '',
         'const tunnel = new BrowserstackTunnel();',
@@ -173,6 +195,67 @@ export function generateCode(history: SessionHistory): string {
       catchBlock,
       '} finally {',
       finallyBody,
+      '}',
+    ].join('\n');
+  }
+
+  if (isSauceLabs) {
+    const slSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const preamble = 'let browser;\nlet slStatus = \'passed\';\nlet slReason;';
+    const catchBlock = '} catch (e) {\n  slStatus = \'failed\';\n  slReason = String(e);\n  throw e;';
+    const statusUpdate = [
+      "    const slAuth = Buffer.from(`${process.env.SAUCE_USERNAME}:${process.env.SAUCE_ACCESS_KEY}`).toString('base64');",
+      '    await fetch(`https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/jobs/` + browser.sessionId, {',
+      "      method: 'PUT',",
+      "      headers: { Authorization: 'Basic ' + slAuth, 'Content-Type': 'application/json' },",
+      '      body: JSON.stringify({ passed: slStatus === \'passed\' })',
+      '    });',
+    ].join('\n');
+    const finallyLines = [
+      '  if (browser) {',
+      statusUpdate,
+      '    await browser.deleteSession();',
+      '  }',
+    ];
+
+    if (usesLocalTunnel) {
+      const tunnelSetup = [
+        '',
+        "import sauceConnectLauncher from 'sauce-connect-launcher';",
+        '',
+        'const startTunnel = promisify(sauceConnectLauncher);',
+        'const sc = await startTunnel({',
+        '  username: process.env.SAUCE_USERNAME,',
+        '  accessKey: process.env.SAUCE_ACCESS_KEY,',
+        '});',
+        'const stopTunnel = promisify(sc.close.bind(sc));',
+        '',
+      ].join('\n');
+
+      return [
+        "import { remote } from 'webdriverio';",
+        "import { promisify } from 'node:util';",
+        tunnelSetup,
+        preamble,
+        'try {',
+        slSteps,
+        catchBlock,
+        '} finally {',
+        ...finallyLines,
+        '  await stopTunnel();',
+        '}',
+      ].join('\n');
+    }
+
+    return [
+      "import { remote } from 'webdriverio';",
+      '',
+      preamble,
+      'try {',
+      slSteps,
+      catchBlock,
+      '} finally {',
+      ...finallyLines,
       '}',
     ].join('\n');
   }

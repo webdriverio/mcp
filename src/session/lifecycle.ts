@@ -84,12 +84,16 @@ export function registerSession(
         if (oldMetadata?.provider) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle).catch(() => {
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser).catch(() => {
           });
         }
         await oldBrowser.deleteSession().catch(() => {
           // Ignore errors during force-close of orphaned session
         });
+        if (oldMetadata?.provider && oldMetadata?.tunnelHandle) {
+          const provider = getProvider(oldMetadata.provider, oldMetadata.type);
+          await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
+        }
       })();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
@@ -120,12 +124,22 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
     if (metadata?.provider) {
       try {
         const provider = getProvider(metadata.provider, metadata.type);
-        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle);
+        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser);
       } catch (e) {
         console.error('[WARN] Failed to run provider onSessionClose:', e);
       }
     }
     await browser.deleteSession();
+
+    // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs
+    if (metadata?.provider && metadata?.tunnelHandle) {
+      try {
+        const provider = getProvider(metadata.provider, metadata.type);
+        await provider.stopTunnel?.(metadata.tunnelHandle);
+      } catch (e) {
+        console.error('[WARN] Failed to stop tunnel:', e);
+      }
+    }
   }
 
   state.browsers.delete(sessionId);

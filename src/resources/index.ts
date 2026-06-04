@@ -1,4 +1,5 @@
 export * from './browserstack-local.resource';
+export * from './saucelabs-local.resource';
 export * from './sessions.resource';
 export * from './capabilities.resource';
 export * from './elements.resource';

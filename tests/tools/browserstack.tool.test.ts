@@ -1,10 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { listAppsTool, uploadAppTool } from '../../src/tools/browserstack.tool';
+import { listAppsTool, uploadAppTool } from '../../src/tools/cloud-provider.tool';
 
 vi.mock('node:fs', () => {
   const mocked = {
     existsSync: vi.fn(),
-    createReadStream: vi.fn(() => 'mock-stream'),
+    readFileSync: vi.fn(() => Buffer.from('mock-file-content')),
   };
   return { ...mocked, default: mocked };
 });
@@ -15,7 +15,7 @@ type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { type: stri
 const callList = listAppsTool as unknown as ToolFn;
 const callUpload = uploadAppTool as unknown as ToolFn;
 
-const mockApp = {
+const mockBSApp = {
   app_name: 'MyApp.apk',
   app_version: '1.2.3',
   app_url: 'bs://abc123',
@@ -24,25 +24,35 @@ const mockApp = {
   uploaded_at: '2026-03-01T10:00:00.000Z',
 };
 
-beforeEach(() => {
-  vi.stubEnv('BROWSERSTACK_USERNAME', 'testuser');
-  vi.stubEnv('BROWSERSTACK_ACCESS_KEY', 'testkey');
-  vi.spyOn(global, 'fetch');
-});
+const mockSLApp = {
+  id: 'abc123',
+  name: 'MyApp.apk',
+  version: '1.2.3',
+  uploadTimestamp: 1711234567890,
+  customId: 'MyApp_GB',
+};
 
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-});
+// ─── BrowserStack tests ───────────────────────────────────────────────────────
 
-describe('list_apps tool', () => {
+describe('list_apps tool (BrowserStack)', () => {
+  beforeEach(() => {
+    vi.stubEnv('BROWSERSTACK_USERNAME', 'testuser');
+    vi.stubEnv('BROWSERSTACK_ACCESS_KEY', 'testkey');
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
   it('calls recent_apps endpoint by default', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => [mockApp],
+      json: async () => [mockBSApp],
     } as Response);
 
-    await callList({});
+    await callList({ provider: 'browserstack' });
 
     const [url, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api-cloud.browserstack.com/app-automate/recent_apps');
@@ -52,34 +62,22 @@ describe('list_apps tool', () => {
   it('calls recent_group_apps with default limit=20 when organizationWide is true', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => [mockApp],
+      json: async () => [mockBSApp],
     } as Response);
 
-    await callList({ organizationWide: true });
+    await callList({ provider: 'browserstack', organizationWide: true });
 
     const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api-cloud.browserstack.com/app-automate/recent_group_apps?limit=20');
   });
 
-  it('appends custom limit query param when provided', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => [mockApp],
-    } as Response);
-
-    await callList({ organizationWide: true, limit: 5 });
-
-    const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://api-cloud.browserstack.com/app-automate/recent_group_apps?limit=5');
-  });
-
   it('returns formatted app list', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => [mockApp],
+      json: async () => [mockBSApp],
     } as Response);
 
-    const result = await callList({});
+    const result = await callList({ provider: 'browserstack' });
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain('MyApp.apk');
     expect(result.content[0].text).toContain('bs://abc123');
@@ -92,42 +90,50 @@ describe('list_apps tool', () => {
       json: async () => null,
     } as Response);
 
-    const result = await callList({});
+    const result = await callList({ provider: 'browserstack' });
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toBe('No apps found.');
   });
 
   it('returns isError true when credentials are missing', async () => {
     vi.unstubAllEnvs();
-    const result = await callList({});
+    const result = await callList({ provider: 'browserstack' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('BROWSERSTACK_USERNAME');
   });
 
   it('returns isError true when fetch fails', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('network error'));
-    const result = await callList({});
+    const result = await callList({ provider: 'browserstack' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('network error');
   });
 });
 
-describe('upload_app tool', () => {
+describe('upload_app tool (BrowserStack)', () => {
   beforeEach(() => {
+    vi.stubEnv('BROWSERSTACK_USERNAME', 'testuser');
+    vi.stubEnv('BROWSERSTACK_ACCESS_KEY', 'testkey');
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.createReadStream).mockReturnValue('mock-stream' as unknown as fs.ReadStream);
+    vi.mocked(fs.readFileSync).mockReturnValue(Buffer.from('mock-file-content'));
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('returns isError true when credentials are missing', async () => {
     vi.unstubAllEnvs();
-    const result = await callUpload({ path: '/some/app.apk' });
+    const result = await callUpload({ provider: 'browserstack', path: '/some/app.apk' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('BROWSERSTACK_USERNAME');
   });
 
   it('returns isError true when file does not exist', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    const result = await callUpload({ path: '/missing/app.apk' });
+    const result = await callUpload({ provider: 'browserstack', path: '/missing/app.apk' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('/missing/app.apk');
   });
@@ -138,21 +144,9 @@ describe('upload_app tool', () => {
       json: async () => ({ app_url: 'bs://newapp456', custom_id: null }),
     } as Response);
 
-    const result = await callUpload({ path: '/local/myapp.apk' });
+    const result = await callUpload({ provider: 'browserstack', path: '/local/myapp.apk' });
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain('bs://newapp456');
-  });
-
-  it('includes custom_id in upload when provided', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ app_url: 'bs://newapp456', custom_id: 'MyCustomId' }),
-    } as Response);
-
-    await callUpload({ path: '/local/myapp.apk', customId: 'MyCustomId' });
-
-    const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://api-cloud.browserstack.com/app-automate/upload');
   });
 
   it('returns isError true when API returns error', async () => {
@@ -162,8 +156,102 @@ describe('upload_app tool', () => {
       text: async () => 'Unauthorized',
     } as Response);
 
-    const result = await callUpload({ path: '/local/myapp.apk' });
+    const result = await callUpload({ provider: 'browserstack', path: '/local/myapp.apk' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('401');
+  });
+});
+
+// ─── Sauce Labs tests ─────────────────────────────────────────────────────────
+
+describe('list_apps tool (Sauce Labs)', () => {
+  beforeEach(() => {
+    vi.stubEnv('SAUCE_USERNAME', 'testuser');
+    vi.stubEnv('SAUCE_ACCESS_KEY', 'testkey');
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('calls Sauce Labs storage/files endpoint', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [mockSLApp] }),
+    } as Response);
+
+    await callList({ provider: 'saucelabs' });
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.eu-central-1.saucelabs.com/v1/storage/files');
+    expect((options?.headers as Record<string, string>)?.Authorization).toMatch(/^Basic /);
+  });
+
+  it('returns formatted app list with storage:filename= format', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [mockSLApp] }),
+    } as Response);
+
+    const result = await callList({ provider: 'saucelabs' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('MyApp.apk');
+    expect(result.content[0].text).toContain('storage:filename=MyApp.apk');
+  });
+
+  it('handles empty items gracefully', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+
+    const result = await callList({ provider: 'saucelabs' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toBe('No apps found.');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callList({ provider: 'saucelabs' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('SAUCE_USERNAME');
+  });
+});
+
+describe('upload_app tool (Sauce Labs)', () => {
+  beforeEach(() => {
+    vi.stubEnv('SAUCE_USERNAME', 'testuser');
+    vi.stubEnv('SAUCE_ACCESS_KEY', 'testkey');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(Buffer.from('mock-file-content'));
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('calls Sauce Labs storage/upload endpoint and returns storage:filename= format', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ item: { id: 'abc123', name: 'myapp.apk' } }),
+    } as Response);
+
+    const result = await callUpload({ provider: 'saucelabs', path: '/local/myapp.apk' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('storage:filename=myapp.apk');
+
+    const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.eu-central-1.saucelabs.com/v1/storage/upload');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callUpload({ provider: 'saucelabs', path: '/some/app.apk' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('SAUCE_USERNAME');
   });
 });

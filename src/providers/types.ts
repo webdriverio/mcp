@@ -1,3 +1,5 @@
+import type { Browser as WdioBrowser } from 'webdriverio';
+
 export interface ConnectionConfig {
   hostname?: string;
   port?: number;
@@ -20,5 +22,6 @@ export interface SessionProvider {
   getSessionType(options: Record<string, unknown>): 'browser' | 'ios' | 'android';
   shouldAutoDetach(options: Record<string, unknown>): boolean;
   startTunnel?(options: Record<string, unknown>): Promise<unknown>;
-  onSessionClose?(sessionId: string, sessionType: 'browser' | 'ios' | 'android', result: SessionResult, tunnelHandle?: unknown): Promise<void>;
+  stopTunnel?(tunnelHandle?: unknown): Promise<void>;
+  onSessionClose?(sessionId: string, sessionType: 'browser' | 'ios' | 'android', result: SessionResult, tunnelHandle?: unknown, browser?: WdioBrowser): Promise<void>;
 }
