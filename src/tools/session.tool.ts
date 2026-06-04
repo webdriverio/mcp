@@ -213,6 +213,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     capabilities: mergedCapabilities,
     isAttached: false,
     provider: args.provider ?? 'local',
+    region: args.region,
     tunnelHandle,
     trace: args.trace ?? false,
   };
@@ -291,6 +292,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     capabilities: mergedCapabilities,
     isAttached: shouldAutoDetach,
     provider: args.provider ?? 'local',
+    region: args.region,
     tunnelHandle,
     trace: args.trace ?? false,
   };

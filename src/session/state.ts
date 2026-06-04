@@ -5,6 +5,7 @@ export interface SessionMetadata {
   capabilities: Record<string, unknown>;
   isAttached: boolean;
   provider?: 'local' | 'browserstack' | 'saucelabs';
+  region?: string;
   tunnelHandle?: unknown;
   trace?: boolean;
 }

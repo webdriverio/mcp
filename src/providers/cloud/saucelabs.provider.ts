@@ -8,8 +8,12 @@ import type { Browser as WdioBrowser } from 'webdriverio';
 export class SauceLabsProvider implements SessionProvider {
   name = 'saucelabs';
 
+  private resolveRegion(options: Record<string, unknown>): string {
+    return (options.region as string | undefined) ?? 'eu-central-1';
+  }
+
   getConnectionConfig(options: Record<string, unknown>): ConnectionConfig {
-    const region = (options.region as string | undefined) ?? 'eu-central-1';
+    const region = this.resolveRegion(options);
     return {
       protocol: 'https',
       hostname: `ondemand.${region}.saucelabs.com`,
@@ -22,11 +26,12 @@ export class SauceLabsProvider implements SessionProvider {
 
   buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
     const platform = options.platform as string;
+    const region = this.resolveRegion(options);
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
     const saucelabsLocal = (options.tunnel ?? options.saucelabsLocal) as boolean | string | undefined;
     const reporting = options.reporting as { project?: string; build?: string; session?: string } | undefined;
 
-    const sauceOptions: Record<string, unknown> = {};
+    const sauceOptions: Record<string, unknown> = { region };
 
     if (reporting?.build) sauceOptions.build = reporting.build;
     if (reporting?.session) sauceOptions.name = reporting.session;
@@ -100,13 +105,12 @@ export class SauceLabsProvider implements SessionProvider {
     return false;
   }
 
-  async startTunnel(_options: Record<string, unknown>): Promise<unknown> {
+  async startTunnel(options: Record<string, unknown>): Promise<unknown> {
+    const region = this.resolveRegion(options);
     const logFile = join(tmpdir(), 'sauce-connect.log');
     console.error(`[SauceLabs] Starting tunnel, log: ${logFile}`);
     try {
-      // sauce-connect-launcher reads SAUCE_API_HOST at import time.
-      // Set it before dynamic import so -x points to the EU endpoint.
-      process.env.SAUCE_API_HOST = 'api.eu-central-1.saucelabs.com';
+      process.env.SAUCE_API_HOST = `api.${region}.saucelabs.com`;
       const { default: sauceConnectLauncher } = await import('sauce-connect-launcher');
       const start = promisify(sauceConnectLauncher);
       const sc = await start({
@@ -131,16 +135,18 @@ export class SauceLabsProvider implements SessionProvider {
     result: SessionResult,
     _tunnelHandle?: unknown,
     _browser?: WdioBrowser,
+    region?: string,
   ): Promise<void> {
-    // Set job result via REST API — must happen BEFORE tunnel stop/deleteSession
+    const effectiveRegion = region ?? 'eu-central-1';
     const user = process.env.SAUCE_USERNAME;
     const key = process.env.SAUCE_ACCESS_KEY;
     if (user && key) {
       try {
         const auth = basicAuth(user, key);
         const body: Record<string, boolean> = { passed: result.status === 'passed' };
+        const apiUrl = `https://api.${effectiveRegion}.saucelabs.com/rest/v1/${user}/jobs/${sessionId}`;
         console.error(`[SauceLabs] Setting job status for ${sessionId}: ${result.status}`);
-        await fetch(`https://saucelabs.com/rest/v1/${user}/jobs/${sessionId}`, {
+        await fetch(apiUrl, {
           method: 'PUT',
           headers: {
             Authorization: `Basic ${auth}`,

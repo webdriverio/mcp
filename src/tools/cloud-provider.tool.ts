@@ -198,6 +198,7 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
     const fileBuffer = readFileSync(path);
     const fileBlob = new Blob([fileBuffer], { type: 'application/octet-stream' });
     form.append(config.uploadField, fileBlob, fileName);
+    if (customId) form.append('custom_id', customId);
 
     const res = await fetch(`${config.apiBase}${config.uploadPath}`, {
       method: 'POST',

@@ -203,9 +203,10 @@ export function generateCode(history: SessionHistory): string {
     const slSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
     const preamble = 'let browser;\nlet slStatus = \'passed\';\nlet slReason;';
     const catchBlock = '} catch (e) {\n  slStatus = \'failed\';\n  slReason = String(e);\n  throw e;';
+    const slRegion = (sauceOptions?.region as string) ?? 'eu-central-1';
     const statusUpdate = [
       "    const slAuth = Buffer.from(`${process.env.SAUCE_USERNAME}:${process.env.SAUCE_ACCESS_KEY}`).toString('base64');",
-      '    await fetch(`https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/jobs/` + browser.sessionId, {',
+      `    await fetch(\`https://api.${slRegion}.saucelabs.com/rest/v1/\${process.env.SAUCE_USERNAME}/jobs/\` + browser.sessionId, {`,
       "      method: 'PUT',",
       "      headers: { Authorization: 'Basic ' + slAuth, 'Content-Type': 'application/json' },",
       '      body: JSON.stringify({ passed: slStatus === \'passed\' })',

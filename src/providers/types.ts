@@ -23,5 +23,5 @@ export interface SessionProvider {
   shouldAutoDetach(options: Record<string, unknown>): boolean;
   startTunnel?(options: Record<string, unknown>): Promise<unknown>;
   stopTunnel?(tunnelHandle?: unknown): Promise<void>;
-  onSessionClose?(sessionId: string, sessionType: 'browser' | 'ios' | 'android', result: SessionResult, tunnelHandle?: unknown, browser?: WdioBrowser): Promise<void>;
+  onSessionClose?(sessionId: string, sessionType: 'browser' | 'ios' | 'android', result: SessionResult, tunnelHandle?: unknown, browser?: WdioBrowser, region?: string): Promise<void>;
 }

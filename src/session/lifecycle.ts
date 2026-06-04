@@ -84,7 +84,7 @@ export function registerSession(
         if (oldMetadata?.provider) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser).catch(() => {
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {
           });
         }
         await oldBrowser.deleteSession().catch(() => {
@@ -124,7 +124,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
     if (metadata?.provider) {
       try {
         const provider = getProvider(metadata.provider, metadata.type);
-        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser);
+        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
       } catch (e) {
         console.error('[WARN] Failed to run provider onSessionClose:', e);
       }

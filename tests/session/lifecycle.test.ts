@@ -81,7 +81,7 @@ describe('registerSession', () => {
     // Allow fire-and-forget to complete
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object));
+    expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object), undefined);
   });
 
   it('appends session_transition to previous session', () => {
@@ -170,7 +170,7 @@ describe('closeSession', () => {
 
     await closeSession('s1', false, false);
 
-    expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, browser);
+    expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, browser, undefined);
     expect(browser.deleteSession).toHaveBeenCalled();
   });
 
@@ -239,7 +239,7 @@ describe('closeSession', () => {
 
     await closeSession('s5', false, false);
 
-    expect(mockOnSessionClose).toHaveBeenCalledWith('s5', 'browser', { status: 'failed', reason: 'page not found' }, undefined, browser);
+    expect(mockOnSessionClose).toHaveBeenCalledWith('s5', 'browser', { status: 'failed', reason: 'page not found' }, undefined, browser, undefined);
   });
 });
 
