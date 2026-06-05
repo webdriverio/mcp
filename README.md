@@ -646,6 +646,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, or `
 | `wdio://session/current/app-state/{bundleId}` | Mobile app lifecycle state for a given bundle ID         |
 | `wdio://session/current/geolocation`          | Device geolocation                                       |
 | `wdio://session/current/capabilities`         | Resolved WebDriver capabilities for the active session   |
+| `wdio://session/current/logs`                 | Crash/console logs for the current session. Auto-detects session type — browser: console logs + JS exceptions; Android: logcat; iOS: crashlog + syslog |
 | `wdio://browserstack/local-binary`            | BrowserStack Local binary download URL and start command |
 | `wdio://saucelabs/local-binary`               | Sauce Connect binary download URL and start command      |
 | `wdio://testmu/local-binary`                  | TestMu Tunnel binary download URL and start command       |
@@ -996,6 +997,24 @@ Timeline (monotonic ms):
 
 The final screenshot at session close is stamped with the last action's `endTime`, so it renders under that action
 rather than appearing as an orphaned frame after the timeline ends.
+
+### Session Logs
+
+The `wdio://session/current/logs` resource returns crash reports, console errors, and system logs for the current
+session, auto-detecting the session type to fetch the right log buffer:
+
+| Session Type | Log Sources                          | Contents                                              |
+|-------------|--------------------------------------|-------------------------------------------------------|
+| Browser     | `getLogs('browser')`                | Console output + uncaught JS exceptions               |
+| Android     | `getLogs('logcat')`                 | System logs, crash dumps, fatal exceptions            |
+| iOS         | `getLogs('crashlog')` + `getLogs('syslog')` | Crash/panic reports + system diagnostics    |
+
+> **Note:** Reading this resource **clears the log buffer** (per the WebDriver spec). Subsequent reads return only entries
+> accumulated since the last read. Browser logs require Chromium (Chrome/Edge) — Firefox and Safari do not support the
+> `getLogs` command.
+
+The response is JSON with `sessionType`, `logTypes` (available log types), and `entries` — each entry includes `level`,
+`message`, `timestamp` (Unix ms), and `timestampISO`.
 
 ## Troubleshooting
 
