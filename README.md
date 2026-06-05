@@ -263,31 +263,30 @@ appium
 # Server runs at http://127.0.0.1:4723 by default
 ```
 
-## BrowserStack
+## Cloud Providers
 
-Run browser and mobile app tests on [BrowserStack](https://www.browserstack.com/) real devices and browsers without any
-local setup.
+Run browser and mobile app tests on cloud real devices and browsers without any local setup. Currently supports
+[BrowserStack](https://www.browserstack.com/), [Sauce Labs](https://saucelabs.com/), and
+[LambdaTest](https://www.lambdatest.com/).
 
 ### Prerequisites
 
-Set your credentials as environment variables:
+Set your provider credentials as environment variables or in your MCP client config:
+
+<details>
+<summary>BrowserStack</summary>
 
 ```bash
 export BROWSERSTACK_USERNAME=your_username
 export BROWSERSTACK_ACCESS_KEY=your_access_key
 ```
 
-Or add them to your MCP client config:
-
 ```json
 {
   "mcpServers": {
     "wdio-mcp": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@wdio/mcp@latest"
-      ],
+      "args": ["-y", "@wdio/mcp@latest"],
       "env": {
         "BROWSERSTACK_USERNAME": "your_username",
         "BROWSERSTACK_ACCESS_KEY": "your_access_key"
@@ -297,11 +296,72 @@ Or add them to your MCP client config:
 }
 ```
 
+</details>
+
+<details>
+<summary>Sauce Labs</summary>
+
+```bash
+export SAUCE_USERNAME=your_username
+export SAUCE_ACCESS_KEY=your_access_key
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "SAUCE_USERNAME": "your_username",
+        "SAUCE_ACCESS_KEY": "your_access_key"
+      }
+    }
+  }
+}
+```
+
+| `SAUCE_USERNAME` | Sauce Labs username (required) |
+| `SAUCE_ACCESS_KEY` | Sauce Labs access key (required) |
+
+The data center is set per-session via the `region` parameter in `start_session` (defaults to `eu-central-1`).
+
+</details>
+
+<details>
+<summary>LambdaTest (TestMu)</summary>
+
+```bash
+export TESTMU_USERNAME=your_username
+export TESTMU_ACCESS_KEY=your_access_key
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "TESTMU_USERNAME": "your_username",
+        "TESTMU_ACCESS_KEY": "your_access_key"
+      }
+    }
+  }
+}
+```
+
+| `TESTMU_USERNAME` | LambdaTest username (required) |
+| `TESTMU_ACCESS_KEY` | LambdaTest access key (required) |
+
+</details>
+
 ### Browser Sessions
 
 Run a browser on a specific OS/version combination:
 
 ```javascript
+// BrowserStack
 start_session({
     provider: 'browserstack',
     platform: 'browser',
@@ -315,56 +375,112 @@ start_session({
         session: 'Login flow'
     }
 })
+
+// Sauce Labs
+start_session({
+    provider: 'saucelabs',
+    platform: 'browser',
+    browser: 'chrome',
+    region: 'eu-central-1',      // default: eu-central-1
+    reporting: {
+        build: 'v1.2.0',
+        session: 'Login flow'
+    }
+})
+
+// LambdaTest
+start_session({
+    provider: 'testmu',
+    platform: 'browser',
+    browser: 'chrome',
+    os: 'Linux',                 // default: Linux
+    osVersion: '11',
+    reporting: {
+        project: 'My Project',
+        build: 'v1.2.0',
+        session: 'Login flow'
+    }
+})
 ```
 
 ### Mobile App Sessions
 
-Test on BrowserStack real devices. First upload your app (or use an existing `bs://` URL):
+Test on cloud real devices. First upload your app (or use an existing app URL):
 
 ```javascript
-// Upload a local .apk or .ipa (returns a bs:// URL)
-upload_app({path: '/path/to/app.apk'})
+// BrowserStack: returns bs:// URL
+upload_app({ provider: 'browserstack', path: '/path/to/app.apk' })
 
-// Start a session with the returned URL
+// Sauce Labs: returns storage:filename= reference
+upload_app({ provider: 'saucelabs', path: '/path/to/app.apk' })
+
+// LambdaTest: returns lt:// URL
+upload_app({ provider: 'testmu', path: '/path/to/app.apk' })
+
+// Start a session
 start_session({
     provider: 'browserstack',
-    platform: 'android',         // android | ios
-    app: 'bs://abc123...',       // bs:// URL or custom_id from upload
+    platform: 'android',
+    app: 'bs://abc123...',
     deviceName: 'Samsung Galaxy S23',
-    platformVersion: '13.0',
-    reporting: {
-        project: 'My Project',
-        build: 'v1.2.0',
-        session: 'Checkout flow'
-    }
+    platformVersion: '13.0'
+})
+
+// Sauce Labs native app
+start_session({
+    provider: 'saucelabs',
+    platform: 'android',
+    app: 'storage:filename=myapp.apk',
+    deviceName: 'Samsung.*',
+    platformVersion: '16'
+})
+
+// LambdaTest native app
+start_session({
+    provider: 'testmu',
+    platform: 'android',
+    app: 'lt://abc123...',
+    deviceName: 'Pixel 7',
+    platformVersion: '13'
 })
 ```
 
 Use `list_apps` to see previously uploaded apps:
 
 ```javascript
-list_apps()                               // own uploads, sorted by date
-list_apps({sortBy: 'app_name'})
-list_apps({organizationWide: true})     // all uploads in your org
+list_apps({ provider: 'browserstack' })
+list_apps({ provider: 'saucelabs', sortBy: 'app_name' })
+list_apps({ provider: 'testmu' })
+list_apps({ provider: 'browserstack', organizationWide: true })
 ```
 
-### BrowserStack Local
+### Local Tunnel
 
-To test against URLs that are only accessible on your local machine or internal network, enable the BrowserStack Local
-tunnel:
+To test against URLs that are only accessible on your local machine or internal network, enable a local tunnel:
 
 ```javascript
+// Auto-start tunnel (provider manages lifecycle)
 start_session({
-    provider: 'browserstack',
+    provider: 'saucelabs',
     platform: 'browser',
-    browser: 'chrome',
-    browserstackLocal: true      // starts tunnel automatically
+    tunnel: true                  // auto-starts tunnel before session
+})
+
+// Use an already-running tunnel
+start_session({
+    provider: 'saucelabs',
+    platform: 'browser',
+    tunnel: 'external'            // uses existing tunnel
 })
 ```
 
+The `tunnel` parameter replaces the deprecated `browserstackLocal`, `saucelabsLocal`, and `testmuLocal` params. Set it to `true` to auto-start the tunnel (stopped automatically after the session), or `'external'` to use a tunnel already running on your machine.
+
+> **Note**: Sauce Connect and TestMu Tunnel require their respective binaries. The `wdio://saucelabs/local-binary` and `wdio://testmu/local-binary` resources provide platform-specific download URLs and setup instructions.
+
 ### Reporting Labels
 
-All session types support `reporting` labels that appear in the BrowserStack Automate dashboard:
+All session types support `reporting` labels that appear in the provider dashboard:
 
 | Field               | Description                             |
 |---------------------|-----------------------------------------|
@@ -372,12 +488,14 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 | `reporting.build`   | Tag sessions with a build/version label |
 | `reporting.session` | Name for the individual test session    |
 
-### BrowserStack Tools
+### Cloud Provider Tools
 
-| Tool         | Description                                                            |
-|--------------|------------------------------------------------------------------------|
-| `upload_app` | Upload a local `.apk` or `.ipa` to BrowserStack; returns a `bs://` URL |
-| `list_apps`  | List apps previously uploaded to your BrowserStack account             |
+| Tool         | Description                                                                   |
+|--------------|-------------------------------------------------------------------------------|
+| `upload_app` | Upload a local `.apk` or `.ipa` to the provider; returns an app URL/reference |
+| `list_apps`  | List apps previously uploaded to the provider's app storage                   |
+
+Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, or `'testmu'`).
 
 ## Features
 
@@ -487,6 +605,8 @@ All session types support `reporting` labels that appear in the BrowserStack Aut
 | `wdio://session/current/geolocation`          | Device geolocation                                       |
 | `wdio://session/current/capabilities`         | Resolved WebDriver capabilities for the active session   |
 | `wdio://browserstack/local-binary`            | BrowserStack Local binary download URL and start command |
+| `wdio://saucelabs/local-binary`               | Sauce Connect binary download URL and start command      |
+| `wdio://testmu/local-binary`                  | TestMu Tunnel binary download URL and start command       |
 
 ## Usage Examples
 
@@ -794,8 +914,8 @@ MCP resources — no extra tool calls needed:
 - `wdio://session/{sessionId}/code` — generated JS for any past session by ID
 
 The generated script reconstructs the full session — including capabilities, navigation, clicks, and inputs — as a
-standalone `import { remote } from 'webdriverio'` file. For BrowserStack sessions it includes the full try/catch/finally
-with automatic session result marking.
+standalone `import { remote } from 'webdriverio'` file. For cloud provider sessions it includes the full try/catch/finally
+with automatic session result marking via the provider's REST API.
 
 ### Trace Recording
 

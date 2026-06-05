@@ -5,10 +5,13 @@ Context for Claude Code when working with this repository.
 ## Commands
 
 ```bash
-npm run bundle    # Build: clean + tsup + make executable + create .tgz
-npm test          # Run unit tests (vitest + happy-dom)
-npm run dev       # Development server (tsx, no build)
-npm start         # Run built server from lib/server.js
+npm run bundle      # Build: clean + tsup + make executable + create .tgz
+npm run lint        # ESLint + TypeScript type-checking (tsc --noEmit)
+npm test            # Run unit tests (vitest + happy-dom)
+npm run dev         # Development server (tsx --watch) — picks up code changes automatically; rebundle only needed for npm package changes
+npm run dev:http    # Dev server with HTTP transport (for browser-based MCP clients)
+npm start           # Run built server from lib/server.js
+npm run start:http  # Built server with HTTP transport (for browser-based MCP clients)
 ```
 
 ## Architecture
@@ -22,7 +25,10 @@ src/
 │   ├── local-browser.provider.ts  # Chrome/Firefox/Edge/Safari
 │   ├── local-appium.provider.ts   # iOS/Android via Appium
 │   └── cloud/
-│       └── browserstack.provider.ts  # BrowserStack (browser + App Automate)
+│       ├── browserstack.provider.ts  # BrowserStack (browser + App Automate)
+│       ├── saucelabs.provider.ts     # Sauce Labs (browser + App Storage)
+│       └── testmu.provider.ts        # TestMu / LambdaTest (browser + mobile)
+├── trace/             # Playwright-compatible trace recording (recorder.ts, tool-mapping.ts, zip-writer.ts)
 ├── tools/             # One file per MCP tool (see Tool Pattern below)
 ├── resources/         # One file per MCP resource (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
@@ -45,7 +51,7 @@ export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   capabilities: Record<string, unknown>;
   isAttached: boolean;
-  provider?: 'local' | 'browserstack';   // set at session start; used by lifecycle to call provider hooks
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu';   // set at session start; used by lifecycle to call provider hooks
   tunnelHandle?: unknown;                 // opaque handle returned by provider.startTunnel(), passed back to onSessionClose()
 }
 ```
@@ -139,6 +145,10 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 ## Gotchas
 
+### Dev Reload vs Reconnect
+
+`npm run dev` runs `tsx --watch` — code changes reload in-process. Only tool/resource **schema changes** (Zod definitions, new tools, parameter additions) require an MCP client reconnect to re-advertise capabilities. No need to rebundle or restart the dev server for implementation-only changes.
+
 ### Console Output
 
 All console methods redirect to stderr via `console.error`. Chrome writes to stdout which corrupts MCP stdio protocol.
@@ -207,11 +217,17 @@ catch (e) {
 |----------|-------------|
 | `BROWSERSTACK_USERNAME` | BrowserStack sessions + tools |
 | `BROWSERSTACK_ACCESS_KEY` | BrowserStack sessions + tools |
+| `SAUCE_USERNAME` | Sauce Labs sessions + App Storage tools |
+| `SAUCE_ACCESS_KEY` | Sauce Labs sessions + App Storage tools |
+| `TESTMU_USERNAME` | TestMu / LambdaTest sessions + tools |
+| `TESTMU_ACCESS_KEY` | TestMu / LambdaTest sessions + tools |
 
 ## Planned Improvements
 
 See `docs/architecture/` for proposals:
 
-- `session-configuration-proposal.md` — Cloud provider pattern (SauceLabs etc.) — BrowserStack already implemented; `providers/registry.ts` + `providers/cloud/` is the extension point
+- `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, and TestMu implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination
 - `interaction-sequencing-proposal.md` — Sequencing model for tool interactions
+- `trace-recording-and-replay.md` — Playwright-compatible trace recording (implemented in `src/trace/`)
+- `trace-extraction-proposal.md` — Trace data extraction and analysis
