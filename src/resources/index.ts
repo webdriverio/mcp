@@ -1,3 +1,4 @@
+export * from './session-logs.resource';
 export * from './browserstack-local.resource';
 export * from './saucelabs-local.resource';
 export * from './testmu-local.resource';

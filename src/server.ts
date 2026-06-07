@@ -46,6 +46,7 @@ import {
   accessibilityResource,
   appStateResource,
   browserstackLocalBinaryResource,
+  sessionLogsResource,
   saucelabsLocalBinaryResource,
   testmuLocalBinaryResource,
   capabilitiesResource,
@@ -172,6 +173,7 @@ function createServer(): McpServer {
   registerResource(sessionStepsResource);
   registerResource(sessionCodeResource);
 
+  registerResource(sessionLogsResource);
   registerResource(browserstackLocalBinaryResource);
   registerResource(saucelabsLocalBinaryResource);
   registerResource(testmuLocalBinaryResource);
