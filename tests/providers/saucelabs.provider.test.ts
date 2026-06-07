@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { Browser } from 'webdriverio';
-import { TestMuProvider } from '../../src/providers/cloud/testmu.provider';
+import { SauceLabsProvider } from '../../src/providers/cloud/saucelabs.provider';
 
-describe('TestMuProvider', () => {
-  let provider: TestMuProvider;
+describe('SauceLabsProvider', () => {
+  let provider: SauceLabsProvider;
 
   beforeEach(() => {
-    provider = new TestMuProvider();
-    vi.stubEnv('TESTMU_USERNAME', 'testuser');
-    vi.stubEnv('TESTMU_ACCESS_KEY', 'testkey');
+    provider = new SauceLabsProvider();
+    vi.stubEnv('SAUCE_USERNAME', 'testuser');
+    vi.stubEnv('SAUCE_ACCESS_KEY', 'testkey');
   });
 
   afterEach(() => {
@@ -17,22 +16,22 @@ describe('TestMuProvider', () => {
   });
 
   describe('getConnectionConfig', () => {
-    it('returns hub.lambdatest.com for browser platform', () => {
+    it('returns region-specific hostname for browser platform', () => {
       const config = provider.getConnectionConfig({ platform: 'browser' });
-      expect(config.hostname).toBe('hub.lambdatest.com');
+      expect(config.hostname).toBe('ondemand.eu-central-1.saucelabs.com');
       expect(config.protocol).toBe('https');
       expect(config.port).toBe(443);
       expect(config.path).toBe('/wd/hub');
     });
 
-    it('returns mobile-hub.lambdatest.com for android platform', () => {
-      const config = provider.getConnectionConfig({ platform: 'android' });
-      expect(config.hostname).toBe('mobile-hub.lambdatest.com');
+    it('uses specified region in hostname', () => {
+      const config = provider.getConnectionConfig({ platform: 'browser', region: 'us-west-1' });
+      expect(config.hostname).toBe('ondemand.us-west-1.saucelabs.com');
     });
 
-    it('returns mobile-hub.lambdatest.com for ios platform', () => {
-      const config = provider.getConnectionConfig({ platform: 'ios' });
-      expect(config.hostname).toBe('mobile-hub.lambdatest.com');
+    it('returns same hostname pattern for mobile platforms', () => {
+      const config = provider.getConnectionConfig({ platform: 'android' });
+      expect(config.hostname).toBe('ondemand.eu-central-1.saucelabs.com');
     });
 
     it('reads credentials from environment variables', () => {
@@ -43,10 +42,10 @@ describe('TestMuProvider', () => {
   });
 
   describe('buildCapabilities — browser platform', () => {
-    it('sets browserName and lt:options for browser platform', () => {
+    it('sets browserName and sauce:options for browser platform', () => {
       const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome' });
       expect(caps.browserName).toBe('chrome');
-      expect(caps['lt:options']).toBeDefined();
+      expect(caps['sauce:options']).toBeDefined();
     });
 
     it('defaults browserVersion to latest', () => {
@@ -64,9 +63,9 @@ describe('TestMuProvider', () => {
       expect(caps.platformName).toBe('Windows 11');
     });
 
-    it('combines os and osVersion for macOS release name', () => {
-      const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome', os: 'macOS', osVersion: 'Monterey' });
-      expect(caps.platformName).toBe('macOS Monterey');
+    it('combines os and osVersion for Mac numbered name', () => {
+      const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome', os: 'Mac', osVersion: '15' });
+      expect(caps.platformName).toBe('Mac 15');
     });
 
     it('uses os alone as platformName when osVersion is not provided', () => {
@@ -74,16 +73,20 @@ describe('TestMuProvider', () => {
       expect(caps.platformName).toBe('Linux');
     });
 
-    it('passes reporting labels to lt:options', () => {
+    it('uses os alone as platformName for ChromiumOS', () => {
+      const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome', os: 'ChromiumOS' });
+      expect(caps.platformName).toBe('ChromiumOS');
+    });
+
+    it('passes reporting labels to sauce:options', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',
         browser: 'firefox',
         reporting: { project: 'MyProject', build: 'build-1', session: 'login test' },
       });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.project).toBe('MyProject');
-      expect(lt.build).toBe('build-1');
-      expect(lt.name).toBe('login test');
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.build).toBe('build-1');
+      expect(sauce.name).toBe('login test');
     });
 
     it('uses project as name when session is not provided', () => {
@@ -92,26 +95,36 @@ describe('TestMuProvider', () => {
         browser: 'chrome',
         reporting: { project: 'MyProject' },
       });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.name).toBe('MyProject');
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.name).toBe('MyProject');
     });
 
-    it('sets w3c: true in lt:options', () => {
+    it('includes region in sauce:options', () => {
       const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome' });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.w3c).toBe(true);
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.region).toBeDefined();
     });
 
-    it('sets tunnel: true when tunnel is enabled', () => {
+    it('sets tunnelName in sauce:options when tunnel is enabled', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',
         browser: 'chrome',
         tunnel: true,
         tunnelName: 'my-tunnel',
       });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.tunnel).toBe(true);
-      expect(lt.tunnelName).toBe('my-tunnel');
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.tunnelName).toBe('my-tunnel');
+    });
+
+    it('supports legacy saucelabsLocal alias', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'browser',
+        browser: 'chrome',
+        saucelabsLocal: true,
+        tunnelName: 'legacy-tunnel',
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.tunnelName).toBe('legacy-tunnel');
     });
 
     it('merges user capabilities at top level', () => {
@@ -129,7 +142,7 @@ describe('TestMuProvider', () => {
         browser: 'chrome',
         os: 'Windows',
         osVersion: '11',
-        capabilities: { platformName: 'macOS Monterey' },
+        capabilities: { platformName: 'Mac 15' },
       });
       expect(caps.platformName).toBe('Windows 11');
     });
@@ -141,39 +154,38 @@ describe('TestMuProvider', () => {
         platform: 'android',
         deviceName: 'Pixel 7',
         platformVersion: '13',
-        app: 'lt://abc123',
+        app: 'storage:filename=myapp.apk',
       });
       expect(caps.platformName).toBe('android');
-      expect(caps['appium:app']).toBe('lt://abc123');
+      expect(caps['appium:app']).toBe('storage:filename=myapp.apk');
     });
 
-    it('sets isRealMobile: true for native app mode', () => {
+    it('sets appiumVersion to latest for native app mode', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
-        app: 'lt://abc',
+        app: 'storage:filename=app.apk',
       });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.isRealMobile).toBe(true);
-      expect(lt.appiumVersion).toBe('latest');
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.appiumVersion).toBe('latest');
     });
 
-    it('sets isRealMobile: false for mobile browser mode', () => {
+    it('sets appiumVersion to 2.11.0 for mobile browser mode', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
         platformVersion: '13',
         browser: 'chrome',
       });
-      const lt = caps['lt:options'] as Record<string, unknown>;
-      expect(lt.isRealMobile).toBe(false);
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.appiumVersion).toBe('2.11.0');
     });
 
     it('defaults autoGrantPermissions and autoAcceptAlerts to true', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
-        app: 'lt://abc',
+        app: 'storage:filename=app.apk',
       });
       expect(caps['appium:autoGrantPermissions']).toBe(true);
       expect(caps['appium:autoAcceptAlerts']).toBe(true);
@@ -183,7 +195,7 @@ describe('TestMuProvider', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
-        app: 'lt://abc',
+        app: 'storage:filename=app.apk',
         autoDismissAlerts: true,
       });
       expect(caps['appium:autoDismissAlerts']).toBe(true);
@@ -194,7 +206,7 @@ describe('TestMuProvider', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
-        app: 'lt://abc',
+        app: 'storage:filename=app.apk',
       });
       expect(caps['appium:newCommandTimeout']).toBe(300);
     });
@@ -203,7 +215,7 @@ describe('TestMuProvider', () => {
       const caps = provider.buildCapabilities({
         platform: 'ios',
         deviceName: 'iPhone 15',
-        app: 'lt://xyz',
+        app: 'storage:filename=app.ipa',
       });
       expect(caps['appium:automationName']).toBe('XCUITest');
     });
@@ -212,7 +224,7 @@ describe('TestMuProvider', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
-        app: 'lt://abc',
+        app: 'storage:filename=app.apk',
       });
       expect(caps['appium:automationName']).toBe('UiAutomator2');
     });
@@ -239,39 +251,36 @@ describe('TestMuProvider', () => {
   });
 
   describe('onSessionClose', () => {
-    it('sends REST PATCH for browser sessions', async () => {
+    it('sends REST PUT for browser sessions', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
 
       await provider.onSessionClose('session-123', 'browser', { status: 'passed' });
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        'https://api.lambdatest.com/automation/api/v1/sessions/session-123',
+        expect.stringContaining('/rest/v1/testuser/jobs/session-123'),
         expect.objectContaining({
-          method: 'PATCH',
+          method: 'PUT',
           headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ status_ind: 'passed' }),
+          body: JSON.stringify({ passed: true }),
         }),
       );
     });
 
-    it('uses browser.execute for mobile sessions', async () => {
-      const executeSpy = vi.fn().mockResolvedValue(undefined);
-      const mockBrowser = { execute: executeSpy } as unknown as Browser;
+    it('sends REST PUT for mobile sessions', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
 
-      await provider.onSessionClose('session-456', 'android', { status: 'failed' }, undefined, mockBrowser);
+      await provider.onSessionClose('session-456', 'android', { status: 'failed' });
 
-      expect(executeSpy).toHaveBeenCalledWith('lambda-status=failed');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/rest/v1/testuser/jobs/session-456'),
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ passed: false }),
+        }),
+      );
     });
 
-    it('does not throw when browser.execute fails for mobile', async () => {
-      const mockBrowser = { execute: vi.fn().mockRejectedValue(new Error('session gone')) } as unknown as Browser;
-
-      await expect(
-        provider.onSessionClose('session-789', 'ios', { status: 'passed' }, undefined, mockBrowser),
-      ).resolves.toBeUndefined();
-    });
-
-    it('does not throw when REST PATCH fails for browser', async () => {
+    it('does not throw when REST PUT fails', async () => {
       vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
 
       await expect(
@@ -280,8 +289,8 @@ describe('TestMuProvider', () => {
     });
 
     it('skips API call when credentials are missing', async () => {
-      vi.stubEnv('TESTMU_USERNAME', '');
-      vi.stubEnv('TESTMU_ACCESS_KEY', '');
+      vi.stubEnv('SAUCE_USERNAME', '');
+      vi.stubEnv('SAUCE_ACCESS_KEY', '');
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
 
       await provider.onSessionClose('session-123', 'browser', { status: 'passed' });

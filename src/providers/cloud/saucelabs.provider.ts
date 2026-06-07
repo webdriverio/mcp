@@ -46,11 +46,11 @@ export class SauceLabsProvider implements SessionProvider {
 
     if (platform === 'browser') {
       return {
+        ...userCapabilities,
         browserName: (options.browser as string | undefined) ?? 'chrome',
         browserVersion: (options.browserVersion as string | undefined) ?? 'latest',
-        platformName: (options.os as string | undefined) ?? 'Linux',
+        platformName: options.os ? [options.os as string, options.osVersion as string | undefined].filter(Boolean).join(' ') : 'Linux',
         'sauce:options': sauceOptions,
-        ...userCapabilities,
       };
     }
 
@@ -71,7 +71,7 @@ export class SauceLabsProvider implements SessionProvider {
         'appium:newCommandTimeout': (options.newCommandTimeout as number | undefined) ?? 300,
         'sauce:options': sauceOptions,
       };
-      return { ...caps, ...userCapabilities };
+      return { ...userCapabilities, ...caps };
     }
 
     // Mobile native app mode
@@ -81,6 +81,7 @@ export class SauceLabsProvider implements SessionProvider {
     const autoDismissAlerts = options.autoDismissAlerts as boolean | undefined;
 
     return {
+      ...userCapabilities,
       platformName: platform,
       'appium:app': options.app,
       'appium:deviceName': options.deviceName,
@@ -91,7 +92,6 @@ export class SauceLabsProvider implements SessionProvider {
       'appium:autoDismissAlerts': autoDismissAlerts,
       'appium:newCommandTimeout': (options.newCommandTimeout as number | undefined) ?? 300,
       'sauce:options': sauceOptions,
-      ...userCapabilities,
     };
   }
 

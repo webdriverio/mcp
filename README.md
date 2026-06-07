@@ -381,6 +381,8 @@ start_session({
     provider: 'saucelabs',
     platform: 'browser',
     browser: 'chrome',
+    os: 'Windows',               // combined with osVersion → platformName
+    osVersion: '11',             // e.g. "11", "Sequoia" (optional)
     region: 'eu-central-1',      // default: eu-central-1
     reporting: {
         build: 'v1.2.0',
@@ -393,8 +395,8 @@ start_session({
     provider: 'testmu',
     platform: 'browser',
     browser: 'chrome',
-    os: 'Linux',                 // default: Linux
-    osVersion: '11',
+    os: 'Windows',               // combined with osVersion → platformName
+    osVersion: '11',             // e.g. "11", "Sequoia" (optional)
     reporting: {
         project: 'My Project',
         build: 'v1.2.0',
@@ -402,6 +404,10 @@ start_session({
     }
 })
 ```
+
+> **Provider-specific `os` / `osVersion` behavior:**
+> - **BrowserStack** — `os` and `osVersion` map to separate `bstack:options.os` / `bstack:options.osVersion` fields.
+> - **Sauce Labs / LambdaTest** — `os` and `osVersion` are combined into the W3C `platformName` capability (e.g., `os: 'Windows'` + `osVersion: '11'` → `platformName: 'Windows 11'`). Both providers use `platformName` values like `"Windows 11"`, `"MacOS Sequoia"`, or `"Linux"`.
 
 ### Mobile App Sessions
 

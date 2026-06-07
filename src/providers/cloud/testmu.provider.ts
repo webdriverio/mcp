@@ -41,11 +41,11 @@ export class TestMuProvider implements SessionProvider {
 
     if (platform === 'browser') {
       return {
+        ...userCapabilities,
         browserName: (options.browser as string | undefined) ?? 'chrome',
         browserVersion: (options.browserVersion as string | undefined) ?? 'latest',
-        platformName: (options.os as string | undefined) ?? 'Linux',
+        platformName: options.os ? [options.os as string, options.osVersion as string | undefined].filter(Boolean).join(' ') : 'Linux',
         'lt:options': ltOptions,
-        ...userCapabilities,
       };
     }
 
@@ -66,7 +66,7 @@ export class TestMuProvider implements SessionProvider {
         'appium:newCommandTimeout': (options.newCommandTimeout as number | undefined) ?? 300,
         'lt:options': ltOptions,
       };
-      return { ...caps, ...userCapabilities };
+      return { ...userCapabilities, ...caps };
     }
 
     // Mobile native app mode
@@ -89,7 +89,7 @@ export class TestMuProvider implements SessionProvider {
       'lt:options': ltOptions,
     };
 
-    return { ...caps, ...userCapabilities };
+    return { ...userCapabilities, ...caps };
   }
 
   getSessionType(options: Record<string, unknown>): 'browser' | 'ios' | 'android' {

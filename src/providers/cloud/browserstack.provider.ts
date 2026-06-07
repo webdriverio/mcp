@@ -42,9 +42,9 @@ export class BrowserStackProvider implements SessionProvider {
       if (reporting?.session) bstackOptions.sessionName = reporting.session;
 
       return {
+        ...userCapabilities,
         browserName: (options.browser as string | undefined) ?? 'chrome',
         'bstack:options': bstackOptions,
-        ...userCapabilities,
       };
     }
 
@@ -66,6 +66,7 @@ export class BrowserStackProvider implements SessionProvider {
     const autoDismissAlerts = options.autoDismissAlerts as boolean | undefined;
 
     return {
+      ...userCapabilities,
       platformName: platform,
       'appium:app': options.app,
       'appium:autoGrantPermissions': (options.autoGrantPermissions as boolean | undefined) ?? true,
@@ -73,7 +74,6 @@ export class BrowserStackProvider implements SessionProvider {
       'appium:autoDismissAlerts': autoDismissAlerts,
       'appium:newCommandTimeout': (options.newCommandTimeout as number | undefined) ?? 300,
       'bstack:options': bstackOptions,
-      ...userCapabilities,
     };
   }
 
