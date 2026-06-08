@@ -108,8 +108,8 @@ export class TestingBotProvider implements SessionProvider {
       console.error(`[TestingBot] Tunnel started: "${tunnelName}"`);
       return tunnel;
     } catch (e: unknown) {
-      const msg = (e !== null && typeof e === 'object' ? (e as { message?: string }).message : undefined) ?? String(e);
-      if (msg.includes('already running') || msg.includes('another tunnel') || msg.includes('already in use')) {
+      const msg = ((e !== null && typeof e === 'object' ? (e as { message?: string }).message : undefined) ?? String(e)).toLowerCase();
+      if (msg.includes('already running') || msg.includes('another tunnel') || msg.includes('already in use') || msg.includes('already active')) {
         console.error('[TestingBot] Tunnel already running — reusing existing tunnel');
         return null;
       }
