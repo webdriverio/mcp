@@ -158,8 +158,12 @@ export class TestingBotProvider implements SessionProvider {
 
   async stopTunnel(tunnelHandle?: unknown): Promise<void> {
     if (!tunnelHandle) return;
-    const tunnel = tunnelHandle as { close?: (cb: () => void) => void };
-    await (typeof tunnel.close === 'function' ? new Promise<void>((resolve) => tunnel.close(() => resolve())) : testingbotTunnel.killAsync());
+    const close = (tunnelHandle as { close?: (cb: () => void) => void }).close;
+    if (typeof close !== 'function') {
+      console.error('[TestingBot] Tunnel handle has no close() method — skipping stop');
+      return;
+    }
+    await new Promise<void>((resolve) => close(() => resolve()));
   }
 }
 
