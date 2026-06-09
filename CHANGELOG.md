@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.7.0](https://github.com/webdriverio/mcp/compare/v3.6.0...v3.7.0) (2026-06-09)
+
+### Features
+
+* **logs:** Introduce new resource `wdio://session/current/logs` that returns crash and browser logs ([6a1e166](https://github.com/webdriverio/mcp/commit/6a1e166d1844bb0c472243908de80d4c4d94c0fe))
+* **providers:** add TestingBot cloud provider ([c07886c](https://github.com/webdriverio/mcp/commit/c07886cdf8afae06bae86eaca0fcd9ab2eb33264))
+
+### Bug Fixes
+
+* **testingbot:** avoid "undefined" app ref when app_url is missing from list response ([df3c7c6](https://github.com/webdriverio/mcp/commit/df3c7c62c6192ffa30de2eade505034c1ad82ce8))
+* **testingbot:** make tunnel-already-running detection case-insensitive ([dd11ec4](https://github.com/webdriverio/mcp/commit/dd11ec47ec34492dcd709d33bf860b354beb97bc))
+* **testingbot:** scope stopTunnel to the session's handle, drop global killAsync fallback ([4358942](https://github.com/webdriverio/mcp/commit/435894264ff567f3d9a158924a6fa2e5dfd49dae))
+
 ## [3.6.0](https://github.com/webdriverio/mcp/compare/v3.5.1...v3.6.0) (2026-06-07)
 
 ### Features
