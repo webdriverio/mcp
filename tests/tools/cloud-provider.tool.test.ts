@@ -383,3 +383,88 @@ describe('upload_app tool (Sauce Labs)', () => {
     expect(result.content[0].text).toContain('SAUCE_USERNAME');
   });
 });
+
+// ─── TestingBot tests ─────────────────────────────────────────────────────────
+
+describe('list_apps tool (TestingBot)', () => {
+  beforeEach(() => {
+    vi.stubEnv('TESTINGBOT_KEY', 'tb-key');
+    vi.stubEnv('TESTINGBOT_SECRET', 'tb-secret');
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('calls the /v1/storage endpoint once with Basic auth', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ app_url: 'tb://abc123', filename: 'MyApp.apk', created_at: '2026-03-01T10:00:00.000Z' }] }),
+    } as Response);
+
+    await callList({ provider: 'testingbot' });
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls).toHaveLength(1);
+    const [url, options] = calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.testingbot.com/v1/storage');
+    expect((options?.headers as Record<string, string>)?.Authorization).toMatch(/^Basic /);
+  });
+
+  it('returns formatted app list with tb:// format', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ app_url: 'tb://abc123', filename: 'MyApp.apk', created_at: '2026-03-01T10:00:00.000Z' }] }),
+    } as Response);
+
+    const result = await callList({ provider: 'testingbot' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('MyApp.apk');
+    expect(result.content[0].text).toContain('tb://abc123');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callList({ provider: 'testingbot' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('TESTINGBOT_KEY');
+  });
+});
+
+describe('upload_app tool (TestingBot)', () => {
+  beforeEach(() => {
+    vi.stubEnv('TESTINGBOT_KEY', 'tb-key');
+    vi.stubEnv('TESTINGBOT_SECRET', 'tb-secret');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(Buffer.from('mock-file-content'));
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('calls /v1/storage and returns a tb:// url', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ app_url: 'tb://newapp456' }),
+    } as Response);
+
+    const result = await callUpload({ provider: 'testingbot', path: '/local/myapp.apk' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('tb://newapp456');
+
+    const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.testingbot.com/v1/storage');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callUpload({ provider: 'testingbot', path: '/some/app.apk' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('TESTINGBOT_KEY');
+  });
+});

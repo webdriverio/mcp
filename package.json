@@ -60,6 +60,7 @@
     "puppeteer-core": "^24.40.0",
     "saucelabs": "^9.0.2",
     "sharp": "^0.34.5",
+    "testingbot-tunnel-launcher": "^1.1.18",
     "webdriverio": "^9.27.0",
     "xpath": "^0.0.34",
     "yazl": "^3.3.1",

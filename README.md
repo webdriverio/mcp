@@ -266,8 +266,8 @@ appium
 ## Cloud Providers
 
 Run browser and mobile app tests on cloud real devices and browsers without any local setup. Currently supports
-[BrowserStack](https://www.browserstack.com/), [Sauce Labs](https://saucelabs.com/), and
-[LambdaTest](https://www.lambdatest.com/).
+[BrowserStack](https://www.browserstack.com/), [Sauce Labs](https://saucelabs.com/),
+[LambdaTest](https://www.lambdatest.com/), and [TestingBot](https://testingbot.com/).
 
 ### Prerequisites
 
@@ -356,6 +356,34 @@ export TESTMU_ACCESS_KEY=your_access_key
 
 </details>
 
+<details>
+<summary>TestingBot</summary>
+
+```bash
+export TESTINGBOT_KEY=your_key
+export TESTINGBOT_SECRET=your_secret
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "TESTINGBOT_KEY": "your_key",
+        "TESTINGBOT_SECRET": "your_secret"
+      }
+    }
+  }
+}
+```
+
+| `TESTINGBOT_KEY` | TestingBot key (required) |
+| `TESTINGBOT_SECRET` | TestingBot secret (required) |
+
+</details>
+
 ### Browser Sessions
 
 Run a browser on a specific OS/version combination:
@@ -403,11 +431,24 @@ start_session({
         session: 'Login flow'
     }
 })
+
+// TestingBot
+start_session({
+    provider: 'testingbot',
+    platform: 'browser',
+    browser: 'chrome',
+    os: 'Windows',               // combined with osVersion → platformName (default: Windows 11)
+    osVersion: '11',
+    reporting: {
+        build: 'v1.2.0',
+        session: 'Login flow'
+    }
+})
 ```
 
 > **Provider-specific `os` / `osVersion` behavior:**
 > - **BrowserStack** — `os` and `osVersion` map to separate `bstack:options.os` / `bstack:options.osVersion` fields.
-> - **Sauce Labs / LambdaTest** — `os` and `osVersion` are combined into the W3C `platformName` capability (e.g., `os: 'Windows'` + `osVersion: '11'` → `platformName: 'Windows 11'`). Both providers use `platformName` values like `"Windows 11"`, `"MacOS Sequoia"`, or `"Linux"`.
+> - **Sauce Labs / LambdaTest / TestingBot** — `os` and `osVersion` are combined into the W3C `platformName` capability (e.g., `os: 'Windows'` + `osVersion: '11'` → `platformName: 'Windows 11'`). These providers use `platformName` values like `"Windows 11"`, `"MacOS Sequoia"`, or `"Linux"`. TestingBot defaults to `Windows 11` when `os` is omitted.
 
 ### Mobile App Sessions
 
@@ -422,6 +463,9 @@ upload_app({ provider: 'saucelabs', path: '/path/to/app.apk' })
 
 // LambdaTest: returns lt:// URL
 upload_app({ provider: 'testmu', path: '/path/to/app.apk' })
+
+// TestingBot: returns tb:// URL
+upload_app({ provider: 'testingbot', path: '/path/to/app.apk' })
 
 // Start a session
 start_session({
@@ -446,6 +490,15 @@ start_session({
     provider: 'testmu',
     platform: 'android',
     app: 'lt://abc123...',
+    deviceName: 'Pixel 7',
+    platformVersion: '13'
+})
+
+// TestingBot native app
+start_session({
+    provider: 'testingbot',
+    platform: 'android',
+    app: 'tb://abc123...',
     deviceName: 'Pixel 7',
     platformVersion: '13'
 })
@@ -483,6 +536,15 @@ start_session({
     deviceName: 'Pixel 7',
     platformVersion: '13'
 })
+
+// TestingBot — Chrome on Android emulator
+start_session({
+    provider: 'testingbot',
+    platform: 'android',
+    browser: 'chrome',
+    deviceName: 'Pixel 7',
+    platformVersion: '13'
+})
 ```
 
 > **Note:** Mobile browser sessions do not require `app`, `appPath`, or `noReset`. The provider launches a browser on the emulator directly.
@@ -493,6 +555,7 @@ Use `list_apps` to see previously uploaded apps:
 list_apps({ provider: 'browserstack' })
 list_apps({ provider: 'saucelabs', sortBy: 'app_name' })
 list_apps({ provider: 'testmu' })
+list_apps({ provider: 'testingbot' })
 list_apps({ provider: 'browserstack', organizationWide: true })
 ```
 
@@ -518,7 +581,7 @@ start_session({
 
 The `tunnel` parameter replaces the deprecated `browserstackLocal`, `saucelabsLocal`, and `testmuLocal` params. Set it to `true` to auto-start the tunnel (stopped automatically after the session), or `'external'` to use a tunnel already running on your machine.
 
-> **Note**: Sauce Connect and TestMu Tunnel require their respective binaries. The `wdio://saucelabs/local-binary` and `wdio://testmu/local-binary` resources provide platform-specific download URLs and setup instructions.
+> **Note**: With `tunnel: true` the provider downloads and manages the tunnel binary for you. For `tunnel: 'external'` you run it yourself — the `wdio://saucelabs/local-binary`, `wdio://testmu/local-binary`, and `wdio://testingbot/local-binary` resources provide download URLs and setup instructions. The TestingBot Tunnel is a single cross-platform Java JAR (requires Java 11+) rather than a per-platform binary.
 
 ### Reporting Labels
 
@@ -537,7 +600,7 @@ All session types support `reporting` labels that appear in the provider dashboa
 | `upload_app` | Upload a local `.apk` or `.ipa` to the provider; returns an app URL/reference |
 | `list_apps`  | List apps previously uploaded to the provider's app storage                   |
 
-Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, or `'testmu'`).
+Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'testmu'`, or `'testingbot'`).
 
 ## Features
 
@@ -650,6 +713,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, or `
 | `wdio://browserstack/local-binary`            | BrowserStack Local binary download URL and start command |
 | `wdio://saucelabs/local-binary`               | Sauce Connect binary download URL and start command      |
 | `wdio://testmu/local-binary`                  | TestMu Tunnel binary download URL and start command       |
+| `wdio://testingbot/local-binary`              | TestingBot Tunnel JAR download URL and start command (Java 11+) |
 
 ## Usage Examples
 

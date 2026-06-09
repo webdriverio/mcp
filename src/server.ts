@@ -49,6 +49,7 @@ import {
   sessionLogsResource,
   saucelabsLocalBinaryResource,
   testmuLocalBinaryResource,
+  testingbotLocalBinaryResource,
   capabilitiesResource,
   contextResource,
   contextsResource,
@@ -177,6 +178,7 @@ function createServer(): McpServer {
   registerResource(browserstackLocalBinaryResource);
   registerResource(saucelabsLocalBinaryResource);
   registerResource(testmuLocalBinaryResource);
+  registerResource(testingbotLocalBinaryResource);
   registerResource(capabilitiesResource);
   registerResource(elementsResource);
   registerResource(accessibilityResource);

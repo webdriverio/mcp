@@ -2,6 +2,7 @@ export * from './session-logs.resource';
 export * from './browserstack-local.resource';
 export * from './saucelabs-local.resource';
 export * from './testmu-local.resource';
+export * from './testingbot-local.resource';
 export * from './sessions.resource';
 export * from './capabilities.resource';
 export * from './elements.resource';

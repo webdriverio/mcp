@@ -4,11 +4,13 @@ import { localAppiumProvider } from './local-appium.provider';
 import { browserStackProvider } from './cloud/browserstack.provider';
 import { sauceLabsProvider } from './cloud/saucelabs.provider';
 import { testMuProvider } from './cloud/testmu.provider';
+import { testingBotProvider } from './cloud/testingbot.provider';
 
 const providers = new Map<string, SessionProvider>([
   ['browserstack', browserStackProvider],
   ['saucelabs', sauceLabsProvider],
   ['testmu', testMuProvider],
+  ['testingbot', testingBotProvider],
 ]);
 
 function getDefaultProvider(platform: string): SessionProvider {

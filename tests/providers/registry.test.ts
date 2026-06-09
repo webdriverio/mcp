@@ -4,6 +4,7 @@ import { LocalBrowserProvider } from '../../src/providers/local-browser.provider
 import { LocalAppiumProvider } from '../../src/providers/local-appium.provider';
 import { BrowserStackProvider } from '../../src/providers/cloud/browserstack.provider';
 import { TestMuProvider } from '../../src/providers/cloud/testmu.provider';
+import { TestingBotProvider } from '../../src/providers/cloud/testingbot.provider';
 
 describe('getProvider', () => {
   it('returns LocalBrowserProvider for local browser', () => {
@@ -40,6 +41,18 @@ describe('getProvider', () => {
 
   it('returns TestMuProvider for testmu ios', () => {
     expect(getProvider('testmu', 'ios')).toBeInstanceOf(TestMuProvider);
+  });
+
+  it('returns TestingBotProvider for testingbot browser', () => {
+    expect(getProvider('testingbot', 'browser')).toBeInstanceOf(TestingBotProvider);
+  });
+
+  it('returns TestingBotProvider for testingbot android', () => {
+    expect(getProvider('testingbot', 'android')).toBeInstanceOf(TestingBotProvider);
+  });
+
+  it('returns TestingBotProvider for testingbot ios', () => {
+    expect(getProvider('testingbot', 'ios')).toBeInstanceOf(TestingBotProvider);
   });
 
   it('defaults to local when provider is undefined', () => {

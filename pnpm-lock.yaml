@@ -46,6 +46,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      testingbot-tunnel-launcher:
+        specifier: ^1.1.18
+        version: 1.1.18
       webdriverio:
         specifier: ^9.27.0
         version: 9.27.1(puppeteer-core@24.43.1)
@@ -3719,6 +3722,10 @@ packages:
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
+
+  testingbot-tunnel-launcher@1.1.18:
+    resolution: {integrity: sha512-0xSA7r/RsW4ltxrviDaIDAEevEZDbTq0E8vFPfxjOPBfo8aTee0rMAqgGTsYnTP0St4rTfosdgS/0aRLEzCEHw==}
+    engines: {node: '>=18'}
 
   text-decoder@1.2.7:
     resolution: {integrity: sha512-vlLytXkeP4xvEq2otHeJfSQIRyWxo/oZGEbXrtEEF9Hnmrdly59sUbzZ/QgyWuLYHctCHxFF4tRQZNQ9k60ExQ==}
@@ -7823,6 +7830,8 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
+
+  testingbot-tunnel-launcher@1.1.18: {}
 
   text-decoder@1.2.7:
     dependencies:

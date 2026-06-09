@@ -1,18 +1,25 @@
 # CLAUDE.md
 
-Context for Claude Code when working with this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
 
 ```bash
 npm run bundle      # Build: clean + tsup + make executable + create .tgz
-npm run lint        # ESLint + TypeScript type-checking (tsc --noEmit)
-npm test            # Run unit tests (vitest + happy-dom)
+npm run lint        # ESLint (--fix) + TypeScript type-checking (tsc --noEmit)
+npm test            # Run all unit tests (vitest run; env: happy-dom)
 npm run dev         # Development server (tsx --watch) — picks up code changes automatically; rebundle only needed for npm package changes
 npm run dev:http    # Dev server with HTTP transport (for browser-based MCP clients)
 npm start           # Run built server from lib/server.js
 npm run start:http  # Built server with HTTP transport (for browser-based MCP clients)
+
+# Single test file / focused run (vitest is not exposed via an npm script):
+npx vitest run tests/tools/get-elements-tool.test.ts   # one file
+npx vitest run -t "filter pattern"                      # tests matching a name
+npx vitest tests/trace/                                 # watch mode for a directory
 ```
+
+`vitest.config.ts` sets `environment: 'happy-dom'` and typechecks tests against `tsconfig.test.json`.
 
 ## Architecture
 
@@ -27,7 +34,8 @@ src/
 │   └── cloud/
 │       ├── browserstack.provider.ts  # BrowserStack (browser + App Automate)
 │       ├── saucelabs.provider.ts     # Sauce Labs (browser + App Storage)
-│       └── testmu.provider.ts        # TestMu / LambdaTest (browser + mobile)
+│       ├── testmu.provider.ts        # TestMu / LambdaTest (browser + mobile)
+│       └── testingbot.provider.ts    # TestingBot (browser + mobile + Storage)
 ├── trace/             # Playwright-compatible trace recording (recorder.ts, tool-mapping.ts, zip-writer.ts)
 ├── tools/             # One file per MCP tool (see Tool Pattern below)
 ├── resources/         # One file per MCP resource (see Recording below)
@@ -51,7 +59,7 @@ export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   capabilities: Record<string, unknown>;
   isAttached: boolean;
-  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu';   // set at session start; used by lifecycle to call provider hooks
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';   // set at session start; used by lifecycle to call provider hooks
   tunnelHandle?: unknown;                 // opaque handle returned by provider.startTunnel(), passed back to onSessionClose()
 }
 ```
@@ -114,13 +122,21 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - `wdio://session/current/app-state` — mobile app state
 - `wdio://session/current/geolocation` — device geolocation
 - `wdio://session/current/capabilities` — resolved WebDriver capabilities for the active session
-- `wdio://browserstack/local-binary` — platform-specific download URL and daemon start command for BrowserStack Local binary
+- `wdio://session/current/logs` — crash logs + browser console logs for the current session
+
+**Cloud tunnel binaries** (download URL + daemon start command):
+- `wdio://browserstack/local-binary`
+- `wdio://saucelabs/local-binary`
+- `wdio://testmu/local-binary`
+- `wdio://testingbot/local-binary` (single cross-platform Java JAR, requires Java 11+)
 
 ### Build
 
 - **tsup** bundles `src/server.ts` → `lib/server.js` (ESM)
 - Shebang preserved for CLI execution
 - `zod` externalized
+- Two `bin` entries: `wdio-mcp` (the server) and `wdio-show-trace` (`src/show-trace.ts` — inspect a recorded trace)
+- Package subpath exports: `.` (server), `./snapshot` (`src/snapshot.ts`), `./trace` (`src/trace.ts`)
 
 ## Key Files
 
@@ -132,10 +148,11 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/providers/registry.ts`                        | `getProvider()` — routes to local or cloud provider |
 | `src/providers/types.ts`                           | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
 | `src/providers/cloud/browserstack.provider.ts`     | BrowserStack provider — tunnel lifecycle + session result marking via `onSessionClose()` |
+| `src/providers/cloud/testingbot.provider.ts`       | TestingBot provider — `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
-| `src/tools/browserstack.tool.ts`                   | `list_apps`, `upload_app` — BrowserStack App Automate |
-| `src/resources/`                                   | All MCP resource definitions (12 files)       |
+| `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu (registered in `server.ts`) |
+| `src/resources/`                                   | All MCP resource definitions (one per URI)    |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
 | `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps tools for step logging |
@@ -221,12 +238,14 @@ catch (e) {
 | `SAUCE_ACCESS_KEY` | Sauce Labs sessions + App Storage tools |
 | `TESTMU_USERNAME` | TestMu / LambdaTest sessions + tools |
 | `TESTMU_ACCESS_KEY` | TestMu / LambdaTest sessions + tools |
+| `TESTINGBOT_KEY` | TestingBot sessions + tools |
+| `TESTINGBOT_SECRET` | TestingBot sessions + tools |
 
 ## Planned Improvements
 
 See `docs/architecture/` for proposals:
 
-- `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, and TestMu implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
+- `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, TestMu, and TestingBot implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination
 - `interaction-sequencing-proposal.md` — Sequencing model for tool interactions
 - `trace-recording-and-replay.md` — Playwright-compatible trace recording (implemented in `src/trace/`)

@@ -117,6 +117,29 @@ const PROVIDER_CONFIGS: Record<string, ProviderApiConfig> = {
       return { appRef: ref, appName: data.name ?? fileName };
     },
   },
+  testingbot: {
+    name: 'TestingBot',
+    apiBase: 'https://api.testingbot.com',
+    credsEnvNames: ['TESTINGBOT_KEY', 'TESTINGBOT_SECRET'],
+    listPath: '/v1/storage',
+    supportsOrgWide: false,
+    parseListResponse: (raw) => {
+      // TestingBot returns { data: [{ app_url, filename, type, version, created_at }] }
+      const data = raw as { data?: Record<string, unknown>[] };
+      const apps = data.data ?? (Array.isArray(raw) ? raw as Record<string, unknown>[] : []);
+      return apps.map((a) => ({
+        name: (a.filename ?? a.name ?? 'unknown') as string,
+        ref: (a.app_url as string | undefined) ?? 'unknown',
+        uploadedAt: a.created_at as string | undefined,
+      }));
+    },
+    uploadPath: '/v1/storage',
+    uploadField: 'file',
+    parseUploadResponse: (raw, fileName) => {
+      const data = raw as { app_url?: string };
+      return { appRef: data.app_url ?? 'unknown', appName: fileName };
+    },
+  },
 };
 
 function getProviderConfig(provider: string, region?: string): { config: ProviderApiConfig; auth: string } | { error: string } {
@@ -140,10 +163,10 @@ function getProviderConfig(provider: string, region?: string): { config: Provide
 
 export const listAppsToolDefinition: ToolDefinition = {
   name: 'list_apps',
-  description: 'List apps uploaded to a cloud provider (BrowserStack App Automate, Sauce Labs App Storage, or TestMu Real Device Cloud). Reads provider-specific credentials from environment.',
+  description: 'List apps uploaded to a cloud provider (BrowserStack App Automate, Sauce Labs App Storage, TestMu Real Device Cloud, or TestingBot Storage). Reads provider-specific credentials from environment.',
   annotations: { title: 'List Cloud Provider Apps', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
-    provider: z.enum(['browserstack', 'saucelabs', 'testmu']).describe('Cloud provider'),
+    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot']).describe('Cloud provider'),
     sortBy: z.enum(['app_name', 'uploaded_at']).optional().default('uploaded_at').describe('Sort order for results'),
     organizationWide: coerceBoolean.optional().default(false).describe('(BrowserStack only) List apps uploaded by all users in the organization. Defaults to false (own uploads only).'),
     limit: z.number().int().min(1).optional().default(20).describe('Maximum number of apps to return (only applies when organizationWide is true, default 20)'),
@@ -152,7 +175,7 @@ export const listAppsToolDefinition: ToolDefinition = {
 };
 
 type ListAppsArgs = {
-  provider: 'browserstack' | 'saucelabs' | 'testmu';
+  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
   sortBy?: 'app_name' | 'uploaded_at';
   organizationWide?: boolean;
   limit?: number;
@@ -223,10 +246,10 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
 
 export const uploadAppToolDefinition: ToolDefinition = {
   name: 'upload_app',
-  description: 'Upload a local .apk or .ipa to a cloud provider (BrowserStack, Sauce Labs, or TestMu). Returns the app URL for use in start_session.',
+  description: 'Upload a local .apk or .ipa to a cloud provider (BrowserStack, Sauce Labs, TestMu, or TestingBot). Returns the app URL for use in start_session.',
   annotations: { title: 'Upload App to Cloud Provider', destructiveHint: false },
   inputSchema: {
-    provider: z.enum(['browserstack', 'saucelabs', 'testmu']).describe('Cloud provider'),
+    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot']).describe('Cloud provider'),
     path: z.string().describe('Absolute path to the .apk or .ipa file'),
     customId: z.string().optional().describe('Optional custom ID for the app (used to reference it later)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1)'),
@@ -234,7 +257,7 @@ export const uploadAppToolDefinition: ToolDefinition = {
 };
 
 type UploadAppArgs = {
-  provider: 'browserstack' | 'saucelabs' | 'testmu';
+  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
   path: string;
   customId?: string;
   region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';

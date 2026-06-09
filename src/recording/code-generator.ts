@@ -36,6 +36,7 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const isBrowserStack = 'bstack:options' in history.capabilities;
       const isSauceLabs = 'sauce:options' in history.capabilities;
       const isLambdaTest = 'lt:options' in history.capabilities;
+      const isTestingBot = 'tb:options' in history.capabilities;
       const capJson = indentJson(history.capabilities)
         .split('\n')
         .map((line, i) => (i > 0 ? `  ${line}` : line))
@@ -93,6 +94,24 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
           "  path: '/wd/hub',",
           '  user: process.env.TESTMU_USERNAME,',
           '  key: process.env.TESTMU_ACCESS_KEY,',
+          `  capabilities: ${capJson}`,
+          `});${nav}`,
+        ].join('\n');
+      }
+
+      if (isTestingBot) {
+        const nav =
+          platform === 'browser' && p.navigationUrl
+            ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');`
+            : '';
+        return [
+          'const browser = await remote({',
+          "  protocol: 'https',",
+          "  hostname: 'hub.testingbot.com',",
+          '  port: 443,',
+          "  path: '/wd/hub',",
+          '  user: process.env.TESTINGBOT_KEY,',
+          '  key: process.env.TESTINGBOT_SECRET,',
           `  capabilities: ${capJson}`,
           `});${nav}`,
         ].join('\n');
@@ -164,12 +183,15 @@ export function generateCode(history: SessionHistory): string {
   const bstackOptions = history.capabilities['bstack:options'] as Record<string, unknown> | undefined;
   const sauceOptions = history.capabilities['sauce:options'] as Record<string, unknown> | undefined;
   const ltOptions = history.capabilities['lt:options'] as Record<string, unknown> | undefined;
+  const tbOptions = history.capabilities['tb:options'] as Record<string, unknown> | undefined;
   const isBrowserStack = bstackOptions !== undefined;
   const isSauceLabs = sauceOptions !== undefined;
   const isLambdaTest = ltOptions !== undefined;
+  const isTestingBot = tbOptions !== undefined;
   const usesLocalTunnel = isBrowserStack ? bstackOptions?.local === true
     : isSauceLabs ? (sauceOptions?.tunnelName !== undefined)
-      : (ltOptions?.tunnel === true);
+      : isLambdaTest ? (ltOptions?.tunnel === true)
+        : (tbOptions?.tunnel === true);
 
   const steps = history.steps
     .map(step => generateStep(step, history))
@@ -340,6 +362,63 @@ export function generateCode(history: SessionHistory): string {
       preamble,
       'try {',
       ltSteps,
+      catchBlock,
+      '} finally {',
+      ...finallyLines,
+      '}',
+    ].join('\n');
+  }
+
+  if (isTestingBot) {
+    const tbSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const preamble = 'let browser;\nlet tbStatus = \'passed\';';
+    const catchBlock = '} catch (e) {\n  tbStatus = \'failed\';\n  throw e;';
+    const statusUpdate = [
+      "    const tbAuth = Buffer.from(`${process.env.TESTINGBOT_KEY}:${process.env.TESTINGBOT_SECRET}`).toString('base64');",
+      "    await fetch('https://api.testingbot.com/v1/tests/' + browser.sessionId, {",
+      "      method: 'PUT',",
+      "      headers: { Authorization: 'Basic ' + tbAuth, 'Content-Type': 'application/x-www-form-urlencoded' },",
+      "      body: 'test[success]=' + (tbStatus === 'passed' ? '1' : '0')",
+      '    });',
+    ].join('\n');
+    const finallyLines = [
+      '  if (browser) {',
+      statusUpdate,
+      '    await browser.deleteSession();',
+      '  }',
+    ];
+
+    if (usesLocalTunnel) {
+      const tunnelName = (tbOptions?.tunnelIdentifier as string) ?? 'wdio-mcp-tunnel';
+      const tunnelSetup = [
+        '',
+        "import testingbotTunnel from 'testingbot-tunnel-launcher';",
+        '',
+        `const tunnel = await testingbotTunnel.downloadAndRunAsync({ apiKey: process.env.TESTINGBOT_KEY, apiSecret: process.env.TESTINGBOT_SECRET, tunnelIdentifier: '${escapeStr(tunnelName)}' });`,
+        'const stopTunnel = () => testingbotTunnel.killAsync();',
+        '',
+      ].join('\n');
+
+      return [
+        "import { remote } from 'webdriverio';",
+        tunnelSetup,
+        preamble,
+        'try {',
+        tbSteps,
+        catchBlock,
+        '} finally {',
+        ...finallyLines,
+        '  await stopTunnel();',
+        '}',
+      ].join('\n');
+    }
+
+    return [
+      "import { remote } from 'webdriverio';",
+      '',
+      preamble,
+      'try {',
+      tbSteps,
       catchBlock,
       '} finally {',
       ...finallyLines,

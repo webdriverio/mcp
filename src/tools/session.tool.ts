@@ -19,13 +19,13 @@ export const startSessionToolDefinition: ToolDefinition = {
   description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
-    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu']).optional().default('local').describe('Session provider (default: local)'),
+    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot']).optional().default('local').describe('Session provider (default: local)'),
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
-    os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs: combined with osVersion into W3C platformName. Browser platform only.'),
-    osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs: combined with os into W3C platformName. Browser platform only.'),
-    app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu mobile sessions)'),
+    os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs/TestingBot: combined with osVersion into W3C platformName. Browser platform only.'),
+    osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs/TestingBot: combined with os into W3C platformName. Browser platform only.'),
+    app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu, tb://... for TestingBot mobile sessions)'),
     reporting: z.object({
       project: z.string().optional(),
       build: z.string().optional(),
@@ -70,7 +70,7 @@ export const startSessionToolDefinition: ToolDefinition = {
 };
 
 type StartSessionArgs = {
-  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu';
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
   platform: 'browser' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   browserVersion?: string;
