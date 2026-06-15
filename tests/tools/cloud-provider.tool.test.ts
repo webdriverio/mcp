@@ -468,3 +468,105 @@ describe('upload_app tool (TestingBot)', () => {
     expect(result.content[0].text).toContain('TESTINGBOT_KEY');
   });
 });
+
+// ─── Digital.ai tests ─────────────────────────────────────────────────────────
+
+describe('list_apps tool (Digital.ai)', () => {
+  beforeEach(() => {
+    vi.stubEnv('DIGITALAI_ACCESS_KEY', 'dai-key');
+    vi.stubEnv('DIGITALAI_CLOUD_URL', 'https://cloud.example.com');
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('calls /api/v1/applications on the env-derived host with Bearer auth', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as Response);
+
+    await callList({ provider: 'digitalai' });
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://cloud.example.com/api/v1/applications');
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe('Bearer dai-key');
+  });
+
+  it('parses the flat array response into cloud: refs', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [{
+        name: 'com.experitest.ExperiBank',
+        applicationName: 'ExperiBank',
+        uniqueName: 'EriBank_1plugin',
+        createdAtFormatted: '2023-02-05 14:42:56',
+      }],
+    } as Response);
+
+    const result = await callList({ provider: 'digitalai' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('ExperiBank');
+    expect(result.content[0].text).toContain('cloud:com.experitest.ExperiBank');
+    expect(result.content[0].text).toContain('EriBank_1plugin');
+  });
+
+  it('does not emit cloud:undefined when an app has no name', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => [{ applicationName: 'In-progress upload', uniqueName: 'pending' }],
+    } as Response);
+
+    const result = await callList({ provider: 'digitalai' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).not.toContain('cloud:undefined');
+    expect(result.content[0].text).toContain('unknown');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callList({ provider: 'digitalai' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('DIGITALAI_ACCESS_KEY');
+  });
+});
+
+describe('upload_app tool (Digital.ai)', () => {
+  beforeEach(() => {
+    vi.stubEnv('DIGITALAI_ACCESS_KEY', 'dai-key');
+    vi.stubEnv('DIGITALAI_CLOUD_URL', 'https://cloud.example.com');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(Buffer.from('mock-file-content'));
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('posts to /api/v1/applications/new and returns a cloud: ref from data.name', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'SUCCESS', data: { id: '12345', name: 'com.sample.sample' }, code: 'OK' }),
+    } as Response);
+
+    const result = await callUpload({ provider: 'digitalai', path: '/local/myapp.apk' });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('cloud:com.sample.sample');
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://cloud.example.com/api/v1/applications/new');
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe('Bearer dai-key');
+  });
+
+  it('returns isError true when credentials are missing', async () => {
+    vi.unstubAllEnvs();
+    const result = await callUpload({ provider: 'digitalai', path: '/some/app.apk' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('DIGITALAI_ACCESS_KEY');
+  });
+});

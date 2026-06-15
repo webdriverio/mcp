@@ -37,6 +37,9 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const isSauceLabs = 'sauce:options' in history.capabilities;
       const isLambdaTest = 'lt:options' in history.capabilities;
       const isTestingBot = 'tb:options' in history.capabilities;
+      // Digital.ai uses flat digitalai:* caps for web (digitalai:accessKey/osName) and a
+      // nested digitalai:options object for mobile — match either.
+      const isDigitalAi = Object.keys(history.capabilities).some((k) => k.startsWith('digitalai:'));
       const capJson = indentJson(history.capabilities)
         .split('\n')
         .map((line, i) => (i > 0 ? `  ${line}` : line))
@@ -117,6 +120,30 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         ].join('\n');
       }
 
+      if (isDigitalAi) {
+        // Digital.ai uses a single hub for browser + mobile; the access key rides in the
+        // capabilities (flat digitalai:accessKey for web, nested digitalai:options for mobile).
+        const nav =
+          platform === 'browser' && p.navigationUrl
+            ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');`
+            : '';
+        // Scrub the resolved key to a process.env reference so the secret is not baked in.
+        const daiCaps = capJson.replace(
+          /("(?:digitalai:)?accessKey":\s*)"(?:[^"\\]|\\.)*"/g,
+          '$1process.env.DIGITALAI_ACCESS_KEY',
+        );
+        return [
+          'const browser = await remote({',
+          "  protocol: 'https',",
+          // DIGITALAI_CLOUD_URL is a full URL; remote() wants a bare hostname (strip scheme + path).
+          "  hostname: (process.env.DIGITALAI_CLOUD_URL ?? '').replace(/^https?:\\/\\//, '').replace(/\\/.*/, ''),",
+          '  port: 443,',
+          "  path: '/wd/hub',",
+          `  capabilities: ${daiCaps}`,
+          `});${nav}`,
+        ].join('\n');
+      }
+
       if (platform === 'browser') {
         const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
         return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
@@ -188,6 +215,8 @@ export function generateCode(history: SessionHistory): string {
   const isSauceLabs = sauceOptions !== undefined;
   const isLambdaTest = ltOptions !== undefined;
   const isTestingBot = tbOptions !== undefined;
+  // Digital.ai uses flat digitalai:* caps (web) or a nested digitalai:options object (mobile).
+  const isDigitalAi = Object.keys(history.capabilities).some((k) => k.startsWith('digitalai:'));
   const usesLocalTunnel = isBrowserStack ? bstackOptions?.local === true
     : isSauceLabs ? (sauceOptions?.tunnelName !== undefined)
       : isLambdaTest ? (ltOptions?.tunnel === true)
@@ -419,6 +448,32 @@ export function generateCode(history: SessionHistory): string {
       preamble,
       'try {',
       tbSteps,
+      catchBlock,
+      '} finally {',
+      ...finallyLines,
+      '}',
+    ].join('\n');
+  }
+
+  if (isDigitalAi) {
+    const daiSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const preamble = 'let browser;\nlet daiStatus = \'passed\';';
+    const catchBlock = '} catch (e) {\n  daiStatus = \'failed\';\n  throw e;';
+    // seetest:client.setReportStatus(status, message) — marks the cloud report pass/fail.
+    const statusUpdate = "    await browser.execute('seetest:client.setReportStatus', daiStatus === 'passed' ? 'Passed' : 'Failed', daiStatus === 'passed' ? 'Test passed' : 'Test failed');";
+    const finallyLines = [
+      '  if (browser) {',
+      statusUpdate,
+      '    await browser.deleteSession();',
+      '  }',
+    ];
+
+    return [
+      "import { remote } from 'webdriverio';",
+      '',
+      preamble,
+      'try {',
+      daiSteps,
       catchBlock,
       '} finally {',
       ...finallyLines,

@@ -4,6 +4,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { basicAuth } from '../utils/auth';
+import { resolveCloudHost } from '../providers/cloud/digitalai.provider';
 
 // ─── Provider API config ───────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ interface ProviderApiConfig {
   apiBase: string;
   /** Env var names for credentials */
   credsEnvNames: [string, string];
+  /** Authorization scheme for API requests (default: 'basic'). */
+  authScheme?: 'basic' | 'bearer';
   /** list_apps endpoint path (relative to apiBase) */
   listPath: string;
   /** Whether list endpoint supports org-wide query param (BrowserStack only) */
@@ -140,11 +143,48 @@ const PROVIDER_CONFIGS: Record<string, ProviderApiConfig> = {
       return { appRef: data.app_url ?? 'unknown', appName: fileName };
     },
   },
+  digitalai: {
+    name: 'Digital.ai',
+    apiBase: '', // derived from DIGITALAI_CLOUD_URL in getProviderConfig
+    credsEnvNames: ['DIGITALAI_ACCESS_KEY', 'DIGITALAI_CLOUD_URL'],
+    authScheme: 'bearer',
+    listPath: '/api/v1/applications',
+    supportsOrgWide: false,
+    parseListResponse: (raw) => {
+      // Apps are referenced in a session as "cloud:<package-or-bundle>" (the `name` field).
+      const apps = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
+      return apps.map((a) => ({
+        name: (a.applicationName ?? a.name ?? 'unknown') as string,
+        ref: a.name ? `cloud:${a.name}` : 'unknown',
+        uploadedAt: a.createdAtFormatted as string | undefined,
+        customId: a.uniqueName as string | undefined,
+      }));
+    },
+    uploadPath: '/api/v1/applications/new',
+    uploadField: 'file',
+    parseUploadResponse: (raw, fileName) => {
+      const data = (raw as { data?: { name?: string } }).data ?? {};
+      const name = data.name ?? fileName;
+      return { appRef: `cloud:${name}`, appName: name };
+    },
+  },
 };
 
-function getProviderConfig(provider: string, region?: string): { config: ProviderApiConfig; auth: string } | { error: string } {
+function getProviderConfig(provider: string, region?: string): { config: ProviderApiConfig; authHeader: string } | { error: string } {
   const base = PROVIDER_CONFIGS[provider];
   if (!base) return { error: `Unknown provider: ${provider}` };
+
+  // Bearer providers (Digital.ai) use a single access key; the second env var is the cloud URL.
+  if (base.authScheme === 'bearer') {
+    const [keyEnv, urlEnv] = base.credsEnvNames;
+    const key = process.env[keyEnv];
+    const host = resolveCloudHost(process.env[urlEnv]);
+    if (!key || !host) {
+      return { error: `Missing credentials: set ${base.credsEnvNames.join(' and ')} environment variables.` };
+    }
+    return { config: { ...base, apiBase: `https://${host}` }, authHeader: `Bearer ${key}` };
+  }
+
   const [userEnv, keyEnv] = base.credsEnvNames;
   const user = process.env[userEnv];
   const key = process.env[keyEnv];
@@ -156,17 +196,17 @@ function getProviderConfig(provider: string, region?: string): { config: Provide
   const config = provider === 'saucelabs'
     ? { ...base, apiBase: `https://api.${region ?? 'eu-central-1'}.saucelabs.com` }
     : base;
-  return { config, auth: basicAuth(user, key) };
+  return { config, authHeader: `Basic ${basicAuth(user, key)}` };
 }
 
 // ─── list_apps ────────────────────────────────────────────────────────────────
 
 export const listAppsToolDefinition: ToolDefinition = {
   name: 'list_apps',
-  description: 'List apps uploaded to a cloud provider (BrowserStack App Automate, Sauce Labs App Storage, TestMu Real Device Cloud, or TestingBot Storage). Reads provider-specific credentials from environment.',
+  description: 'List apps uploaded to a cloud provider (BrowserStack App Automate, Sauce Labs App Storage, TestMu Real Device Cloud, TestingBot Storage, or Digital.ai Applications). Reads provider-specific credentials from environment.',
   annotations: { title: 'List Cloud Provider Apps', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
-    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot']).describe('Cloud provider'),
+    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).describe('Cloud provider'),
     sortBy: z.enum(['app_name', 'uploaded_at']).optional().default('uploaded_at').describe('Sort order for results'),
     organizationWide: coerceBoolean.optional().default(false).describe('(BrowserStack only) List apps uploaded by all users in the organization. Defaults to false (own uploads only).'),
     limit: z.number().int().min(1).optional().default(20).describe('Maximum number of apps to return (only applies when organizationWide is true, default 20)'),
@@ -175,7 +215,7 @@ export const listAppsToolDefinition: ToolDefinition = {
 };
 
 type ListAppsArgs = {
-  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
+  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai';
   sortBy?: 'app_name' | 'uploaded_at';
   organizationWide?: boolean;
   limit?: number;
@@ -188,7 +228,7 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
   if ('error' in resolved) {
     return { isError: true as const, content: [{ type: 'text' as const, text: resolved.error }] };
   }
-  const { config, auth } = resolved;
+  const { config, authHeader } = resolved;
 
   try {
     let url = `${config.apiBase}${config.listPath}`;
@@ -203,7 +243,7 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
       for (const platform of ['android', 'ios']) {
         try {
           const res = await fetch(`${url}?type=${platform}`, {
-            headers: { Authorization: `Basic ${auth}` },
+            headers: { Authorization: authHeader },
           });
           if (res.ok) {
             const raw = await res.json();
@@ -222,7 +262,7 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
       }
     } else {
       const res = await fetch(url, {
-        headers: { Authorization: `Basic ${auth}` },
+        headers: { Authorization: authHeader },
       });
 
       if (!res.ok) {
@@ -246,10 +286,10 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
 
 export const uploadAppToolDefinition: ToolDefinition = {
   name: 'upload_app',
-  description: 'Upload a local .apk or .ipa to a cloud provider (BrowserStack, Sauce Labs, TestMu, or TestingBot). Returns the app URL for use in start_session.',
+  description: 'Upload a local .apk or .ipa to a cloud provider (BrowserStack, Sauce Labs, TestMu, TestingBot, or Digital.ai). Returns the app URL for use in start_session.',
   annotations: { title: 'Upload App to Cloud Provider', destructiveHint: false },
   inputSchema: {
-    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot']).describe('Cloud provider'),
+    provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).describe('Cloud provider'),
     path: z.string().describe('Absolute path to the .apk or .ipa file'),
     customId: z.string().optional().describe('Optional custom ID for the app (used to reference it later)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1)'),
@@ -257,7 +297,7 @@ export const uploadAppToolDefinition: ToolDefinition = {
 };
 
 type UploadAppArgs = {
-  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
+  provider: 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai';
   path: string;
   customId?: string;
   region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';
@@ -269,7 +309,7 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
   if ('error' in resolved) {
     return { isError: true as const, content: [{ type: 'text' as const, text: resolved.error }] };
   }
-  const { config, auth } = resolved;
+  const { config, authHeader } = resolved;
 
   if (!existsSync(path)) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `File not found: ${path}` }] };
@@ -286,7 +326,7 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
 
     const res = await fetch(`${config.apiBase}${config.uploadPath}`, {
       method: 'POST',
-      headers: { Authorization: `Basic ${auth}` },
+      headers: { Authorization: authHeader },
       body: form,
     });
 

@@ -5,6 +5,7 @@ import { LocalAppiumProvider } from '../../src/providers/local-appium.provider';
 import { BrowserStackProvider } from '../../src/providers/cloud/browserstack.provider';
 import { TestMuProvider } from '../../src/providers/cloud/testmu.provider';
 import { TestingBotProvider } from '../../src/providers/cloud/testingbot.provider';
+import { DigitalAiProvider } from '../../src/providers/cloud/digitalai.provider';
 
 describe('getProvider', () => {
   it('returns LocalBrowserProvider for local browser', () => {
@@ -53,6 +54,18 @@ describe('getProvider', () => {
 
   it('returns TestingBotProvider for testingbot ios', () => {
     expect(getProvider('testingbot', 'ios')).toBeInstanceOf(TestingBotProvider);
+  });
+
+  it('returns DigitalAiProvider for digitalai browser', () => {
+    expect(getProvider('digitalai', 'browser')).toBeInstanceOf(DigitalAiProvider);
+  });
+
+  it('returns DigitalAiProvider for digitalai android', () => {
+    expect(getProvider('digitalai', 'android')).toBeInstanceOf(DigitalAiProvider);
+  });
+
+  it('returns DigitalAiProvider for digitalai ios', () => {
+    expect(getProvider('digitalai', 'ios')).toBeInstanceOf(DigitalAiProvider);
   });
 
   it('defaults to local when provider is undefined', () => {
