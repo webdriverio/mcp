@@ -113,6 +113,42 @@ describe('generateCode - header', () => {
     expect(code).toContain("await browser.url('https://github.com/login');");
   });
 
+  it('generates start_session (Digital.ai) with the cloud hub connection and no basic auth', () => {
+    const history: SessionHistory = {
+      sessionId: 'dai-123',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {
+        browserName: 'chrome',
+        'digitalai:accessKey': 'super-secret-key',
+        'digitalai:osName': 'Windows 10',
+      },
+      steps: [{
+        index: 1,
+        tool: 'start_session',
+        params: { platform: 'browser', browser: 'chrome', provider: 'digitalai', navigationUrl: 'https://example.com' },
+        status: 'ok',
+        durationMs: 100,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+    const code = generateCode(history);
+    // hostname must strip the scheme/path from DIGITALAI_CLOUD_URL (remote() wants a bare host).
+    expect(code).toContain("hostname: (process.env.DIGITALAI_CLOUD_URL ?? '').replace(/^https?:\\/\\//, '').replace(/\\/.*/, ''),");
+    expect(code).not.toContain('hostname: process.env.DIGITALAI_CLOUD_URL,');
+    expect(code).toContain("path: '/wd/hub',");
+    expect(code).toContain('"digitalai:osName"');
+    expect(code).not.toContain('user: process.env');
+    // The flat access key must be referenced via env, never baked in as a literal.
+    expect(code).toContain('"digitalai:accessKey": process.env.DIGITALAI_ACCESS_KEY');
+    expect(code).not.toContain('super-secret-key');
+    expect(code).toContain("await browser.url('https://example.com');");
+    // Pass/fail wrapper, like the other cloud providers.
+    expect(code).toContain("let daiStatus = 'passed';");
+    expect(code).toContain("await browser.execute('seetest:client.setReportStatus'");
+    expect(code).toContain('} finally {');
+  });
+
   it('generates start_session (mobile) using history.appiumConfig for connection config', () => {
     const history: SessionHistory = {
       sessionId: 'app-123',

@@ -19,13 +19,13 @@ export const startSessionToolDefinition: ToolDefinition = {
   description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
-    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot']).optional().default('local').describe('Session provider (default: local)'),
+    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).optional().default('local').describe('Session provider (default: local). "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
-    os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs/TestingBot: combined with osVersion into W3C platformName. Browser platform only.'),
-    osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs/TestingBot: combined with os into W3C platformName. Browser platform only.'),
-    app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu, tb://... for TestingBot mobile sessions)'),
+    os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs/TestingBot: combined with osVersion into W3C platformName. Digital.ai: combined with osVersion into the digitalai:osName capability (e.g. "Mac OS Sequoia", "Windows 10") — required for the grid to match a node. Browser platform only.'),
+    osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs/TestingBot: combined with os into W3C platformName. Digital.ai: combined with os into digitalai:osName. Browser platform only.'),
+    app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu, tb://... for TestingBot, cloud:<package-or-bundle> for Digital.ai mobile sessions)'),
     reporting: z.object({
       project: z.string().optional(),
       build: z.string().optional(),
@@ -35,6 +35,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     windowWidth: z.number().min(400).max(3840).optional().default(1920).describe('Browser window width'),
     windowHeight: z.number().min(400).max(2160).optional().default(1080).describe('Browser window height'),
     deviceName: z.string().optional().describe('Mobile device/emulator/simulator name (required for ios/android)'),
+    deviceQuery: z.string().optional().describe('Digital.ai device selection query for dynamic allocation, e.g. "@os=\'android\' and @version=\'14\' and @name=\'.*Pixel.*\'". Only used with provider: "digitalai" mobile sessions; if omitted, one is built from deviceName/platformVersion.'),
     platformVersion: z.string().optional().describe('OS version for mobile sessions (e.g., "17.0", "14"). Mobile (ios/android) only.'),
     appPath: z.string().optional().describe('Path to app file (.app/.apk/.ipa)'),
     automationName: automationEnum.optional().describe('Automation driver'),
@@ -70,7 +71,7 @@ export const startSessionToolDefinition: ToolDefinition = {
 };
 
 type StartSessionArgs = {
-  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai';
   platform: 'browser' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   browserVersion?: string;
@@ -82,6 +83,7 @@ type StartSessionArgs = {
   windowWidth?: number;
   windowHeight?: number;
   deviceName?: string;
+  deviceQuery?: string;
   platformVersion?: string;
   appPath?: string;
   automationName?: 'XCUITest' | 'UiAutomator2';
@@ -259,11 +261,12 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const headlessNote = headless && !headlessSupported
     ? '\nNote: Safari does not support headless mode. Started in headed mode.'
     : '';
+  const reportNote = provider.getStartNote?.(wdioBrowser) ?? '';
 
   return {
     content: [{
       type: 'text',
-      text: `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}`,
+      text: `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${reportNote}`,
     }],
   };
 }
@@ -338,11 +341,13 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     ? '\n\n(Auto-detach enabled: session will be preserved on close. Use close_session({ detach: false }) to force terminate.)'
     : '';
 
+  const reportNote = provider.getStartNote?.(browser) ?? '';
+
   return {
     content: [
       {
         type: 'text',
-        text: `${platform} ${sessionKind} session started with sessionId: ${sessionId}\nDevice: ${deviceName}${appInfo}\nAppium Server: ${serverConfig.hostname}:${serverConfig.port}${serverConfig.path}${detachNote}`,
+        text: `${platform} ${sessionKind} session started with sessionId: ${sessionId}\nDevice: ${deviceName}${appInfo}\nAppium Server: ${serverConfig.hostname}:${serverConfig.port}${serverConfig.path}${detachNote}${reportNote}`,
       },
     ],
   };

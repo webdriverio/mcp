@@ -267,7 +267,8 @@ appium
 
 Run browser and mobile app tests on cloud real devices and browsers without any local setup. Currently supports
 [BrowserStack](https://www.browserstack.com/), [Sauce Labs](https://saucelabs.com/),
-[LambdaTest](https://www.lambdatest.com/), and [TestingBot](https://testingbot.com/).
+[LambdaTest](https://www.lambdatest.com/), [TestingBot](https://testingbot.com/), and
+[Digital.ai Testing](https://digital.ai/products/continuous-testing/).
 
 ### Prerequisites
 
@@ -384,6 +385,49 @@ export TESTINGBOT_SECRET=your_secret
 
 </details>
 
+<details>
+<summary>Digital.ai Testing</summary>
+
+```bash
+export DIGITALAI_CLOUD_URL=https://your-cloud.example.com
+export DIGITALAI_ACCESS_KEY=your_access_key
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "DIGITALAI_CLOUD_URL": "https://your-cloud.example.com",
+        "DIGITALAI_ACCESS_KEY": "your_access_key"
+      }
+    }
+  }
+}
+```
+
+| `DIGITALAI_CLOUD_URL` | Digital.ai cloud host, e.g. `https://your-cloud.example.com` (required) |
+| `DIGITALAI_ACCESS_KEY` | Digital.ai access key (required) |
+
+The access key is sent via the `digitalai:options` capability (mobile) or the flat `digitalai:accessKey` capability (web).
+
+**Report pass/fail status:** WebdriverIO defaults to the BiDi protocol, over which Digital.ai's cloud cannot observe command failures — so reports default to "Passed". To make the cloud reflect actual pass/fail, opt in to classic WebDriver per session:
+
+```js
+start_session({
+  provider: 'digitalai', platform: 'browser', browser: 'chrome', os: 'Windows 10',
+  capabilities: { 'wdio:enforceWebDriverClassic': true }
+})
+```
+
+(Pure client-side assertion failures still report as "Passed" — only failures that reach the cloud as WebDriver command errors are detected.)
+
+**Mobile (Appium):** configure your Digital.ai project for **Appium-server execution** and pick its default Appium version via the project's **"Manage default Appium server version"** setting — the version is chosen at the project level (and tracks the versions your cloud supports), so this MCP does not pin one. See [Appium Server Test Execution](https://docs.digital.ai/continuous-testing/docs/te/test-execution-home/mobile-android-and-ios/appium/appium-server-test-execution).
+
+</details>
+
 ### Browser Sessions
 
 Run a browser on a specific OS/version combination:
@@ -444,6 +488,18 @@ start_session({
         session: 'Login flow'
     }
 })
+
+// Digital.ai
+start_session({
+    provider: 'digitalai',
+    platform: 'browser',
+    browser: 'chrome',
+    os: 'Windows',               // combined with osVersion → platformName (optional)
+    osVersion: '11',
+    reporting: {
+        session: 'Login flow'    // → digitalai:options.testName
+    }
+})
 ```
 
 > **Provider-specific `os` / `osVersion` behavior:**
@@ -466,6 +522,9 @@ upload_app({ provider: 'testmu', path: '/path/to/app.apk' })
 
 // TestingBot: returns tb:// URL
 upload_app({ provider: 'testingbot', path: '/path/to/app.apk' })
+
+// Digital.ai: returns cloud:<package-or-bundle> reference
+upload_app({ provider: 'digitalai', path: '/path/to/app.apk' })
 
 // Start a session
 start_session({
@@ -501,6 +560,15 @@ start_session({
     app: 'tb://abc123...',
     deviceName: 'Pixel 7',
     platformVersion: '13'
+})
+
+// Digital.ai native app — devices are selected via a deviceQuery
+start_session({
+    provider: 'digitalai',
+    platform: 'android',
+    app: 'cloud:com.example.app',
+    deviceQuery: "@os='android' and @version='14' and @name='.*Pixel.*'"
+    // or omit deviceQuery and pass deviceName / platformVersion to build one
 })
 ```
 

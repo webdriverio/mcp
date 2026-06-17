@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.8.0](https://github.com/webdriverio/mcp/compare/v3.7.0...v3.8.0) (2026-06-16)
+
+### Features
+
+* **providers:** add Digital.ai Testing cloud provider ([76e4542](https://github.com/webdriverio/mcp/commit/76e4542b8fde9084bcc468647e42680125df1af3))
+
 ## [3.7.0](https://github.com/webdriverio/mcp/compare/v3.6.0...v3.7.0) (2026-06-09)
 
 ### Features

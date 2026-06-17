@@ -35,7 +35,8 @@ src/
 │       ├── browserstack.provider.ts  # BrowserStack (browser + App Automate)
 │       ├── saucelabs.provider.ts     # Sauce Labs (browser + App Storage)
 │       ├── testmu.provider.ts        # TestMu / LambdaTest (browser + mobile)
-│       └── testingbot.provider.ts    # TestingBot (browser + mobile + Storage)
+│       ├── testingbot.provider.ts    # TestingBot (browser + mobile + Storage)
+│       └── digitalai.provider.ts     # Digital.ai Testing (browser + mobile; accessKey cap, deviceQuery)
 ├── trace/             # Playwright-compatible trace recording (recorder.ts, tool-mapping.ts, zip-writer.ts)
 ├── tools/             # One file per MCP tool (see Tool Pattern below)
 ├── resources/         # One file per MCP resource (see Recording below)
@@ -149,9 +150,10 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/providers/types.ts`                           | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
 | `src/providers/cloud/browserstack.provider.ts`     | BrowserStack provider — tunnel lifecycle + session result marking via `onSessionClose()` |
 | `src/providers/cloud/testingbot.provider.ts`       | TestingBot provider — `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
+| `src/providers/cloud/digitalai.provider.ts`        | Digital.ai provider — `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<id>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
-| `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu (registered in `server.ts`) |
+| `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Digital.ai uses Bearer auth; registered in `server.ts`) |
 | `src/resources/`                                   | All MCP resource definitions (one per URI)    |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
@@ -240,12 +242,14 @@ catch (e) {
 | `TESTMU_ACCESS_KEY` | TestMu / LambdaTest sessions + tools |
 | `TESTINGBOT_KEY` | TestingBot sessions + tools |
 | `TESTINGBOT_SECRET` | TestingBot sessions + tools |
+| `DIGITALAI_CLOUD_URL` | Digital.ai sessions + tools (cloud host, e.g. `https://cloud.example.com`) |
+| `DIGITALAI_ACCESS_KEY` | Digital.ai sessions + tools |
 
 ## Planned Improvements
 
 See `docs/architecture/` for proposals:
 
-- `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, TestMu, and TestingBot implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
+- `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, TestMu, TestingBot, and Digital.ai implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination
 - `interaction-sequencing-proposal.md` — Sequencing model for tool interactions
 - `trace-recording-and-replay.md` — Playwright-compatible trace recording (implemented in `src/trace/`)
