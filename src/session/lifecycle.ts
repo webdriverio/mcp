@@ -87,9 +87,11 @@ export function registerSession(
           await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {
           });
         }
-        await oldBrowser.deleteSession().catch(() => {
-          // Ignore errors during force-close of orphaned session
-        });
+        if (!oldMetadata?.isAttached) {
+          await oldBrowser.deleteSession().catch(() => {
+            // Ignore errors during force-close of orphaned session
+          });
+        }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle) {
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});

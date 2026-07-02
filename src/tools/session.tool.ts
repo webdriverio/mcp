@@ -19,7 +19,7 @@ export const startSessionToolDefinition: ToolDefinition = {
   description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
-    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).optional().default('local').describe('Session provider (default: local). "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
+    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Session provider (default: local). Use "external" to connect to an externally managed W3C WebDriver endpoint. "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
@@ -53,6 +53,12 @@ export const startSessionToolDefinition: ToolDefinition = {
       port: z.number().optional().default(9222),
       host: z.string().optional().default('localhost'),
     }).optional().describe('Chrome remote debugging connection (attach mode only, defaults: port 9222, host localhost)'),
+    webdriverConfig: z.object({
+      protocol: z.string().optional().default('http'),
+      hostname: z.string().optional().default('127.0.0.1'),
+      port: z.number().optional().default(4445),
+      path: z.string().optional().default('/'),
+    }).optional().describe('Existing W3C WebDriver endpoint connection (provider: "external" only). Defaults to 127.0.0.1:4445/.'),
     appiumConfig: z.object({
       host: z.string().optional(),
       port: z.number().optional(),
@@ -71,7 +77,7 @@ export const startSessionToolDefinition: ToolDefinition = {
 };
 
 type StartSessionArgs = {
-  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai';
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';
   platform: 'browser' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   browserVersion?: string;
@@ -98,6 +104,7 @@ type StartSessionArgs = {
   trace?: boolean;
   attach?: boolean;
   attachConfig?: { port?: number; host?: string };
+  webdriverConfig?: { protocol?: string; hostname?: string; port?: number; path?: string };
   appiumConfig?: { host?: string; port?: number; path?: string; protocol?: string };
   region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';
   tunnel?: boolean | 'external';
@@ -218,11 +225,12 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
 
   const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
   const { sessionId } = wdioBrowser;
+  const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
   const sessionMetadata: SessionMetadata = {
     type: 'browser',
     capabilities: mergedCapabilities,
-    isAttached: false,
+    isAttached: shouldAutoDetach,
     provider: args.provider ?? 'local',
     region: args.region,
     tunnelName,
@@ -262,11 +270,20 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     ? '\nNote: Safari does not support headless mode. Started in headed mode.'
     : '';
   const reportNote = provider.getStartNote?.(wdioBrowser) ?? '';
+  const startMessage = args.provider === 'external'
+    ? [
+      `Connected to externally managed WebDriver endpoint with sessionId: ${sessionId}`,
+      `Endpoint: ${connectionConfig.protocol ?? 'http'}://${connectionConfig.hostname ?? '127.0.0.1'}:${connectionConfig.port ?? 4445}${connectionConfig.path ?? '/'}`,
+      `Capabilities: ${JSON.stringify(mergedCapabilities)}`,
+      sizeNote.trim(),
+      reportNote.trim(),
+    ].filter(Boolean).join('\n')
+    : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${reportNote}`;
 
   return {
     content: [{
       type: 'text',
-      text: `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${reportNote}`,
+      text: startMessage,
     }],
   };
 }
@@ -422,6 +439,13 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
 
 export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Promise<CallToolResult> => {
   try {
+    if (args.provider === 'external' && args.platform !== 'browser') {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: 'Error starting session: provider "external" currently supports browser platform sessions only.' }],
+      };
+    }
+
     if (args.platform === 'browser') {
       if (args.attach) {
         return await attachBrowserSession(args);
@@ -442,7 +466,7 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const metadata = state.sessionMetadata.get(sessionId);
 
     const isAttached = !!metadata?.isAttached;
-    const detach = args.detach ?? false;
+    const detach = args.detach ?? metadata?.provider === 'external';
 
     // Determine if this is a force-close (auto-detached session + explicit close)
     const force = !detach && isAttached;

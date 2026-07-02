@@ -4,6 +4,7 @@ import type { SessionHistory } from '../../src/types/recording';
 // No mock of browser.tool — closeSessionTool reads from the module-level state directly.
 // We inject test sessions via getState(), which IS the module-level state object.
 import { closeSessionTool } from '../../src/tools/session.tool';
+import type { SessionMetadata } from '../../src/session/state';
 import { getState } from '../../src/session/state';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
@@ -11,11 +12,11 @@ const callClose = closeSessionTool as unknown as ToolFn;
 
 const mockDeleteSession = vi.fn();
 
-function setupSession(sessionId: string, isAttached: boolean) {
+function setupSession(sessionId: string, isAttached: boolean, metadata: Partial<SessionMetadata> = {}) {
   const state = getState();
   state.browsers.set(sessionId, { deleteSession: mockDeleteSession } as unknown as WebdriverIO.Browser);
   state.currentSession = sessionId;
-  state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached });
+  state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached, ...metadata });
   state.sessionHistory.set(sessionId, {
     sessionId,
     type: 'browser',
@@ -63,6 +64,22 @@ describe('close_session', () => {
     setupSession('sess-attached', true);
     const result = await callClose({ detach: true });
     expect(result.content[0].text).toContain('detached from');
+  });
+
+  it('detaches external sessions by default without deleting the externally managed session', async () => {
+    setupSession('sess-external', true, { provider: 'external' });
+    const result = await callClose({});
+
+    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('detached from');
+  });
+
+  it('force-closes external sessions when detach is explicitly false', async () => {
+    setupSession('sess-external', true, { provider: 'external' });
+    const result = await callClose({ detach: false });
+
+    expect(mockDeleteSession).toHaveBeenCalledOnce();
+    expect(result.content[0].text).toContain('closed');
   });
 
   it('cleans up local state in both cases', async () => {
