@@ -6,6 +6,7 @@ import { BrowserStackProvider } from '../../src/providers/cloud/browserstack.pro
 import { TestMuProvider } from '../../src/providers/cloud/testmu.provider';
 import { TestingBotProvider } from '../../src/providers/cloud/testingbot.provider';
 import { DigitalAiProvider } from '../../src/providers/cloud/digitalai.provider';
+import { ExternalProvider } from '../../src/providers/external.provider';
 
 describe('getProvider', () => {
   it('returns LocalBrowserProvider for local browser', () => {
@@ -66,6 +67,10 @@ describe('getProvider', () => {
 
   it('returns DigitalAiProvider for digitalai ios', () => {
     expect(getProvider('digitalai', 'ios')).toBeInstanceOf(DigitalAiProvider);
+  });
+
+  it('returns ExternalProvider for external browser', () => {
+    expect(getProvider('external', 'browser')).toBeInstanceOf(ExternalProvider);
   });
 
   it('defaults to local when provider is undefined', () => {

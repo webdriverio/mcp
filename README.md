@@ -681,6 +681,8 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 - **Scrolling**: Smooth scrolling with configurable distances
 - **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing
   authenticated or pre-configured sessions
+- **Connect to existing WebDriver endpoints**: Reuse an already-running Selenium-compatible WebDriver endpoint, such as
+  a framework-managed browser or a desktop webview automation bridge (like Tauri)
 - **Device emulation**: Apply mobile/tablet presets (iPhone 15, Pixel 7, etc.) to simulate responsive layouts without a
   physical device
 - **Session Recording**: All tool calls are automatically recorded and exportable as runnable WebdriverIO JS
@@ -700,7 +702,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a browser or app session. Use `platform: 'browser'` for web, `platform: 'ios'`/`'android'` for mobile, or `attach: true` to connect to a running Chrome instance |
+| `start_session`  | Start a browser or app session. Use `platform: 'browser'` for web, `platform: 'ios'`/`'android'` for mobile, `attach: true` to connect to a running Chrome instance, or `provider: 'external'` to connect to an existing WebDriver endpoint |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
 | `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
 | `emulate_device` | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session                                                                                |
@@ -874,6 +876,37 @@ start_session({attach: true})
 start_session({attach: true, port: 9333})
 start_session({attach: true, port: 9222, navigationUrl: 'https://app.example.com'})
 ```
+
+**Connect to an existing WebDriver endpoint:**
+
+Use `provider: 'external'` when another process already owns the browser or webview lifecycle and exposes a W3C
+WebDriver endpoint. This is useful for Selenium Grid sessions, externally managed browser drivers, or desktop apps like Tauri apps that
+embed a webview and expose WebDriver separately. The MCP server connects to the endpoint; it does not launch or stop the
+target application, start tunnels, or manage framework-specific setup.
+
+```javascript
+// Defaults to http://127.0.0.1:4445/ and browserName: 'chrome'
+start_session({provider: 'external', platform: 'browser'})
+
+// Custom WebDriver endpoint and capabilities
+start_session({
+    provider: 'external',
+    platform: 'browser',
+    webdriverConfig: {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: 4445,
+        path: '/'
+    },
+    capabilities: {
+        browserName: 'tauri'
+    }
+})
+```
+
+For desktop webview apps such as Tauri, first start the app and its WebDriver bridge outside of this MCP server, then
+pass the endpoint and the required capabilities. For example, a Tauri WebDriver bridge may require
+`capabilities: {browserName: 'tauri'}`.
 
 **Device emulation (requires BiDi session):**
 

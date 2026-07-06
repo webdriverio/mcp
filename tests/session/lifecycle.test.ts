@@ -84,6 +84,26 @@ describe('registerSession', () => {
     expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object), undefined);
   });
 
+  it('does not delete an auto-detached previous session during session transition', async () => {
+    const state = getState();
+    const oldBrowser = makeBrowser();
+    const oldMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: true, provider: 'external' };
+    const h1: SessionHistory = { sessionId: 's1', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
+    state.browsers.set('s1', oldBrowser);
+    state.sessionMetadata.set('s1', oldMeta);
+    state.sessionHistory.set('s1', h1);
+    state.currentSession = 's1';
+
+    const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
+    const h2: SessionHistory = { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
+    registerSession('s2', makeBrowser(), newMeta, h2);
+
+    // Allow fire-and-forget cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(oldBrowser.deleteSession).not.toHaveBeenCalled();
+  });
+
   it('appends session_transition to previous session', () => {
     const state = getState();
     const meta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };

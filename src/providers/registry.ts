@@ -6,6 +6,7 @@ import { sauceLabsProvider } from './cloud/saucelabs.provider';
 import { testMuProvider } from './cloud/testmu.provider';
 import { testingBotProvider } from './cloud/testingbot.provider';
 import { digitalAiProvider } from './cloud/digitalai.provider';
+import { externalProvider } from './external.provider';
 
 const providers = new Map<string, SessionProvider>([
   ['browserstack', browserStackProvider],
@@ -13,6 +14,7 @@ const providers = new Map<string, SessionProvider>([
   ['testmu', testMuProvider],
   ['testingbot', testingBotProvider],
   ['digitalai', digitalAiProvider],
+  ['external', externalProvider],
 ]);
 
 function getDefaultProvider(platform: string): SessionProvider {
