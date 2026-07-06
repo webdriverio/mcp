@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.10.0](https://github.com/webdriverio/mcp/compare/v3.9.0...v3.10.0) (2026-07-06)
+
+### Features
+
+* add external WebDriver provider ([2f83435](https://github.com/webdriverio/mcp/commit/2f83435da29fb51a560c12e2707abf7cd32043da))
+
 ## [3.9.0](https://github.com/webdriverio/mcp/compare/v3.8.0...v3.9.0) (2026-06-18)
 
 ## [3.8.0](https://github.com/webdriverio/mcp/compare/v3.7.0...v3.8.0) (2026-06-16)
