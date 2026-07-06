@@ -60,7 +60,7 @@ export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   capabilities: Record<string, unknown>;
   isAttached: boolean;
-  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot';   // set at session start; used by lifecycle to call provider hooks
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai';   // set at session start; used by lifecycle to call provider hooks
   tunnelHandle?: unknown;                 // opaque handle returned by provider.startTunnel(), passed back to onSessionClose()
 }
 ```

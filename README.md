@@ -494,10 +494,10 @@ start_session({
     provider: 'digitalai',
     platform: 'browser',
     browser: 'chrome',
-    os: 'Windows',               // combined with osVersion → platformName (optional)
+    os: 'Windows',               // combined with osVersion → digitalai:osName (optional)
     osVersion: '11',
     reporting: {
-        session: 'Login flow'    // → digitalai:options.testName
+        session: 'Login flow'    // → digitalai:testName (flat capability, not nested)
     }
 })
 ```
@@ -505,6 +505,7 @@ start_session({
 > **Provider-specific `os` / `osVersion` behavior:**
 > - **BrowserStack** — `os` and `osVersion` map to separate `bstack:options.os` / `bstack:options.osVersion` fields.
 > - **Sauce Labs / LambdaTest / TestingBot** — `os` and `osVersion` are combined into the W3C `platformName` capability (e.g., `os: 'Windows'` + `osVersion: '11'` → `platformName: 'Windows 11'`). These providers use `platformName` values like `"Windows 11"`, `"MacOS Sequoia"`, or `"Linux"`. TestingBot defaults to `Windows 11` when `os` is omitted.
+> - **Digital.ai** — `os` and `osVersion` are combined into the flat `digitalai:osName` capability (NOT `platformName`), e.g. `os: 'Windows'` + `osVersion: '11'` → `digitalai:osName: 'Windows 11'`.
 
 ### Mobile App Sessions
 
@@ -574,7 +575,7 @@ start_session({
 
 ### Mobile Browser Sessions
 
-Run a browser on a cloud mobile emulator/simulator without uploading an app:
+Run a browser on a cloud mobile device — real device or emulator/simulator — without uploading an app:
 
 ```javascript
 // BrowserStack — Chrome on Android emulator
@@ -613,9 +614,20 @@ start_session({
     deviceName: 'Pixel 7',
     platformVersion: '13'
 })
+
+// Digital.ai — Chrome on an Android device (real or emulator; selected via a deviceQuery)
+start_session({
+    provider: 'digitalai',
+    platform: 'android',
+    browser: 'chrome',
+    deviceName: 'Pixel 7',
+    platformVersion: '13'
+    // or omit deviceName / platformVersion and pass deviceQuery directly, e.g.
+    // deviceQuery: "@os='android' and @emulator='true'" to force an emulator
+})
 ```
 
-> **Note:** Mobile browser sessions do not require `app`, `appPath`, or `noReset`. The provider launches a browser on the emulator directly.
+> **Note:** Mobile browser sessions do not require `app`, `appPath`, or `noReset`. The provider launches a browser directly on the selected device — real or emulator/simulator.
 
 Use `list_apps` to see previously uploaded apps:
 
@@ -624,6 +636,7 @@ list_apps({ provider: 'browserstack' })
 list_apps({ provider: 'saucelabs', sortBy: 'app_name' })
 list_apps({ provider: 'testmu' })
 list_apps({ provider: 'testingbot' })
+list_apps({ provider: 'digitalai' })
 list_apps({ provider: 'browserstack', organizationWide: true })
 ```
 
@@ -668,7 +681,7 @@ All session types support `reporting` labels that appear in the provider dashboa
 | `upload_app` | Upload a local `.apk` or `.ipa` to the provider; returns an app URL/reference |
 | `list_apps`  | List apps previously uploaded to the provider's app storage                   |
 
-Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'testmu'`, or `'testingbot'`).
+Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'testmu'`, `'testingbot'`, or `'digitalai'`).
 
 ## Features
 
