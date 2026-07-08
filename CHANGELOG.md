@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.10.1](https://github.com/webdriverio/mcp/compare/v3.10.0...v3.10.1) (2026-07-08)
+
+### Features
+
+* **digitalai:** support mobile browser sessions, fix doc parity gaps ([9580afd](https://github.com/webdriverio/mcp/commit/9580afd670ccb210f4dbd137cb7f11cd698daf1e))
+
+### Bug Fixes
+
+* **bin:** Add default command for `npx -y` startup ([f1807ad](https://github.com/webdriverio/mcp/commit/f1807ad604500b72314e58257f05da7452eff6f0))
+
 ## [3.10.0](https://github.com/webdriverio/mcp/compare/v3.9.0...v3.10.0) (2026-07-06)
 
 ### Features
