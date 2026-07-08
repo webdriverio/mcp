@@ -87,8 +87,17 @@ export class DigitalAiProvider implements SessionProvider {
       'digitalai:options': digitalaiOptions,
     };
 
-    // Native app — Digital.ai app references look like "cloud:<package-or-bundle>".
-    if (options.app) caps['appium:app'] = options.app;
+    // Mobile browser mode (e.g. Chrome on a real or virtual Android device) — browserName is
+    // a standard W3C capability, so it stays flat rather than nested in digitalai:options.
+    // The deviceQuery matches real devices by default; pass '@emulator=\'true\'' to force one.
+    // No app needed.
+    const mobileBrowser = options.browser as string | undefined;
+    if (mobileBrowser) {
+      caps.browserName = mobileBrowser;
+    } else if (options.app) {
+      // Native app — Digital.ai app references look like "cloud:<package-or-bundle>".
+      caps['appium:app'] = options.app;
+    }
 
     return { ...userCapabilities, ...caps };
   }

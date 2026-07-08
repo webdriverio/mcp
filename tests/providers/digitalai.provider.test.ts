@@ -133,6 +133,14 @@ describe('DigitalAiProvider', () => {
       expect(caps['appium:app']).toBe('cloud:com.example.app');
     });
 
+    it('sets a flat browserName for mobile browser sessions and omits appium:app', () => {
+      const caps = provider.buildCapabilities({ platform: 'android', browser: 'chrome', deviceName: 'Pixel 7', platformVersion: '13' });
+      expect(caps.browserName).toBe('chrome');
+      expect(caps['appium:app']).toBeUndefined();
+      const dai = caps['digitalai:options'] as Record<string, unknown>;
+      expect(dai.deviceQuery).toBe("@os='android' and @version='13' and @name='Pixel 7'");
+    });
+
     it('defaults automationName per platform', () => {
       expect(provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15' })['appium:automationName']).toBe('XCUITest');
       expect(provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 7' })['appium:automationName']).toBe('UiAutomator2');

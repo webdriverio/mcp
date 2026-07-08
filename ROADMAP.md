@@ -13,7 +13,7 @@ What's shipped and stable today.
 | Mobile automation     | iOS (XCUITest) and Android (UiAutomator2) via Appium; native + hybrid app support             |
 | Element detection     | Platform-aware classification, multi-strategy locator generation, viewport filtering          |
 | Session model         | Single active session (browser or mobile), state preservation, detach mode                    |
-| Cloud providers       | BrowserStack browser + App Automate; provider abstraction ready for SauceLabs / LambdaTest    |
+| Cloud providers       | BrowserStack, Sauce Labs, LambdaTest (TestMu), TestingBot, and Digital.ai Testing — browser + native app, local tunnel support |
 | Test infrastructure   | Vitest unit tests, ESLint + TypeScript checks, CI pipeline on every PR                        |
 | Trace recording (v1)  | Synchronous Playwright-compatible trace zip; screenshot per action; auto-saved on session close; playable at player.vibium.dev |
 
