@@ -28,6 +28,7 @@ function setupSession(sessionId: string, isAttached: boolean, metadata: Partial<
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
   const state = getState();
   state.browsers.clear();
   state.sessionMetadata.clear();
@@ -76,6 +77,28 @@ describe('close_session', () => {
 
   it('force-closes external sessions when detach is explicitly false', async () => {
     setupSession('sess-external', true, { provider: 'external' });
+    const result = await callClose({ detach: false });
+
+    expect(mockDeleteSession).toHaveBeenCalledOnce();
+    expect(result.content[0].text).toContain('closed');
+  });
+
+  it('detaches sessionId attachments by default regardless of provider', async () => {
+    setupSession('sess-existing-cloud', true, {
+      provider: 'browserstack',
+      externallyManaged: true,
+    });
+    const result = await callClose({});
+
+    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('detached from');
+  });
+
+  it('force-closes sessionId attachments when detach is explicitly false', async () => {
+    setupSession('sess-existing-cloud', true, {
+      provider: 'browserstack',
+      externallyManaged: true,
+    });
     const result = await callClose({ detach: false });
 
     expect(mockDeleteSession).toHaveBeenCalledOnce();

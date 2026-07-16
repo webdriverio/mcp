@@ -1,4 +1,4 @@
-import { remote } from 'webdriverio';
+import { attach, remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
@@ -16,7 +16,7 @@ const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
-  description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
+  description: 'Starts or attaches to a browser or mobile automation session. Only one active session at a time — starting or attaching to another session closes or detaches from the existing session first. Use sessionId to attach to an existing remote WebDriver/Appium session, or attach: true to connect to a running Chrome via CDP.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
     provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Session provider (default: local). Use "external" to connect to an externally managed W3C WebDriver endpoint. "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
@@ -48,6 +48,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     fullReset: coerceBoolean.optional().describe('Uninstall app before/after session'),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium command timeout in seconds'),
     trace: coerceBoolean.optional().default(false).describe('Enable trace recording — produces a Playwright-compatible zip saved to .trace/ on close_session, playable at player.vibium.dev.'),
+    sessionId: z.string().min(1).optional().describe('Existing remote WebDriver/Appium session ID to attach to instead of creating a new session. The session is detached, not terminated, by default on close.'),
     attach: coerceBoolean.optional().default(false).describe('Attach to existing Chrome instead of launching'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -102,6 +103,7 @@ type StartSessionArgs = {
   fullReset?: boolean;
   newCommandTimeout?: number;
   trace?: boolean;
+  sessionId?: string;
   attach?: boolean;
   attachConfig?: { port?: number; host?: string };
   webdriverConfig?: { protocol?: string; hostname?: string; port?: number; path?: string };
@@ -370,6 +372,88 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   };
 }
 
+async function attachExistingSession(args: StartSessionArgs): Promise<CallToolResult> {
+  const { sessionId, platform, navigationUrl } = args;
+  if (!sessionId) throw new Error('sessionId is required to attach to an existing session');
+
+  const providerName = args.provider ?? 'local';
+  const provider = getProvider(providerName, platform);
+  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const mergedCapabilities = provider.buildCapabilities(args as Record<string, unknown>);
+
+  // Capabilities are not sent to the server while attaching, but WebdriverIO uses them
+  // to register the correct platform-specific command surface on the local client.
+  if (platform === 'ios' || platform === 'android') {
+    mergedCapabilities.platformName = platform === 'ios' ? 'iOS' : 'Android';
+    mergedCapabilities['appium:automationName'] = args.automationName
+      ?? (platform === 'ios' ? 'XCUITest' : 'UiAutomator2');
+  }
+
+  const browser = await attach({
+    ...connectionConfig,
+    sessionId,
+    capabilities: mergedCapabilities,
+    requestedCapabilities: mergedCapabilities,
+  });
+  const sessionType = provider.getSessionType(args as Record<string, unknown>);
+
+  const metadata: SessionMetadata = {
+    type: sessionType,
+    capabilities: mergedCapabilities,
+    isAttached: true,
+    externallyManaged: true,
+    provider: providerName,
+    region: args.region,
+    trace: args.trace ?? false,
+  };
+
+  registerSession(sessionId, browser, metadata, {
+    sessionId,
+    type: sessionType,
+    startedAt: new Date().toISOString(),
+    capabilities: mergedCapabilities,
+    ...(platform === 'browser' ? {} : {
+      appiumConfig: {
+        hostname: connectionConfig.hostname,
+        port: connectionConfig.port,
+        path: connectionConfig.path,
+      },
+    }),
+    steps: [],
+  });
+
+  if (args.trace) {
+    const viewport = platform === 'browser'
+      ? { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 }
+      : undefined;
+    startTrace(sessionId, mergedCapabilities, sessionType, viewport);
+  }
+
+  if (platform === 'browser' && navigationUrl) {
+    await browser.url(navigationUrl);
+    if (args.trace) await recordInitialNavigation(sessionId, navigationUrl);
+  }
+
+  const protocol = connectionConfig.protocol ?? 'http';
+  const hostname = connectionConfig.hostname ?? '127.0.0.1';
+  const port = connectionConfig.port ?? (protocol === 'https' ? 443 : 4444);
+  const path = connectionConfig.path ?? '/';
+  const reportNote = provider.getStartNote?.(browser) ?? '';
+
+  return {
+    content: [{
+      type: 'text',
+      text: [
+        `Attached to existing ${platform} session with sessionId: ${sessionId}`,
+        `Provider: ${providerName}`,
+        `Endpoint: ${protocol}://${hostname}:${port}${path}`,
+        'The externally managed session will be detached by default on close.',
+        reportNote.trim(),
+      ].filter(Boolean).join('\n'),
+    }],
+  };
+}
+
 async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolResult> {
   const { port = 9222, host = 'localhost' } = args.attachConfig ?? {};
   const { navigationUrl } = args;
@@ -439,6 +523,28 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
 
 export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Promise<CallToolResult> => {
   try {
+    if (args.sessionId && args.attach) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: 'Error starting session: sessionId cannot be combined with attach: true. Use sessionId for WebDriver/Appium attachment or attach for Chrome CDP attachment.' }],
+      };
+    }
+
+    const managedTunnel = args.tunnel === true
+      || args.browserstackLocal === true
+      || args.saucelabsLocal === true
+      || args.testmuLocal === true;
+    if (args.sessionId && managedTunnel) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: 'Error starting session: an existing session cannot start an MCP-managed tunnel. Keep the original tunnel running and use tunnel: "external" when applicable.' }],
+      };
+    }
+
+    if (args.sessionId) {
+      return await attachExistingSession(args);
+    }
+
     if (args.provider === 'external' && args.platform !== 'browser') {
       return {
         isError: true,
@@ -466,7 +572,8 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const metadata = state.sessionMetadata.get(sessionId);
 
     const isAttached = !!metadata?.isAttached;
-    const detach = args.detach ?? metadata?.provider === 'external';
+    const detachByDefault = metadata?.externallyManaged === true || metadata?.provider === 'external';
+    const detach = args.detach ?? detachByDefault;
 
     // Determine if this is a force-close (auto-detached session + explicit close)
     const force = !detach && isAttached;

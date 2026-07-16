@@ -715,7 +715,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a browser or app session. Use `platform: 'browser'` for web, `platform: 'ios'`/`'android'` for mobile, `attach: true` to connect to a running Chrome instance, or `provider: 'external'` to connect to an existing WebDriver endpoint |
+| `start_session`  | Start or attach to a browser or app session. Use `sessionId` for an existing remote WebDriver/Appium session, `attach: true` for a running Chrome instance over CDP, or omit both to create a session |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
 | `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
 | `emulate_device` | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session                                                                                |
@@ -921,6 +921,56 @@ For desktop webview apps such as Tauri, first start the app and its WebDriver br
 pass the endpoint and the required capabilities. For example, a Tauri WebDriver bridge may require
 `capabilities: {browserName: 'tauri'}`.
 
+**Attach to an existing WebDriver or Appium session:**
+
+Pass `sessionId` when the session has already been created by another process. The MCP reuses the selected provider's
+endpoint and credentials, registers the appropriate browser/mobile command set locally, and does not issue a new-session
+request. Attached sessions are externally managed: `close_session()` detaches by default, while
+`close_session({detach: false})` explicitly terminates the remote session.
+
+```javascript
+// Existing BrowserStack App Automate session
+start_session({
+    provider: 'browserstack',
+    platform: 'ios',
+    sessionId: 'existing-browserstack-session-id',
+    capabilities: {
+        'appium:deviceName': 'iPhone 15',
+        'appium:automationName': 'XCUITest'
+    }
+})
+
+// Existing session on a local Appium server
+start_session({
+    provider: 'local',
+    platform: 'android',
+    sessionId: 'existing-appium-session-id',
+    appiumConfig: {
+        protocol: 'http',
+        host: '127.0.0.1',
+        port: 4723,
+        path: '/'
+    }
+})
+
+// Existing mobile session on a custom W3C WebDriver endpoint
+start_session({
+    provider: 'external',
+    platform: 'ios',
+    sessionId: 'existing-grid-session-id',
+    webdriverConfig: {
+        protocol: 'https',
+        hostname: 'grid.example.com',
+        port: 443,
+        path: '/wd/hub'
+    }
+})
+```
+
+An existing cloud session must keep using the tunnel it was created with. `tunnel: true` is therefore rejected while
+attaching; keep the original tunnel process alive and use `tunnel: 'external'` when the provider configuration needs the
+tunnel capability metadata.
+
 **Device emulation (requires BiDi session):**
 
 ```
@@ -1034,6 +1084,7 @@ Test my hybrid app:
 - Use `close_session({ detach: true })` to disconnect without terminating the session on the Appium server
 - **State preservation** can be controlled with `noReset` and `fullReset` parameters during session creation
 - Sessions created with `noReset: true` or without `appPath` will automatically detach on close
+- Sessions attached with `sessionId` always detach on close unless `detach: false` is explicitly requested
 
 ⚠️ **Task Planning:**
 
@@ -1108,6 +1159,8 @@ close_session({detach: false})  // or just close_session()
 ```
 
 Sessions created with `noReset: true` or without `appPath` will automatically detach on close.
+Sessions attached by `sessionId` are externally managed and also detach by default; pass `detach: false` only when the
+MCP should deliberately terminate the existing remote session.
 
 This is particularly useful when:
 

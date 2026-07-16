@@ -104,6 +104,48 @@ describe('registerSession', () => {
     expect(oldBrowser.deleteSession).not.toHaveBeenCalled();
   });
 
+  it('does not report, delete, or stop resources for an externally managed previous session', async () => {
+    const state = getState();
+    const tunnel = makeTunnel();
+    const oldBrowser = makeBrowser();
+    const oldMeta: SessionMetadata = {
+      type: 'ios',
+      capabilities: {},
+      isAttached: true,
+      externallyManaged: true,
+      provider: 'browserstack',
+      tunnelHandle: tunnel,
+    };
+    state.browsers.set('external-session', oldBrowser);
+    state.sessionMetadata.set('external-session', oldMeta);
+    state.sessionHistory.set('external-session', {
+      sessionId: 'external-session',
+      type: 'ios',
+      startedAt: new Date().toISOString(),
+      capabilities: {},
+      steps: [],
+    });
+    state.currentSession = 'external-session';
+
+    registerSession('new-session', makeBrowser(), {
+      type: 'browser',
+      capabilities: {},
+      isAttached: false,
+    }, {
+      sessionId: 'new-session',
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: {},
+      steps: [],
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(mockOnSessionClose).not.toHaveBeenCalled();
+    expect(oldBrowser.deleteSession).not.toHaveBeenCalled();
+    expect(tunnel.stop).not.toHaveBeenCalled();
+  });
+
   it('appends session_transition to previous session', () => {
     const state = getState();
     const meta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
