@@ -174,6 +174,34 @@ describe('generateCode - header', () => {
     expect(code).toContain('"port": 4723');
     expect(code).toContain('"platformName": "Android"');
   });
+
+  it('generates attach_session with attach() and preserves the external session', () => {
+    const history: SessionHistory = {
+      sessionId: 'existing-bs-session',
+      type: 'ios',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: {
+        platformName: 'iOS',
+        'appium:automationName': 'XCUITest',
+      },
+      steps: [{
+        index: 1,
+        tool: 'attach_session',
+        params: { sessionId: 'existing-bs-session', provider: 'browserstack', platform: 'ios' },
+        status: 'ok',
+        durationMs: 100,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }],
+    };
+
+    const code = generateCode(history);
+    expect(code).toContain("import { attach } from 'webdriverio';");
+    expect(code).toContain('const browser = await attach({');
+    expect(code).toContain("hostname: 'hub-cloud.browserstack.com'");
+    expect(code).toContain("sessionId: 'existing-bs-session'");
+    expect(code).not.toContain('remote(');
+    expect(code).not.toContain('deleteSession');
+  });
 });
 
 describe('generateCode - tool mappings', () => {

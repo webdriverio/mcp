@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { getContextsTool } from '../../src/tools/get-contexts.tool';
-import { closeSessionTool, startSessionTool } from '../../src/tools/session.tool';
+import { attachSessionTool, closeSessionTool } from '../../src/tools/session.tool';
 import { switchContextTool } from '../../src/tools/context.tool';
 import { getState } from '../../src/session/state';
 
@@ -10,7 +10,7 @@ type ToolFn = (args: Record<string, unknown>) => Promise<{
   isError?: boolean;
 }>;
 
-const callStart = startSessionTool as unknown as ToolFn;
+const callAttach = attachSessionTool as unknown as ToolFn;
 const callContexts = getContextsTool as unknown as ToolFn;
 const callSwitch = switchContextTool as unknown as ToolFn;
 const callClose = closeSessionTool as unknown as ToolFn;
@@ -62,7 +62,7 @@ describe('existing session protocol integration', () => {
   });
 
   it('drives an existing Appium session without creating or deleting it', async () => {
-    const startResult = await callStart({
+    const startResult = await callAttach({
       sessionId: 'existing-appium-session',
       provider: 'external',
       platform: 'ios',

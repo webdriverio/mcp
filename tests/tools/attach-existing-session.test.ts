@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attach, remote } from 'webdriverio';
 import { Local as BrowserstackTunnel } from 'browserstack-local';
 import { registerSession } from '../../src/session/lifecycle';
-import { startSessionTool, startSessionToolDefinition } from '../../src/tools/session.tool';
+import {
+  attachSessionTool,
+  attachSessionToolDefinition,
+  startSessionToolDefinition,
+} from '../../src/tools/session.tool';
 
 const mockBrowser = vi.hoisted(() => ({
   sessionId: 'existing-session-id',
   capabilities: {},
-  url: vi.fn(),
 }));
 
 vi.mock('webdriverio', () => ({
@@ -33,7 +36,7 @@ vi.mock('../../src/session/state', () => ({
 }));
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
-const callTool = startSessionTool as unknown as ToolFn;
+const callTool = attachSessionTool as unknown as ToolFn;
 const mockAttach = attach as ReturnType<typeof vi.fn>;
 const mockRemote = remote as ReturnType<typeof vi.fn>;
 const mockRegisterSession = registerSession as ReturnType<typeof vi.fn>;
@@ -49,14 +52,18 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe('start_session with sessionId', () => {
-  it('exposes sessionId in the tool schema', () => {
-    const schema = startSessionToolDefinition.inputSchema.sessionId as unknown as {
+describe('attach_session', () => {
+  it('owns session-ID attachment in a dedicated, narrow schema', () => {
+    const schema = attachSessionToolDefinition.inputSchema.sessionId as unknown as {
       safeParse: (value: unknown) => { success: boolean };
     };
 
     expect(schema.safeParse('abc123').success).toBe(true);
     expect(schema.safeParse('').success).toBe(false);
+    expect(startSessionToolDefinition.inputSchema.sessionId).toBeUndefined();
+    expect(attachSessionToolDefinition.inputSchema.attach).toBeUndefined();
+    expect(attachSessionToolDefinition.inputSchema.tunnel).toBeUndefined();
+    expect(attachSessionToolDefinition.inputSchema.navigationUrl).toBeUndefined();
   });
 
   it('attaches to an existing BrowserStack iOS session without creating a session', async () => {
@@ -159,43 +166,6 @@ describe('start_session with sessionId', () => {
         type: 'ios',
       }),
     );
-  });
-
-  it('navigates only when navigationUrl is explicitly supplied for a browser session', async () => {
-    await callTool({
-      sessionId: 'existing-session-id',
-      provider: 'browserstack',
-      platform: 'browser',
-      browser: 'chrome',
-      navigationUrl: 'https://example.com',
-    });
-
-    expect(mockBrowser.url).toHaveBeenCalledWith('https://example.com');
-  });
-
-  it('rejects sessionId combined with Chrome CDP attach', async () => {
-    const result = await callTool({
-      sessionId: 'existing-session-id',
-      platform: 'browser',
-      attach: true,
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('cannot be combined');
-    expect(mockAttach).not.toHaveBeenCalled();
-  });
-
-  it('rejects starting a managed tunnel for an already-created session', async () => {
-    const result = await callTool({
-      sessionId: 'existing-session-id',
-      provider: 'browserstack',
-      platform: 'ios',
-      tunnel: true,
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('cannot start an MCP-managed tunnel');
-    expect(mockAttach).not.toHaveBeenCalled();
   });
 
   it('returns a tool error when WebdriverIO attachment fails', async () => {
