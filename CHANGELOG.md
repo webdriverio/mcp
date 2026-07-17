@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.11.0](https://github.com/webdriverio/mcp/compare/v3.10.1...v3.11.0) (2026-07-17)
+
+### Features
+
+* attach to existing WebDriver sessions ([e01a356](https://github.com/webdriverio/mcp/commit/e01a35636202da09285492ef6ffe1366e9a7866d))
+
+### Refactoring
+
+* separate existing session attachment ([792ea2d](https://github.com/webdriverio/mcp/commit/792ea2dac5eaaf52691e4472ef55db9e05ef3827))
+
 ## [3.10.1](https://github.com/webdriverio/mcp/compare/v3.10.0...v3.10.1) (2026-07-08)
 
 ### Features
