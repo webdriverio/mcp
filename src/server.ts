@@ -65,6 +65,8 @@ import {
   tabsResource,
 } from './resources';
 import {
+  attachSessionTool,
+  attachSessionToolDefinition,
   closeSessionTool,
   closeSessionToolDefinition,
   startSessionTool,
@@ -130,6 +132,7 @@ function createServer(): McpServer {
     withTrace(name, withRecording(name, cb));
 
   registerTool(startSessionToolDefinition, withRecording('start_session', startSessionTool));
+  registerTool(attachSessionToolDefinition, withRecording('attach_session', attachSessionTool));
   registerTool(closeSessionToolDefinition, closeSessionTool);
   registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
   registerTool(emulateDeviceToolDefinition, emulateDeviceTool);

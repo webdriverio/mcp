@@ -9,6 +9,8 @@ export interface SessionMetadata {
   tunnelName?: string;
   tunnelHandle?: unknown;
   trace?: boolean;
+  /** The remote session lifecycle is owned outside this MCP process. */
+  externallyManaged?: boolean;
 }
 
 const state = {

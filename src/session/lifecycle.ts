@@ -81,18 +81,18 @@ export function registerSession(
         if (oldMetadata?.trace) {
           await finalizeTrace(oldSessionId, oldBrowser);
         }
-        if (oldMetadata?.provider) {
+        if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {
           });
         }
-        if (!oldMetadata?.isAttached) {
+        if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           await oldBrowser.deleteSession().catch(() => {
             // Ignore errors during force-close of orphaned session
           });
         }
-        if (oldMetadata?.provider && oldMetadata?.tunnelHandle) {
+        if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }

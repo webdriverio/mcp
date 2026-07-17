@@ -1,4 +1,4 @@
-import { remote } from 'webdriverio';
+import { attach, remote } from 'webdriverio';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
@@ -16,7 +16,7 @@ const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
-  description: 'Starts a browser or mobile automation session. Only one active session at a time — starting a new one closes the existing session first. Use platform "browser" with a browser name, or "ios"/"android" with deviceName. Set attach: true to connect to a running Chrome via CDP instead of launching a new browser.',
+  description: 'Starts a new browser or mobile automation session. Only one active session at a time — starting another session closes or detaches from the existing session first. Use attach: true to connect to a running Chrome via CDP.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
     provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Session provider (default: local). Use "external" to connect to an externally managed W3C WebDriver endpoint. "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
@@ -76,6 +76,34 @@ export const startSessionToolDefinition: ToolDefinition = {
   },
 };
 
+export const attachSessionToolDefinition: ToolDefinition = {
+  name: 'attach_session',
+  description: 'Attaches to an existing remote WebDriver or Appium session by ID without creating a new session. Only one session can be active at a time. The externally managed session is detached, not terminated, by default on close.',
+  annotations: { title: 'Attach Session', destructiveHint: false },
+  inputSchema: {
+    sessionId: z.string().min(1).describe('Existing remote WebDriver/Appium session ID'),
+    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Provider hosting the existing session (default: local). Use "external" for a custom W3C WebDriver endpoint.'),
+    platform: platformEnum.describe('Existing session platform type'),
+    browser: browserEnum.optional().describe('Browser for local command registration (browser platform only, default: chrome)'),
+    automationName: automationEnum.optional().describe('Appium automation driver for local command registration (mobile platforms only)'),
+    webdriverConfig: z.object({
+      protocol: z.string().optional().default('http'),
+      hostname: z.string().optional().default('127.0.0.1'),
+      port: z.number().optional().default(4445),
+      path: z.string().optional().default('/'),
+    }).optional().describe('Existing W3C WebDriver endpoint connection (provider: "external" only). Defaults to 127.0.0.1:4445/.'),
+    appiumConfig: z.object({
+      host: z.string().optional(),
+      port: z.number().optional(),
+      path: z.string().optional(),
+      protocol: z.string().optional(),
+    }).optional().describe('Appium server connection (local provider only)'),
+    region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1). Only used with provider: "saucelabs".'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.'),
+    capabilities: z.record(z.string(), z.unknown()).optional().describe('Capabilities used to register the correct browser or Appium command surface locally; they are not sent to the remote endpoint'),
+  },
+};
+
 type StartSessionArgs = {
   provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';
   platform: 'browser' | 'ios' | 'android';
@@ -116,12 +144,25 @@ type StartSessionArgs = {
   capabilities?: Record<string, unknown>;
 };
 
+type AttachSessionArgs = {
+  sessionId: string;
+  provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';
+  platform: 'browser' | 'ios' | 'android';
+  browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
+  automationName?: 'XCUITest' | 'UiAutomator2';
+  webdriverConfig?: { protocol?: string; hostname?: string; port?: number; path?: string };
+  appiumConfig?: { host?: string; port?: number; path?: string; protocol?: string };
+  region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';
+  trace?: boolean;
+  capabilities?: Record<string, unknown>;
+};
+
 export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
   description: 'Closes the current session or detaches without terminating. Detach preserves app state on the Appium server — sessions with noReset: true auto-detach by default. Closing a browser attach session terminates chromedriver but the Chrome process spawned by launch_chrome remains running.',
   annotations: { title: 'Close Session', destructiveHint: true },
   inputSchema: {
-    detach: coerceBoolean.optional().describe('If true, disconnect without terminating (preserves app state). Default: false'),
+    detach: coerceBoolean.optional().describe('If true, disconnect without terminating; if false, terminate. When omitted, externally managed and auto-detach sessions are preserved while other sessions are terminated.'),
   },
 };
 
@@ -370,6 +411,82 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   };
 }
 
+async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolResult> {
+  const { sessionId, platform } = args;
+
+  const providerName = args.provider ?? 'local';
+  const provider = getProvider(providerName, platform);
+  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const mergedCapabilities = provider.buildCapabilities(args as Record<string, unknown>);
+
+  // Capabilities are not sent to the server while attaching, but WebdriverIO uses them
+  // to register the correct platform-specific command surface on the local client.
+  if (platform === 'ios' || platform === 'android') {
+    mergedCapabilities.platformName = platform === 'ios' ? 'iOS' : 'Android';
+    mergedCapabilities['appium:automationName'] = args.automationName
+      ?? (platform === 'ios' ? 'XCUITest' : 'UiAutomator2');
+  }
+
+  const browser = await attach({
+    ...connectionConfig,
+    sessionId,
+    capabilities: mergedCapabilities,
+    requestedCapabilities: mergedCapabilities,
+  });
+  const sessionType = provider.getSessionType(args as Record<string, unknown>);
+
+  const metadata: SessionMetadata = {
+    type: sessionType,
+    capabilities: mergedCapabilities,
+    isAttached: true,
+    externallyManaged: true,
+    provider: providerName,
+    region: args.region,
+    trace: args.trace ?? false,
+  };
+
+  registerSession(sessionId, browser, metadata, {
+    sessionId,
+    type: sessionType,
+    startedAt: new Date().toISOString(),
+    capabilities: mergedCapabilities,
+    ...(platform === 'browser' ? {} : {
+      appiumConfig: {
+        hostname: connectionConfig.hostname,
+        port: connectionConfig.port,
+        path: connectionConfig.path,
+      },
+    }),
+    steps: [],
+  });
+
+  if (args.trace) {
+    const viewport = platform === 'browser'
+      ? { width: 1920, height: 1080 }
+      : undefined;
+    startTrace(sessionId, mergedCapabilities, sessionType, viewport);
+  }
+
+  const protocol = connectionConfig.protocol ?? 'http';
+  const hostname = connectionConfig.hostname ?? '127.0.0.1';
+  const port = connectionConfig.port ?? (protocol === 'https' ? 443 : 4444);
+  const path = connectionConfig.path ?? '/';
+  const reportNote = provider.getStartNote?.(browser) ?? '';
+
+  return {
+    content: [{
+      type: 'text',
+      text: [
+        `Attached to existing ${platform} session with sessionId: ${sessionId}`,
+        `Provider: ${providerName}`,
+        `Endpoint: ${protocol}://${hostname}:${port}${path}`,
+        'The externally managed session will be detached by default on close.',
+        reportNote.trim(),
+      ].filter(Boolean).join('\n'),
+    }],
+  };
+}
+
 async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolResult> {
   const { port = 9222, host = 'localhost' } = args.attachConfig ?? {};
   const { navigationUrl } = args;
@@ -458,6 +575,14 @@ export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Pr
   }
 };
 
+export const attachSessionTool: ToolCallback = async (args: AttachSessionArgs): Promise<CallToolResult> => {
+  try {
+    return await attachExistingSession(args);
+  } catch (e) {
+    return { isError: true, content: [{ type: 'text', text: `Error attaching to session: ${e}` }] };
+  }
+};
+
 export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } = {}): Promise<CallToolResult> => {
   try {
     getBrowser();
@@ -466,7 +591,8 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const metadata = state.sessionMetadata.get(sessionId);
 
     const isAttached = !!metadata?.isAttached;
-    const detach = args.detach ?? metadata?.provider === 'external';
+    const detachByDefault = metadata?.externallyManaged === true || metadata?.provider === 'external';
+    const detach = args.detach ?? detachByDefault;
 
     // Determine if this is a force-close (auto-detached session + explicit close)
     const force = !detach && isAttached;

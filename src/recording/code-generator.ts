@@ -24,6 +24,88 @@ function inferExtensionScheme(history: SessionHistory): 'chrome-extension' | 'mo
   return browserName.includes('firefox') ? 'moz-extension' : 'chrome-extension';
 }
 
+function generateAttachSessionStep(params: Record<string, unknown>, history: SessionHistory): string {
+  const provider = (params.provider as string | undefined) ?? 'local';
+  const platform = params.platform as string;
+  const sessionId = (params.sessionId as string | undefined) ?? history.sessionId;
+  const capabilities = indentJson(history.capabilities).replace(
+    /("(?:digitalai:)?accessKey":\s*)"(?:[^"\\]|\\.)*"/g,
+    '$1process.env.DIGITALAI_ACCESS_KEY',
+  );
+
+  const connectionLines: string[] = [];
+  if (provider === 'browserstack') {
+    connectionLines.push(
+      "  protocol: 'https',",
+      `  hostname: '${platform === 'browser' ? 'hub.browserstack.com' : 'hub-cloud.browserstack.com'}',`,
+      '  port: 443,',
+      "  path: '/wd/hub',",
+      '  user: process.env.BROWSERSTACK_USERNAME,',
+      '  key: process.env.BROWSERSTACK_ACCESS_KEY,',
+    );
+  } else if (provider === 'saucelabs') {
+    const region = (params.region as string | undefined) ?? 'eu-central-1';
+    connectionLines.push(
+      "  protocol: 'https',",
+      `  hostname: 'ondemand.${escapeStr(region)}.saucelabs.com',`,
+      '  port: 443,',
+      "  path: '/wd/hub',",
+      '  user: process.env.SAUCE_USERNAME,',
+      '  key: process.env.SAUCE_ACCESS_KEY,',
+    );
+  } else if (provider === 'testmu') {
+    connectionLines.push(
+      "  protocol: 'https',",
+      `  hostname: '${platform === 'browser' ? 'hub.lambdatest.com' : 'mobile-hub.lambdatest.com'}',`,
+      '  port: 443,',
+      "  path: '/wd/hub',",
+      '  user: process.env.TESTMU_USERNAME,',
+      '  key: process.env.TESTMU_ACCESS_KEY,',
+    );
+  } else if (provider === 'testingbot') {
+    connectionLines.push(
+      "  protocol: 'https',",
+      "  hostname: 'hub.testingbot.com',",
+      '  port: 443,',
+      "  path: '/wd/hub',",
+      '  user: process.env.TESTINGBOT_KEY,',
+      '  key: process.env.TESTINGBOT_SECRET,',
+    );
+  } else if (provider === 'digitalai') {
+    connectionLines.push(
+      "  protocol: 'https',",
+      "  hostname: (process.env.DIGITALAI_CLOUD_URL ?? '').replace(/^https?:\\/\\//, '').replace(/\\/wd\\/hub\\/?$/, '').replace(/\\/+$/, ''),",
+      '  port: 443,',
+      "  path: '/wd/hub',",
+    );
+  } else {
+    const rawConfig = provider === 'external'
+      ? (params.webdriverConfig as Record<string, unknown> | undefined)
+      : (params.appiumConfig as Record<string, unknown> | undefined);
+    if (rawConfig) {
+      const config = {
+        protocol: rawConfig.protocol,
+        hostname: rawConfig.hostname ?? rawConfig.host,
+        port: rawConfig.port,
+        path: rawConfig.path,
+      };
+      for (const [key, value] of Object.entries(config)) {
+        if (value !== undefined) connectionLines.push(`  ${key}: ${JSON.stringify(value)},`);
+      }
+    }
+  }
+
+  const indentedCapabilities = capabilities.split('\n').map(line => `  ${line}`).join('\n');
+  return [
+    'const browser = await attach({',
+    ...connectionLines,
+    `  sessionId: '${escapeStr(sessionId)}',`,
+    `  capabilities: ${indentedCapabilities.trimStart()},`,
+    `  requestedCapabilities: ${indentedCapabilities.trimStart()},`,
+    '});',
+  ].join('\n');
+}
+
 function generateStep(step: RecordedStep, history: SessionHistory): string {
   if (step.tool === '__session_transition__') {
     const newId = (step.params.newSessionId as string) ?? 'unknown';
@@ -36,6 +118,8 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
 
   const p = step.params;
   switch (step.tool) {
+    case 'attach_session':
+      return generateAttachSessionStep(p, history);
     case 'start_session': {
       const platform = p.platform as string;
       const isBrowserStack = 'bstack:options' in history.capabilities;
@@ -241,6 +325,16 @@ export function generateCode(history: SessionHistory): string {
     .split('\n')
     .map(line => `  ${line}`)
     .join('\n');
+
+  if (history.steps.some(step => step.tool === 'attach_session')) {
+    return [
+      "import { attach } from 'webdriverio';",
+      '',
+      steps.replace(/^ {2}/gm, ''),
+      '',
+      '// The externally managed session is intentionally left running.',
+    ].join('\n');
+  }
 
   if (isBrowserStack) {
     const bsSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');

@@ -42,6 +42,26 @@ describe('ExternalProvider', () => {
     });
   });
 
+  it('builds platform capabilities for an attached iOS session', () => {
+    expect(provider.buildCapabilities({ platform: 'ios' })).toEqual({
+      platformName: 'iOS',
+      'appium:automationName': 'XCUITest',
+    });
+    expect(provider.getSessionType({ platform: 'ios' })).toBe('ios');
+  });
+
+  it('builds platform capabilities for an attached Android session', () => {
+    expect(provider.buildCapabilities({
+      platform: 'android',
+      capabilities: { 'appium:deviceName': 'Pixel 9' },
+    })).toEqual({
+      platformName: 'Android',
+      'appium:automationName': 'UiAutomator2',
+      'appium:deviceName': 'Pixel 9',
+    });
+    expect(provider.getSessionType({ platform: 'android' })).toBe('android');
+  });
+
   it('reports browser session semantics', () => {
     expect(provider.getSessionType({})).toBe('browser');
     expect(provider.shouldAutoDetach({})).toBe(true);
