@@ -127,6 +127,61 @@ describe('SauceLabsProvider', () => {
       expect(sauce.tunnelName).toBe('legacy-tunnel');
     });
 
+    it('does not set tunnelName when tunnel is enabled but no tunnelName is given', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'browser',
+        browser: 'chrome',
+        tunnel: true,
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce).not.toHaveProperty('tunnelName');
+    });
+
+    it('does not set tunnelName when tunnel is disabled', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'browser',
+        browser: 'chrome',
+        tunnelName: 'my-tunnel',
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce).not.toHaveProperty('tunnelName');
+    });
+
+    it('merges user-supplied sauce:options into generated sauce:options', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'browser',
+        browser: 'chrome',
+        capabilities: { 'sauce:options': { screenResolution: '1920x1080', extendedDebugging: true } },
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.screenResolution).toBe('1920x1080');
+      expect(sauce.extendedDebugging).toBe(true);
+      expect(sauce.region).toBeDefined();
+    });
+
+    it('generated region overrides a user-supplied sauce:options region', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'browser',
+        browser: 'chrome',
+        region: 'us-west-1',
+        capabilities: { 'sauce:options': { region: 'eu-central-1' } },
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.region).toBe('us-west-1');
+    });
+
+    it('merges user sauce:options for mobile native app mode', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'Pixel 7',
+        app: 'storage:filename=app.apk',
+        capabilities: { 'sauce:options': { extendedDebugging: true } },
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.extendedDebugging).toBe(true);
+      expect(sauce.appiumVersion).toBe('latest');
+    });
+
     it('merges user capabilities at top level', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',

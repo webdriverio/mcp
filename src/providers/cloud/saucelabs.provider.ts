@@ -34,13 +34,14 @@ export class SauceLabsProvider implements SessionProvider {
     const saucelabsLocal = (options.tunnel ?? options.saucelabsLocal) as boolean | string | undefined;
     const reporting = options.reporting as { project?: string; build?: string; session?: string } | undefined;
 
-    const sauceOptions: Record<string, unknown> = { region };
+    const userSauceOptions = (userCapabilities['sauce:options'] as Record<string, unknown> | undefined) ?? {};
+    const sauceOptions: Record<string, unknown> = { ...userSauceOptions, region };
 
     if (reporting?.build) sauceOptions.build = reporting.build;
     if (reporting?.session) sauceOptions.name = reporting.session;
     else if (reporting?.project) sauceOptions.name = reporting.project;
 
-    if (saucelabsLocal) {
+    if (saucelabsLocal && options.tunnelName) {
       sauceOptions.tunnelName = options.tunnelName;
     }
 
