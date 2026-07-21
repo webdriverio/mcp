@@ -170,18 +170,6 @@ describe('SauceLabsProvider', () => {
       expect(sauce.region).toBe('us-west-1');
     });
 
-    it('merges user sauce:options for mobile native app mode', () => {
-      const caps = provider.buildCapabilities({
-        platform: 'android',
-        deviceName: 'Pixel 7',
-        app: 'storage:filename=app.apk',
-        capabilities: { 'sauce:options': { extendedDebugging: true } },
-      });
-      const sauce = caps['sauce:options'] as Record<string, unknown>;
-      expect(sauce.extendedDebugging).toBe(true);
-      expect(sauce.appiumVersion).toBe('latest');
-    });
-
     it('merges user capabilities at top level', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',
@@ -271,6 +259,18 @@ describe('SauceLabsProvider', () => {
         app: 'storage:filename=app.apk',
       });
       expect(caps['appium:automationName']).toBe('UiAutomator2');
+    });
+
+    it('merges user sauce:options for mobile native app mode', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'Pixel 7',
+        app: 'storage:filename=app.apk',
+        capabilities: { 'sauce:options': { extendedDebugging: true } },
+      });
+      const sauce = caps['sauce:options'] as Record<string, unknown>;
+      expect(sauce.extendedDebugging).toBe(true);
+      expect(sauce.appiumVersion).toBe('latest');
     });
   });
 
