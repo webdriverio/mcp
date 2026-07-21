@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.11.1](https://github.com/webdriverio/mcp/compare/v3.11.0...v3.11.1) (2026-07-21)
+
+### Bug Fixes
+
+* **saucelabs:** preserve user sauce:options and omit empty tunnelName ([0608a15](https://github.com/webdriverio/mcp/commit/0608a15ea185e3383df15f8f6cbe9b7462e34818))
+* **saucelabs:** reorder and reintroduce test for merging user sauce:options in mobile native app mode ([1324871](https://github.com/webdriverio/mcp/commit/1324871a0b68239d93db9e7338ea2d7a8a32d584))
+
 ## [3.11.0](https://github.com/webdriverio/mcp/compare/v3.10.1...v3.11.0) (2026-07-17)
 
 ### Features
