@@ -1,5 +1,7 @@
 # WebDriverIO MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.webdriverio%2Fmcp.svg)](https://mcptoplist.com/server/io.github.webdriverio%2Fmcp)
+
 A Model Context Protocol (MCP) server that enables AI assistants to interact with web browsers and mobile applications
 using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified
 interface.
