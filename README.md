@@ -733,7 +733,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
 | `execute_script`         | Execute arbitrary JavaScript in the browser, or Appium mobile commands on devices                                                                                                                      |
 | `execute_electron_script` | Execute privileged JavaScript in the Electron main process (Electron sessions only)                                                                                                                   |
-| `trigger_electron_deeplink` | Trigger an Electron application deeplink (Electron sessions only)                                                                                                                                    |
+| `trigger_electron_deeplink` | Trigger an Electron deeplink whose scheme was explicitly configured at session start                                                                                                                 |
 | `switch_tab`             | Switch to a different browser tab by handle or 0-based index. Browser-only.                                                                                                                            |
 | `switch_frame`           | Switch into an iframe by CSS/XPath selector, or back to the top-level frame if no selector is given. Browser-only.                                                                                     |
 
@@ -891,6 +891,19 @@ execute_electron_script({ script: 'return electron.app.getName()' })
 ```
 
 Existing browser DOM tools work against the Electron renderer. `close_session` always tears down MCP-managed Electron sessions; `detach: true` is intentionally unsupported. Main/renderer log capture can be enabled with `captureMainProcessLogs` or `captureRendererLogs` plus `logDir`. Electron mocks are not exposed yet.
+
+To trigger an app deeplink, explicitly configure its URI scheme when starting the Electron session. The scheme has no colon and only URLs with that exact scheme can be dispatched:
+
+```javascript
+start_session({
+  platform: 'electron',
+  electronOptions: {
+    appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp',
+    deeplinkScheme: 'myapp'
+  }
+})
+trigger_electron_deeplink({ url: 'myapp://open/item' })
+```
 
 **Attach to a running Chrome instance:**
 

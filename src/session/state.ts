@@ -4,6 +4,8 @@ export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   /** Browser sessions can have a specialised lifecycle while retaining renderer semantics. */
   runtime?: 'webdriver' | 'electron';
+  /** Normalized URI scheme explicitly allowed for Electron deeplink dispatch. */
+  electronDeeplinkScheme?: string;
   capabilities: Record<string, unknown>;
   isAttached: boolean;
   provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';

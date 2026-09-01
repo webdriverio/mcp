@@ -123,34 +123,42 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
   // Terminate the WebDriver session if:
   // - force is true (override), OR
   // - detach is false AND isAttached is false (normal close)
-  if (force || (!detach && !isAttached)) {
-    if (metadata?.provider) {
+  try {
+    if (force || (!detach && !isAttached)) {
+      if (metadata?.provider) {
+        try {
+          const provider = getProvider(metadata.provider, metadata.type);
+          await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
+        } catch (e) {
+          console.error('[WARN] Failed to run provider onSessionClose:', e);
+        }
+      }
       try {
-        const provider = getProvider(metadata.provider, metadata.type);
-        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
+        await cleanupSessionRuntime(metadata?.runtime, browser);
       } catch (e) {
-        console.error('[WARN] Failed to run provider onSessionClose:', e);
+        console.error('[WARN] Failed to clean up session runtime:', e);
+      }
+      try {
+        await browser.deleteSession();
+      } finally {
+        // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs
+        if (metadata?.provider && metadata?.tunnelHandle) {
+          try {
+            const provider = getProvider(metadata.provider, metadata.type);
+            await provider.stopTunnel?.(metadata.tunnelHandle);
+          } catch (e) {
+            console.error('[WARN] Failed to stop tunnel:', e);
+          }
+        }
       }
     }
-    await cleanupSessionRuntime(metadata?.runtime, browser);
-    await browser.deleteSession();
+  } finally {
+    state.browsers.delete(sessionId);
+    state.sessionMetadata.delete(sessionId);
 
-    // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs
-    if (metadata?.provider && metadata?.tunnelHandle) {
-      try {
-        const provider = getProvider(metadata.provider, metadata.type);
-        await provider.stopTunnel?.(metadata.tunnelHandle);
-      } catch (e) {
-        console.error('[WARN] Failed to stop tunnel:', e);
-      }
+    // Only clear currentSession if it matches the session being closed
+    if (state.currentSession === sessionId) {
+      state.currentSession = null;
     }
-  }
-
-  state.browsers.delete(sessionId);
-  state.sessionMetadata.delete(sessionId);
-
-  // Only clear currentSession if it matches the session being closed
-  if (state.currentSession === sessionId) {
-    state.currentSession = null;
   }
 }

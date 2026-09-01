@@ -11,7 +11,7 @@ vi.mock('../../src/electron/runtime', () => ({
 }));
 vi.mock('../../src/session/lifecycle', () => ({ closeSession: vi.fn(), registerSession: mocks.registerSession }));
 
-import { startSessionTool } from '../../src/tools/session.tool';
+import { startSessionTool, startSessionToolDefinition } from '../../src/tools/session.tool';
 import { getState } from '../../src/session/state';
 
 const callStart = startSessionTool as unknown as (args: Record<string, unknown>, extra: unknown) => ReturnType<typeof startSessionTool>;
@@ -34,6 +34,29 @@ describe('start_session Electron', () => {
     expect(mocks.createElectronCapabilities).toHaveBeenCalledWith({ appBinaryPath: '/Applications/My App', appArgs: ['--test'] });
     expect(mocks.startWdioSession).toHaveBeenCalledWith([expect.objectContaining({ browserName: 'electron', browserVersion: '33.2.1' })], undefined);
     expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ type: 'browser', runtime: 'electron', provider: 'local' }), expect.objectContaining({ runtime: 'electron' }));
+  });
+
+  it('normalizes deeplinkScheme in metadata without passing it to the Electron service', async () => {
+    await callStart({
+      platform: 'electron',
+      electronOptions: { appBinaryPath: '/Applications/My App', deeplinkScheme: 'MyApp' },
+    }, {});
+
+    expect(mocks.createElectronCapabilities).toHaveBeenCalledWith({ appBinaryPath: '/Applications/My App' });
+    expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({
+      electronDeeplinkScheme: 'myapp',
+    }), expect.any(Object));
+  });
+
+  it('validates deeplinkScheme as a URI scheme without a colon', () => {
+    const schema = startSessionToolDefinition.inputSchema.electronOptions as unknown as {
+      safeParse: (value: unknown) => { success: boolean; data?: { deeplinkScheme?: string } };
+    };
+
+    expect(schema.safeParse({ deeplinkScheme: 'myapp' }).success).toBe(true);
+    expect(schema.safeParse({ deeplinkScheme: 'myapp:' }).success).toBe(false);
+    expect(schema.safeParse({ deeplinkScheme: 'my app' }).success).toBe(false);
+    expect(schema.safeParse({ deeplinkScheme: 'MyApp' }).data?.deeplinkScheme).toBe('myapp');
   });
 
   it('rejects cloud Electron and standalone log capture without a log directory', async () => {

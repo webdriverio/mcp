@@ -66,6 +66,16 @@ describe('attach_session', () => {
     expect(attachSessionToolDefinition.inputSchema.navigationUrl).toBeUndefined();
   });
 
+  it('rejects Electron at schema validation before provider or WebDriver attachment', () => {
+    const schema = attachSessionToolDefinition.inputSchema.platform as unknown as {
+      safeParse: (value: unknown) => { success: boolean };
+    };
+
+    expect(schema.safeParse('electron').success).toBe(false);
+    expect(mockAttach).not.toHaveBeenCalled();
+    expect(mockRemote).not.toHaveBeenCalled();
+  });
+
   it('attaches to an existing BrowserStack iOS session without creating a session', async () => {
     const result = await callTool({
       sessionId: 'existing-session-id',

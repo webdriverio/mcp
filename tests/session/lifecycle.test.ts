@@ -10,9 +10,16 @@ import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
 
 // Mock the provider registry so lifecycle tests don't depend on real providers
-const mockOnSessionClose = vi.fn().mockResolvedValue(undefined);
+const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime } = vi.hoisted(() => ({
+  mockOnSessionClose: vi.fn().mockResolvedValue(undefined),
+  mockStopTunnel: vi.fn().mockResolvedValue(undefined),
+  mockCleanupSessionRuntime: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../../src/providers/registry', () => ({
-  getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose })),
+  getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose, stopTunnel: mockStopTunnel })),
+}));
+vi.mock('../../src/electron/runtime', () => ({
+  cleanupSessionRuntime: mockCleanupSessionRuntime,
 }));
 
 const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
@@ -47,6 +54,8 @@ beforeEach(() => {
   state.sessionHistory.clear();
   state.currentSession = null;
   mockOnSessionClose.mockResolvedValue(undefined);
+  mockStopTunnel.mockResolvedValue(undefined);
+  mockCleanupSessionRuntime.mockResolvedValue(undefined);
 });
 
 describe('registerSession', () => {
@@ -269,6 +278,33 @@ describe('closeSession', () => {
 
     expect(browser.deleteSession).toHaveBeenCalled();
     expect(state.currentSession).toBeNull();
+  });
+
+  it('continues Electron teardown when runtime cleanup fails', async () => {
+    const browser = makeBrowser();
+    const tunnel = makeTunnel();
+    const state = getState();
+    mockCleanupSessionRuntime.mockRejectedValueOnce(new Error('Electron cleanup failed'));
+    state.browsers.set('electron-session', browser);
+    state.sessionMetadata.set('electron-session', {
+      type: 'browser', runtime: 'electron', capabilities: {}, isAttached: false,
+      provider: 'browserstack', tunnelHandle: tunnel,
+    });
+    state.sessionHistory.set('electron-session', {
+      sessionId: 'electron-session', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+    state.currentSession = 'electron-session';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await closeSession('electron-session', false, false);
+
+    expect(error).toHaveBeenCalledWith('[WARN] Failed to clean up session runtime:', expect.any(Error));
+    expect(browser.deleteSession).toHaveBeenCalledOnce();
+    expect(mockStopTunnel).toHaveBeenCalledWith(tunnel);
+    expect(state.browsers.has('electron-session')).toBe(false);
+    expect(state.sessionMetadata.has('electron-session')).toBe(false);
+    expect(state.currentSession).toBeNull();
+    error.mockRestore();
   });
 
   it('does not call onSessionClose when detach=true', async () => {
