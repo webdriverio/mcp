@@ -24,6 +24,12 @@ function inferExtensionScheme(history: SessionHistory): 'chrome-extension' | 'mo
   return browserName.includes('firefox') ? 'moz-extension' : 'chrome-extension';
 }
 
+function getElectronDeeplinkScheme(history: SessionHistory): string | undefined {
+  const startStep = history.steps.find(step => step.tool === 'start_session' && step.params.platform === 'electron');
+  const scheme = (startStep?.params.electronOptions as Record<string, unknown> | undefined)?.deeplinkScheme;
+  return typeof scheme === 'string' ? scheme.toLowerCase() : undefined;
+}
+
 function generateAttachSessionStep(params: Record<string, unknown>, history: SessionHistory): string {
   const provider = (params.provider as string | undefined) ?? 'local';
   const platform = params.platform as string;
@@ -285,8 +291,18 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const values = indentJson(p.args ?? []);
       return `await browser.electron.execute((electron, source, args) => new Function('electron', 'args', source)(electron, args), ${script}, ${values});`;
     }
-    case 'trigger_electron_deeplink':
-      return `await browser.electron.triggerDeeplink(${JSON.stringify(p.url)});`;
+    case 'trigger_electron_deeplink': {
+      const url = JSON.stringify(p.url);
+      return [
+        'if (!electronDeeplinkScheme) {',
+        "  throw new Error('Recorded Electron deeplink is missing electronOptions.deeplinkScheme.');",
+        '}',
+        `if (new URL(${url}).protocol !== \`${'${electronDeeplinkScheme}'}:\`) {`,
+        `  throw new Error(\`Recorded Electron deeplink must use "${'${electronDeeplinkScheme}'}:".\`);`,
+        '}',
+        `await browser.electron.triggerDeeplink(${url});`,
+      ].join('\n');
+    }
     case 'open_web_extension': {
       const scheme = p.scheme ?? inferExtensionScheme(history);
       const extensionPath = String(p.path).replace(/^\/+/, '');
@@ -338,8 +354,11 @@ export function generateCode(history: SessionHistory): string {
     .join('\n');
 
   if (history.runtime === 'electron') {
+    const deeplinkScheme = getElectronDeeplinkScheme(history);
     return [
       "import { startWdioSession, cleanupWdioSession } from '@wdio/electron-service';",
+      '',
+      `const electronDeeplinkScheme = ${JSON.stringify(deeplinkScheme)};`,
       '',
       'let browser;',
       'try {',
