@@ -233,6 +233,10 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         ].join('\n');
       }
 
+      if (platform === 'electron') {
+        const rootDir = (p.electronOptions as Record<string, unknown> | undefined)?.rootDir;
+        return `browser = await startWdioSession([${indentJson(history.capabilities)}]${rootDir ? `, { rootDir: ${JSON.stringify(rootDir)} }` : ''});`;
+      }
       if (platform === 'browser') {
         const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
         return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
@@ -276,6 +280,13 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const scriptArgs = (p.args as unknown[])?.length ? `, ${indentJson(p.args)}` : '';
       return `await browser.execute(${scriptCode}${scriptArgs});`;
     }
+    case 'execute_electron_script': {
+      const script = JSON.stringify(p.script);
+      const values = indentJson(p.args ?? []);
+      return `await browser.electron.execute((electron, source, args) => new Function('electron', 'args', source)(electron, args), ${script}, ${values});`;
+    }
+    case 'trigger_electron_deeplink':
+      return `await browser.electron.triggerDeeplink(${JSON.stringify(p.url)});`;
     case 'open_web_extension': {
       const scheme = p.scheme ?? inferExtensionScheme(history);
       const extensionPath = String(p.path).replace(/^\/+/, '');
@@ -325,6 +336,22 @@ export function generateCode(history: SessionHistory): string {
     .split('\n')
     .map(line => `  ${line}`)
     .join('\n');
+
+  if (history.runtime === 'electron') {
+    return [
+      "import { startWdioSession, cleanupWdioSession } from '@wdio/electron-service';",
+      '',
+      'let browser;',
+      'try {',
+      steps,
+      '} finally {',
+      '  if (browser) {',
+      '    await cleanupWdioSession(browser);',
+      '    await browser.deleteSession();',
+      '  }',
+      '}',
+    ].join('\n');
+  }
 
   if (history.steps.some(step => step.tool === 'attach_session')) {
     return [

@@ -60,7 +60,7 @@ describe('registerSession', () => {
       capabilities: {},
       steps: []
     };
-    registerSession('s1', browser, meta, history);
+    void registerSession('s1', browser, meta, history);
     expect(getState().currentSession).toBe('s1');
   });
 
@@ -76,7 +76,7 @@ describe('registerSession', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const h2: SessionHistory = { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s2', makeBrowser(), newMeta, h2);
+    void registerSession('s2', makeBrowser(), newMeta, h2);
 
     // Allow fire-and-forget to complete
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -96,7 +96,7 @@ describe('registerSession', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const h2: SessionHistory = { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s2', makeBrowser(), newMeta, h2);
+    void registerSession('s2', makeBrowser(), newMeta, h2);
 
     // Allow fire-and-forget cleanup to complete
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -127,7 +127,7 @@ describe('registerSession', () => {
     });
     state.currentSession = 'external-session';
 
-    registerSession('new-session', makeBrowser(), {
+    void registerSession('new-session', makeBrowser(), {
       type: 'browser',
       capabilities: {},
       isAttached: false,
@@ -168,7 +168,7 @@ describe('registerSession', () => {
       capabilities: {},
       steps: []
     };
-    registerSession('s2', makeBrowser(), meta, h2);
+    void registerSession('s2', makeBrowser(), meta, h2);
 
     expect(h1.steps.length).toBe(1);
     expect(h1.steps[0].tool).toBe('__session_transition__');
@@ -359,7 +359,7 @@ describe('registerSession orphaned trace cleanup', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const newHistory: SessionHistory = { sessionId: 's-new', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s-new', makeBrowser(), newMeta, newHistory);
+    void registerSession('s-new', makeBrowser(), newMeta, newHistory);
 
     // The orphan cleanup is fire-and-forget; wait for it to settle
     await vi.waitFor(() => {

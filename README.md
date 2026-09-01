@@ -1,8 +1,7 @@
 # WebDriverIO MCP Server
 
-A Model Context Protocol (MCP) server that enables AI assistants to interact with web browsers and mobile applications
-using WebDriverIO. Automate Chrome, Firefox, Edge, and Safari browsers plus iOS and Android apps—all through a unified
-interface.
+A Model Context Protocol (MCP) server that enables AI assistants to interact with web browsers, local Electron applications,
+and mobile applications using WebdriverIO. Automate Chrome, Firefox, Edge, Safari, Electron, iOS, and Android through a unified interface.
 
 ## Installation
 
@@ -715,7 +714,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a new browser or app session; `attach: true` retains the existing Chrome CDP connection mode                                                                         |
+| `start_session`  | Start a browser, local Electron application, or mobile app session; `attach: true` retains the existing Chrome CDP connection mode                                         |
 | `attach_session` | Attach to an existing remote WebDriver/Appium session by ID without creating a new session                                                                                   |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
 | `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
@@ -733,6 +732,8 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
 | `execute_script`         | Execute arbitrary JavaScript in the browser, or Appium mobile commands on devices                                                                                                                      |
+| `execute_electron_script` | Execute privileged JavaScript in the Electron main process (Electron sessions only)                                                                                                                   |
+| `trigger_electron_deeplink` | Trigger an Electron application deeplink (Electron sessions only)                                                                                                                                    |
 | `switch_tab`             | Switch to a different browser tab by handle or 0-based index. Browser-only.                                                                                                                            |
 | `switch_frame`           | Switch into an iframe by CSS/XPath selector, or back to the top-level frame if no selector is given. Browser-only.                                                                                     |
 
@@ -870,6 +871,26 @@ start_session({
     }
 })
 ```
+
+### Electron applications
+
+Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.12 or newer. Start a packaged app with `appBinaryPath`, an unpackaged app with `appEntryPoint`, or use `rootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
+
+```javascript
+start_session({
+  platform: 'electron',
+  browserVersion: '33.2.1',
+  electronOptions: {
+    appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp',
+    appArgs: ['--disable-gpu']
+  }
+})
+
+// Privileged: this code runs in the Electron main process, not the renderer.
+execute_electron_script({ script: 'return electron.app.getName()' })
+```
+
+Existing browser DOM tools work against the Electron renderer. `close_session` always tears down MCP-managed Electron sessions; `detach: true` is intentionally unsupported. Main/renderer log capture can be enabled with `captureMainProcessLogs` or `captureRendererLogs` plus `logDir`. Electron mocks are not exposed yet.
 
 **Attach to a running Chrome instance:**
 

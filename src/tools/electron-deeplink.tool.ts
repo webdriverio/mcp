@@ -1,0 +1,30 @@
+import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolDefinition } from '../types/tool';
+import { z } from 'zod';
+import { getBrowser, getState } from '../session/state';
+
+export const triggerElectronDeeplinkToolDefinition: ToolDefinition = {
+  name: 'trigger_electron_deeplink',
+  description: 'Triggers a deeplink through the active Electron application. Packaged binaries are required for deeplinks on Windows and Linux.',
+  annotations: { title: 'Trigger Electron Deeplink', destructiveHint: true },
+  inputSchema: { url: z.string().url().describe('Deeplink URL to trigger through the Electron service.') },
+};
+
+export const triggerElectronDeeplinkTool: ToolCallback = async (args: { url: string }): Promise<CallToolResult> => {
+  try {
+    const state = getState();
+    const metadata = state.currentSession ? state.sessionMetadata.get(state.currentSession) : undefined;
+    if (metadata?.runtime !== 'electron') {
+      return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: no active Electron session.' }] };
+    }
+    const browser = getBrowser() as WebdriverIO.Browser & { electron?: { triggerDeeplink: (url: string) => Promise<void> } };
+    if (!browser.electron?.triggerDeeplink) {
+      return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: Electron deeplink support is unavailable for this session.' }] };
+    }
+    await browser.electron.triggerDeeplink(args.url);
+    return { content: [{ type: 'text', text: `Electron deeplink triggered: ${args.url}` }] };
+  } catch (error) {
+    return { isError: true, content: [{ type: 'text', text: `Error triggering Electron deeplink: ${error instanceof Error ? error.message : String(error)}` }] };
+  }
+};

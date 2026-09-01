@@ -8,6 +8,7 @@ import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
+import { cleanupSessionRuntime } from '../electron/runtime.js';
 
 async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
   endTrace(sessionId);
@@ -55,12 +56,12 @@ export function handleSessionTransition(newSessionId: string): void {
   }
 }
 
-export function registerSession(
+export async function registerSession(
   sessionId: string,
   browser: WebdriverIO.Browser,
   metadata: SessionMetadata,
   historyEntry: SessionHistory,
-): void {
+): Promise<void> {
   const state = getState();
   const oldSessionId = state.currentSession;
   if (oldSessionId && oldSessionId !== sessionId) {
@@ -76,27 +77,27 @@ export function registerSession(
     const oldBrowser = state.browsers.get(oldSessionId);
     const oldMetadata = state.sessionMetadata.get(oldSessionId);
     if (oldBrowser) {
-      // Fire and forget — don't block registration on close
-      void (async () => {
-        if (oldMetadata?.trace) {
-          await finalizeTrace(oldSessionId, oldBrowser);
-        }
+      // Electron's standalone service has process-wide state. Its teardown must
+      // finish before a replacement app starts; other session transitions retain
+      // the former non-blocking behaviour.
+      const closeOld = async () => {
+        if (oldMetadata?.trace) await finalizeTrace(oldSessionId, oldBrowser);
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {
-          });
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {});
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
-          await oldBrowser.deleteSession().catch(() => {
-            // Ignore errors during force-close of orphaned session
-          });
+          await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
+          await oldBrowser.deleteSession().catch(() => {});
         }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }
-      })();
+      };
+      if (oldMetadata?.runtime === 'electron') await closeOld();
+      else void closeOld();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
     }
@@ -131,6 +132,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
         console.error('[WARN] Failed to run provider onSessionClose:', e);
       }
     }
+    await cleanupSessionRuntime(metadata?.runtime, browser);
     await browser.deleteSession();
 
     // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs

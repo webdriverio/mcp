@@ -9,20 +9,32 @@ import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
+import { getElectronService } from '../electron/runtime.js';
 
-const platformEnum = z.enum(['browser', 'ios', 'android']);
+const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
 const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
-  description: 'Starts a new browser or mobile automation session. Only one active session at a time — starting another session closes or detaches from the existing session first. Use attach: true to connect to a running Chrome via CDP.',
+  description: 'Starts a new browser, local Electron application, or mobile automation session. Only one active session at a time — starting another session closes or detaches from the existing session first. Use attach: true to connect to a running Chrome via CDP.',
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
     provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Session provider (default: local). Use "external" to connect to an externally managed W3C WebDriver endpoint. "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
+    electronOptions: z.object({
+      appBinaryPath: z.string().min(1).optional(),
+      appEntryPoint: z.string().min(1).optional(),
+      appArgs: z.array(z.string()).optional(),
+      rootDir: z.string().min(1).optional(),
+      electronBuilderConfig: z.string().min(1).optional(),
+      captureMainProcessLogs: coerceBoolean.optional(),
+      captureRendererLogs: coerceBoolean.optional(),
+      logDir: z.string().min(1).optional(),
+      cdpBridgeTimeout: z.number().positive().optional(),
+    }).optional().describe('Electron local-app options. Provide appBinaryPath, appEntryPoint, or rootDir for service discovery. browserVersion identifies the Electron version when the app binary is outside this project. Log capture requires logDir in standalone mode.'),
     os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs/TestingBot: combined with osVersion into W3C platformName. Digital.ai: combined with osVersion into the digitalai:osName capability (e.g. "Mac OS Sequoia", "Windows 10") — required for the grid to match a node. Browser platform only.'),
     osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs/TestingBot: combined with os into W3C platformName. Digital.ai: combined with os into digitalai:osName. Browser platform only.'),
     app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu, tb://... for TestingBot, cloud:<package-or-bundle> for Digital.ai mobile sessions)'),
@@ -106,9 +118,20 @@ export const attachSessionToolDefinition: ToolDefinition = {
 
 type StartSessionArgs = {
   provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';
-  platform: 'browser' | 'ios' | 'android';
+  platform: 'browser' | 'electron' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   browserVersion?: string;
+  electronOptions?: {
+    appBinaryPath?: string;
+    appEntryPoint?: string;
+    appArgs?: string[];
+    rootDir?: string;
+    electronBuilderConfig?: string;
+    captureMainProcessLogs?: boolean;
+    captureRendererLogs?: boolean;
+    logDir?: string;
+    cdpBridgeTimeout?: number;
+  };
   os?: string;
   osVersion?: string;
   app?: string;
@@ -279,7 +302,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     trace: args.trace ?? false,
   };
 
-  registerSession(sessionId, wdioBrowser, sessionMetadata, {
+  await registerSession(sessionId, wdioBrowser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
@@ -329,6 +352,70 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   };
 }
 
+async function startElectronSession(args: StartSessionArgs): Promise<CallToolResult> {
+  if ((args.provider ?? 'local') !== 'local') {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron sessions currently support provider "local" only.' }] };
+  }
+  if (args.attach) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: attaching to an existing Electron session is not supported.' }] };
+  }
+
+  const electronOptions = args.electronOptions ?? {};
+  const userCapabilities = args.capabilities ?? {};
+  const capabilityOptions = (userCapabilities['wdio:electronServiceOptions'] ?? {}) as Record<string, unknown>;
+  const hasApplication = Boolean(
+    electronOptions.appBinaryPath || electronOptions.appEntryPoint || electronOptions.rootDir ||
+    capabilityOptions.appBinaryPath || capabilityOptions.appEntryPoint,
+  );
+  if (!hasApplication) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron requires electronOptions.appBinaryPath, electronOptions.appEntryPoint, or electronOptions.rootDir.' }] };
+  }
+  if ((electronOptions.captureMainProcessLogs || electronOptions.captureRendererLogs) && !electronOptions.logDir && !capabilityOptions.logDir) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron log capture in standalone mode requires electronOptions.logDir.' }] };
+  }
+
+  // A replacement Electron app must be fully torn down before the service starts
+  // another app because the standalone service tracks launcher state by browser.
+  const state = getState();
+  if (state.currentSession) {
+    const oldMetadata = state.sessionMetadata.get(state.currentSession);
+    if (oldMetadata?.runtime === 'electron') {
+      await closeSession(state.currentSession, false, Boolean(oldMetadata.isAttached), true);
+    }
+  }
+
+  const { rootDir, ...serviceInput } = electronOptions;
+  const serviceOptions = { ...capabilityOptions, ...serviceInput };
+  const { createElectronCapabilities, startWdioSession } = await getElectronService();
+  const prepared = serviceOptions.appBinaryPath || serviceOptions.appEntryPoint
+    ? createElectronCapabilities(serviceOptions as Parameters<typeof createElectronCapabilities>[0])
+    : { browserName: 'electron', 'wdio:electronServiceOptions': serviceOptions };
+  const capabilities: Record<string, unknown> = {
+    ...userCapabilities,
+    ...prepared,
+    browserName: 'electron',
+    ...(args.browserVersion ? { browserVersion: args.browserVersion } : {}),
+    'wdio:electronServiceOptions': serviceOptions,
+  };
+
+  const browser = await startWdioSession([capabilities as never], rootDir ? { rootDir } : undefined);
+  const sessionId = browser.sessionId;
+  const metadata: SessionMetadata = {
+    type: 'browser', runtime: 'electron', capabilities, isAttached: false,
+    provider: 'local', trace: args.trace ?? false,
+  };
+  await registerSession(sessionId, browser, metadata, {
+    sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities, steps: [],
+  });
+  if (args.trace) startTrace(sessionId, capabilities, 'browser', { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 });
+
+  return { content: [{ type: 'text', text: [
+    `Electron application started with sessionId: ${sessionId}`,
+    serviceOptions.appBinaryPath ? `App binary: ${serviceOptions.appBinaryPath}` : serviceOptions.appEntryPoint ? `App entry point: ${serviceOptions.appEntryPoint}` : `Project root: ${rootDir}`,
+    args.browserVersion ? `Electron version: ${args.browserVersion}` : undefined,
+  ].filter(Boolean).join('\n') }] };
+}
+
 async function startMobileSession(args: StartSessionArgs): Promise<CallToolResult> {
   const { platform, appPath, app, deviceName, noReset } = args;
 
@@ -376,7 +463,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     trace: args.trace ?? false,
   };
 
-  registerSession(sessionId, browser, metadata, {
+  await registerSession(sessionId, browser, metadata, {
     sessionId,
     type: sessionType,
     startedAt: new Date().toISOString(),
@@ -445,7 +532,7 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
     trace: args.trace ?? false,
   };
 
-  registerSession(sessionId, browser, metadata, {
+  await registerSession(sessionId, browser, metadata, {
     sessionId,
     type: sessionType,
     startedAt: new Date().toISOString(),
@@ -519,7 +606,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     trace: args.trace ?? false,
   };
 
-  registerSession(sessionId, browser, sessionMetadata, {
+  await registerSession(sessionId, browser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
@@ -563,6 +650,7 @@ export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Pr
       };
     }
 
+    if (args.platform === 'electron') return await startElectronSession(args);
     if (args.platform === 'browser') {
       if (args.attach) {
         return await attachBrowserSession(args);
@@ -591,6 +679,9 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const metadata = state.sessionMetadata.get(sessionId);
 
     const isAttached = !!metadata?.isAttached;
+    if (metadata?.runtime === 'electron' && args.detach) {
+      return { isError: true, content: [{ type: 'text', text: 'Electron sessions are managed by the MCP server and cannot be detached.' }] };
+    }
     const detachByDefault = metadata?.externallyManaged === true || metadata?.provider === 'external';
     const detach = args.detach ?? detachByDefault;
 

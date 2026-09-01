@@ -141,7 +141,7 @@ export class DigitalAiProvider implements SessionProvider {
       ? 'Test passed'
       : `Test failed${result.reason ? `: ${result.reason}` : ''}`;
     try {
-      await browser.execute('seetest:client.setReportStatus', status, message);
+      await (browser as any).execute('seetest:client.setReportStatus', status, message);
     } catch (e) {
       console.error('[Digital.ai] Failed to set report status:', e);
     }
