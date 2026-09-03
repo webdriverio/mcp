@@ -874,15 +874,17 @@ start_session({
 
 ### Electron applications
 
-Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.12 or newer. Start a packaged app with `appBinaryPath`, an unpackaged app with `appEntryPoint`, or use `rootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
+Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.12 or newer. Put service options such as `appBinaryPath`, `appEntryPoint`, and `appArgs` in `capabilities['wdio:electronServiceOptions']`; use top-level `electronRootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
 
 ```javascript
 start_session({
   platform: 'electron',
   browserVersion: '33.2.1',
-  electronOptions: {
-    appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp',
-    appArgs: ['--disable-gpu']
+  capabilities: {
+    'wdio:electronServiceOptions': {
+      appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp',
+      appArgs: ['--disable-gpu']
+    }
   }
 })
 
@@ -897,9 +899,11 @@ To trigger an app deeplink, explicitly configure its URI scheme when starting th
 ```javascript
 start_session({
   platform: 'electron',
-  electronOptions: {
-    appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp',
-    deeplinkScheme: 'myapp'
+  electronDeeplinkScheme: 'myapp',
+  capabilities: {
+    'wdio:electronServiceOptions': {
+      appBinaryPath: '/path/to/MyApp.app/Contents/MacOS/MyApp'
+    }
   }
 })
 trigger_electron_deeplink({ url: 'myapp://open/item' })

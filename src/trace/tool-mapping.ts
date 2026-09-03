@@ -12,6 +12,8 @@ const TOOL_MAP: Record<string, TraceAction> = {
   swipe: { class: 'Page', method: 'swipe' },
   drag_and_drop: { class: 'Element', method: 'dragTo' },
   execute_script: { class: 'Page', method: 'evaluate' },
+  execute_electron_script: { class: 'Electron', method: 'execute' },
+  trigger_electron_deeplink: { class: 'Electron', method: 'triggerDeeplink' },
   launch_chrome: { class: 'Browser', method: 'launch' },
   open_web_extension: { class: 'Page', method: 'navigate' },
 };

@@ -56,12 +56,12 @@ export function handleSessionTransition(newSessionId: string): void {
   }
 }
 
-export async function registerSession(
+export function registerSession(
   sessionId: string,
   browser: WebdriverIO.Browser,
   metadata: SessionMetadata,
   historyEntry: SessionHistory,
-): Promise<void> {
+): void {
   const state = getState();
   const oldSessionId = state.currentSession;
   if (oldSessionId && oldSessionId !== sessionId) {
@@ -77,11 +77,17 @@ export async function registerSession(
     const oldBrowser = state.browsers.get(oldSessionId);
     const oldMetadata = state.sessionMetadata.get(oldSessionId);
     if (oldBrowser) {
-      // Electron's standalone service has process-wide state. Its teardown must
-      // finish before a replacement app starts; other session transitions retain
-      // the former non-blocking behaviour.
+      // Electron replacement teardown is performed by startElectronSession
+      // before it starts the next standalone service. Registration itself stays
+      // synchronous and orphan cleanup remains non-blocking.
       const closeOld = async () => {
-        if (oldMetadata?.trace) await finalizeTrace(oldSessionId, oldBrowser);
+        if (oldMetadata?.trace) {
+          try {
+            await finalizeTrace(oldSessionId, oldBrowser);
+          } catch (e) {
+            console.error('[WARN] Failed to finalize orphaned session trace:', e);
+          }
+        }
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
@@ -89,15 +95,18 @@ export async function registerSession(
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
-          await oldBrowser.deleteSession().catch(() => {});
+          try {
+            await oldBrowser.deleteSession();
+          } catch {
+            return;
+          }
         }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }
       };
-      if (oldMetadata?.runtime === 'electron') await closeOld();
-      else void closeOld();
+      void closeOld();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
     }
@@ -138,17 +147,15 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
-      try {
-        await browser.deleteSession();
-      } finally {
-        // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs
-        if (metadata?.provider && metadata?.tunnelHandle) {
-          try {
-            const provider = getProvider(metadata.provider, metadata.type);
-            await provider.stopTunnel?.(metadata.tunnelHandle);
-          } catch (e) {
-            console.error('[WARN] Failed to stop tunnel:', e);
-          }
+      await browser.deleteSession();
+      // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs. If
+      // session deletion fails, leave the tunnel alone for recovery.
+      if (metadata?.provider && metadata?.tunnelHandle) {
+        try {
+          const provider = getProvider(metadata.provider, metadata.type);
+          await provider.stopTunnel?.(metadata.tunnelHandle);
+        } catch (e) {
+          console.error('[WARN] Failed to stop tunnel:', e);
         }
       }
     }

@@ -162,8 +162,8 @@ function createServer(): McpServer {
   registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
-  registerTool(executeElectronScriptToolDefinition, withRecording('execute_electron_script', executeElectronScriptTool));
-  registerTool(triggerElectronDeeplinkToolDefinition, withRecording('trigger_electron_deeplink', triggerElectronDeeplinkTool));
+  registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
+  registerTool(triggerElectronDeeplinkToolDefinition, instrument('trigger_electron_deeplink', triggerElectronDeeplinkTool));
   registerTool(getElementsToolDefinition, getElementsTool);
   registerTool(openWebExtensionToolDefinition, instrument('open_web_extension', openWebExtensionTool));
 

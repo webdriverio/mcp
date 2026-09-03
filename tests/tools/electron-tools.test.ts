@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../src/session/state';
 import { executeElectronScriptTool } from '../../src/tools/electron-execute.tool';
-import { triggerElectronDeeplinkTool } from '../../src/tools/electron-deeplink.tool';
+import { triggerElectronDeeplinkTool, triggerElectronDeeplinkToolDefinition } from '../../src/tools/electron-deeplink.tool';
 
 const callElectronScript = executeElectronScriptTool as unknown as (args: { script: string; args?: unknown[] }, extra: unknown) => ReturnType<typeof executeElectronScriptTool>;
 const callElectronDeeplink = triggerElectronDeeplinkTool as unknown as (args: { url: string }, extra: unknown) => ReturnType<typeof triggerElectronDeeplinkTool>;
@@ -10,6 +10,14 @@ describe('Electron tools', () => {
   beforeEach(() => {
     const state = getState();
     state.browsers.clear(); state.sessionMetadata.clear(); state.sessionHistory.clear(); state.currentSession = null;
+  });
+
+  it('validates deeplink URI syntax while allowing authority-less custom URIs', () => {
+    const schema = triggerElectronDeeplinkToolDefinition.inputSchema.url as unknown as {
+      safeParse: (value: unknown) => { success: boolean };
+    };
+    expect(schema.safeParse('myapp:settings').success).toBe(true);
+    expect(schema.safeParse('not a uri').success).toBe(false);
   });
 
   it('rejects main-process execution outside Electron', async () => {
@@ -38,6 +46,19 @@ describe('Electron tools', () => {
     const result = await callElectronDeeplink({ url: 'myapp://open/item' }, {});
     expect(triggerDeeplink).toHaveBeenCalledWith('myapp://open/item');
     expect(result.isError).toBeUndefined();
+  });
+
+  it('accepts a valid deeplink without an authority component', async () => {
+    const triggerDeeplink = vi.fn().mockResolvedValue(undefined);
+    const state = getState();
+    state.currentSession = 'electron';
+    state.browsers.set('electron', { electron: { triggerDeeplink } } as any);
+    state.sessionMetadata.set('electron', { type: 'browser', runtime: 'electron', electronDeeplinkScheme: 'myapp', capabilities: {}, isAttached: false });
+
+    const result = await callElectronDeeplink({ url: 'myapp:settings' }, {});
+
+    expect(result.isError).toBeUndefined();
+    expect(triggerDeeplink).toHaveBeenCalledWith('myapp:settings');
   });
 
   it('rejects deeplinks when the Electron session has no configured scheme', async () => {

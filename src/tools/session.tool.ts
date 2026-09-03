@@ -26,18 +26,8 @@ export const startSessionToolDefinition: ToolDefinition = {
     platform: platformEnum.describe('Session platform type'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
-    electronOptions: z.object({
-      appBinaryPath: z.string().min(1).optional(),
-      appEntryPoint: z.string().min(1).optional(),
-      appArgs: z.array(z.string()).optional(),
-      rootDir: z.string().min(1).optional(),
-      electronBuilderConfig: z.string().min(1).optional(),
-      captureMainProcessLogs: coerceBoolean.optional(),
-      captureRendererLogs: coerceBoolean.optional(),
-      logDir: z.string().min(1).optional(),
-      cdpBridgeTimeout: z.number().positive().optional(),
-      deeplinkScheme: uriScheme.optional().describe('URI scheme allowed by trigger_electron_deeplink, without ":" (for example, "myapp"). Optional unless triggering deeplinks.'),
-    }).optional().describe('Electron local-app options. Provide appBinaryPath, appEntryPoint, or rootDir for service discovery. browserVersion identifies the Electron version when the app binary is outside this project. Log capture requires logDir in standalone mode. Configure deeplinkScheme before triggering deeplinks.'),
+    electronRootDir: z.string().min(1).optional().describe('Project root used by the Electron standalone service for Electron Builder/Electron Forge discovery. Electron-only.'),
+    electronDeeplinkScheme: uriScheme.optional().describe('URI scheme allowed by trigger_electron_deeplink, without ":" (for example, "myapp"). Electron-only and optional unless triggering deeplinks.'),
     os: z.string().optional().describe('Operating system for cloud provider browser sessions (e.g. "Windows", "Mac", "macOS", "Linux"). BrowserStack: sets bstack:options.os separately. TestMu/Sauce Labs/TestingBot: combined with osVersion into W3C platformName. Digital.ai: combined with osVersion into the digitalai:osName capability (e.g. "Mac OS Sequoia", "Windows 10") — required for the grid to match a node. Browser platform only.'),
     osVersion: z.string().optional().describe('OS version for cloud provider browser sessions (e.g. "11", "15", "Monterey"). BrowserStack: sets bstack:options.osVersion separately. TestMu/Sauce Labs/TestingBot: combined with os into W3C platformName. Digital.ai: combined with os into digitalai:osName. Browser platform only.'),
     app: z.string().optional().describe('App URL (bs://... for BrowserStack, storage:filename= for Sauce Labs, lt://... for TestMu, tb://... for TestingBot, cloud:<package-or-bundle> for Digital.ai mobile sessions)'),
@@ -87,7 +77,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     saucelabsLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: use "tunnel" instead. Enable Sauce Connect tunnel routing.'),
     testmuLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: use "tunnel" instead. Enable TestMu Tunnel routing.'),
     navigationUrl: z.string().optional().describe('URL to navigate to after starting'),
-    capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional capabilities to merge'),
+    capabilities: z.record(z.string(), z.unknown()).optional().describe('Additional capabilities to merge. For Electron, configure the official service under "wdio:electronServiceOptions" (for example appBinaryPath, appEntryPoint, appArgs, logDir, or captureRendererLogs).'),
   },
 };
 
@@ -124,18 +114,8 @@ type StartSessionArgs = {
   platform: 'browser' | 'electron' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   browserVersion?: string;
-  electronOptions?: {
-    appBinaryPath?: string;
-    appEntryPoint?: string;
-    appArgs?: string[];
-    rootDir?: string;
-    electronBuilderConfig?: string;
-    captureMainProcessLogs?: boolean;
-    captureRendererLogs?: boolean;
-    logDir?: string;
-    cdpBridgeTimeout?: number;
-    deeplinkScheme?: string;
-  };
+  electronRootDir?: string;
+  electronDeeplinkScheme?: string;
   os?: string;
   osVersion?: string;
   app?: string;
@@ -306,7 +286,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     trace: args.trace ?? false,
   };
 
-  await registerSession(sessionId, wdioBrowser, sessionMetadata, {
+  registerSession(sessionId, wdioBrowser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
@@ -364,18 +344,19 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     return { isError: true, content: [{ type: 'text', text: 'Error starting session: attaching to an existing Electron session is not supported.' }] };
   }
 
-  const electronOptions = args.electronOptions ?? {};
   const userCapabilities = args.capabilities ?? {};
-  const capabilityOptions = (userCapabilities['wdio:electronServiceOptions'] ?? {}) as Record<string, unknown>;
+  const configuredServiceOptions = userCapabilities['wdio:electronServiceOptions'];
+  const capabilityOptions = configuredServiceOptions && typeof configuredServiceOptions === 'object' && !Array.isArray(configuredServiceOptions)
+    ? configuredServiceOptions as Record<string, unknown>
+    : {};
   const hasApplication = Boolean(
-    electronOptions.appBinaryPath || electronOptions.appEntryPoint || electronOptions.rootDir ||
-    capabilityOptions.appBinaryPath || capabilityOptions.appEntryPoint,
+    args.electronRootDir || capabilityOptions.appBinaryPath || capabilityOptions.appEntryPoint,
   );
   if (!hasApplication) {
-    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron requires electronOptions.appBinaryPath, electronOptions.appEntryPoint, or electronOptions.rootDir.' }] };
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron requires capabilities["wdio:electronServiceOptions"].appBinaryPath, capabilities["wdio:electronServiceOptions"].appEntryPoint, or electronRootDir.' }] };
   }
-  if ((electronOptions.captureMainProcessLogs || electronOptions.captureRendererLogs) && !electronOptions.logDir && !capabilityOptions.logDir) {
-    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron log capture in standalone mode requires electronOptions.logDir.' }] };
+  if ((capabilityOptions.captureMainProcessLogs || capabilityOptions.captureRendererLogs) && !capabilityOptions.logDir) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: Electron log capture in standalone mode requires capabilities["wdio:electronServiceOptions"].logDir.' }] };
   }
 
   // A replacement Electron app must be fully torn down before the service starts
@@ -388,35 +369,28 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     }
   }
 
-  const { rootDir, deeplinkScheme, ...serviceInput } = electronOptions;
-  const serviceOptions = { ...capabilityOptions, ...serviceInput };
-  const { createElectronCapabilities, startWdioSession } = await getElectronService();
-  const prepared = serviceOptions.appBinaryPath || serviceOptions.appEntryPoint
-    ? createElectronCapabilities(serviceOptions as Parameters<typeof createElectronCapabilities>[0])
-    : { browserName: 'electron', 'wdio:electronServiceOptions': serviceOptions };
+  const { startWdioSession } = await getElectronService();
   const capabilities: Record<string, unknown> = {
     ...userCapabilities,
-    ...prepared,
     browserName: 'electron',
     ...(args.browserVersion ? { browserVersion: args.browserVersion } : {}),
-    'wdio:electronServiceOptions': serviceOptions,
   };
 
-  const browser = await startWdioSession([capabilities as never], rootDir ? { rootDir } : undefined);
+  const browser = await startWdioSession([capabilities as never], args.electronRootDir ? { rootDir: args.electronRootDir } : undefined);
   const sessionId = browser.sessionId;
   const metadata: SessionMetadata = {
     type: 'browser', runtime: 'electron', capabilities, isAttached: false,
     provider: 'local', trace: args.trace ?? false,
-    ...(deeplinkScheme ? { electronDeeplinkScheme: deeplinkScheme.toLowerCase() } : {}),
+    ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
-  await registerSession(sessionId, browser, metadata, {
+  registerSession(sessionId, browser, metadata, {
     sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities, steps: [],
   });
   if (args.trace) startTrace(sessionId, capabilities, 'browser', { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 });
 
   return { content: [{ type: 'text', text: [
     `Electron application started with sessionId: ${sessionId}`,
-    serviceOptions.appBinaryPath ? `App binary: ${serviceOptions.appBinaryPath}` : serviceOptions.appEntryPoint ? `App entry point: ${serviceOptions.appEntryPoint}` : `Project root: ${rootDir}`,
+    capabilityOptions.appBinaryPath ? `App binary: ${capabilityOptions.appBinaryPath}` : capabilityOptions.appEntryPoint ? `App entry point: ${capabilityOptions.appEntryPoint}` : `Project root: ${args.electronRootDir}`,
     args.browserVersion ? `Electron version: ${args.browserVersion}` : undefined,
   ].filter(Boolean).join('\n') }] };
 }
@@ -468,7 +442,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     trace: args.trace ?? false,
   };
 
-  await registerSession(sessionId, browser, metadata, {
+  registerSession(sessionId, browser, metadata, {
     sessionId,
     type: sessionType,
     startedAt: new Date().toISOString(),
@@ -537,7 +511,7 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
     trace: args.trace ?? false,
   };
 
-  await registerSession(sessionId, browser, metadata, {
+  registerSession(sessionId, browser, metadata, {
     sessionId,
     type: sessionType,
     startedAt: new Date().toISOString(),
@@ -611,7 +585,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     trace: args.trace ?? false,
   };
 
-  await registerSession(sessionId, browser, sessionMetadata, {
+  registerSession(sessionId, browser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),

@@ -6,9 +6,11 @@ import { getBrowser, getState } from '../session/state';
 
 export const triggerElectronDeeplinkToolDefinition: ToolDefinition = {
   name: 'trigger_electron_deeplink',
-  description: 'Triggers a deeplink through the active Electron application. The Electron session must be started with electronOptions.deeplinkScheme matching the URL scheme. Packaged binaries are required for deeplinks on Windows and Linux.',
+  description: 'Triggers a deeplink through the active Electron application. The Electron session must be started with electronDeeplinkScheme matching the URL scheme. Packaged binaries are required for deeplinks on Windows and Linux.',
   annotations: { title: 'Trigger Electron Deeplink', destructiveHint: true },
-  inputSchema: { url: z.string().url().describe('Deeplink URL to trigger through the Electron service.') },
+  inputSchema: { url: z.string().refine(value => {
+    try { new URL(value); return true; } catch { return false; }
+  }, 'Must be a valid URI.').describe('Deeplink URI to trigger through the Electron service.') },
 };
 
 export const triggerElectronDeeplinkTool: ToolCallback = async (args: { url: string }): Promise<CallToolResult> => {
@@ -19,7 +21,7 @@ export const triggerElectronDeeplinkTool: ToolCallback = async (args: { url: str
       return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: no active Electron session.' }] };
     }
     if (!metadata.electronDeeplinkScheme) {
-      return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: start the Electron session with electronOptions.deeplinkScheme before triggering deeplinks.' }] };
+      return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: start the Electron session with electronDeeplinkScheme before triggering deeplinks.' }] };
     }
     const url = new URL(args.url);
     if (url.protocol !== `${metadata.electronDeeplinkScheme}:`) {

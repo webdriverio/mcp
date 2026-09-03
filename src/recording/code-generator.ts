@@ -26,7 +26,7 @@ function inferExtensionScheme(history: SessionHistory): 'chrome-extension' | 'mo
 
 function getElectronDeeplinkScheme(history: SessionHistory): string | undefined {
   const startStep = history.steps.find(step => step.tool === 'start_session' && step.params.platform === 'electron');
-  const scheme = (startStep?.params.electronOptions as Record<string, unknown> | undefined)?.deeplinkScheme;
+  const scheme = startStep?.params.electronDeeplinkScheme;
   return typeof scheme === 'string' ? scheme.toLowerCase() : undefined;
 }
 
@@ -240,7 +240,7 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       }
 
       if (platform === 'electron') {
-        const rootDir = (p.electronOptions as Record<string, unknown> | undefined)?.rootDir;
+        const rootDir = p.electronRootDir;
         return `browser = await startWdioSession([${indentJson(history.capabilities)}]${rootDir ? `, { rootDir: ${JSON.stringify(rootDir)} }` : ''});`;
       }
       if (platform === 'browser') {
@@ -295,7 +295,7 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const url = JSON.stringify(p.url);
       return [
         'if (!electronDeeplinkScheme) {',
-        "  throw new Error('Recorded Electron deeplink is missing electronOptions.deeplinkScheme.');",
+        "  throw new Error('Recorded Electron deeplink is missing electronDeeplinkScheme.');",
         '}',
         `if (new URL(${url}).protocol !== \`${'${electronDeeplinkScheme}'}:\`) {`,
         `  throw new Error(\`Recorded Electron deeplink must use "${'${electronDeeplinkScheme}'}:".\`);`,
