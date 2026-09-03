@@ -12,6 +12,7 @@ vi.mock('../../src/session/lifecycle', () => ({ closeSession: vi.fn(), registerS
 
 import { startSessionTool, startSessionToolDefinition } from '../../src/tools/session.tool';
 import { getState } from '../../src/session/state';
+import { generateCode } from '../../src/recording/code-generator';
 
 const callStart = startSessionTool as unknown as (args: Record<string, unknown>, extra: unknown) => ReturnType<typeof startSessionTool>;
 
@@ -31,6 +32,37 @@ describe('start_session Electron', () => {
     expect(result.isError).toBeUndefined();
     expect(mocks.startWdioSession).toHaveBeenCalledWith([expect.objectContaining({ browserName: 'electron', browserVersion: '33.2.1', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/My App', appArgs: ['--test'] } })], undefined);
     expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ type: 'browser', runtime: 'electron', provider: 'local' }), expect.objectContaining({ runtime: 'electron' }));
+  });
+
+  it('records immutable Electron capabilities when the standalone service mutates launch capabilities', async () => {
+    mocks.startWdioSession.mockImplementation(async (capabilities: Record<string, unknown>[]) => {
+      const launchCapabilities = capabilities[0];
+      launchCapabilities.browserName = 'chrome';
+      const options = launchCapabilities['wdio:electronServiceOptions'] as Record<string, unknown>;
+      options.appArgs = ['--mutated-by-service'];
+      return { sessionId: 'electron-session' };
+    });
+
+    await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/My App', appArgs: ['--original'] } },
+    }, {});
+
+    const [, , metadata, history] = mocks.registerSession.mock.calls[0];
+    expect(metadata.capabilities).toMatchObject({
+      browserName: 'electron',
+      'wdio:electronServiceOptions': { appBinaryPath: '/Applications/My App', appArgs: ['--original'] },
+    });
+    expect(history.capabilities).toEqual(metadata.capabilities);
+    history.steps.push({
+      index: 1,
+      tool: 'start_session',
+      params: { platform: 'electron' },
+      status: 'ok',
+      durationMs: 0,
+      timestamp: new Date().toISOString(),
+    });
+    expect(generateCode(history)).toContain('"browserName": "electron"');
   });
 
   it('forwards electronRootDir and normalizes the top-level deeplink scheme', async () => {

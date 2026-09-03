@@ -93,6 +93,25 @@ describe('registerSession', () => {
     expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object), undefined);
   });
 
+  it('stops an orphaned managed tunnel when WebDriver deletion fails', async () => {
+    const state = getState();
+    const tunnel = makeTunnel();
+    const oldBrowser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('grid unavailable')) });
+    state.browsers.set('s1', oldBrowser);
+    state.sessionMetadata.set('s1', {
+      type: 'browser', capabilities: {}, isAttached: false, provider: 'saucelabs', tunnelHandle: tunnel,
+    });
+    state.sessionHistory.set('s1', { sessionId: 's1', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 's1';
+
+    registerSession('s2', makeBrowser(), { type: 'browser', capabilities: {}, isAttached: false }, {
+      sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+
+    await vi.waitFor(() => expect(mockStopTunnel).toHaveBeenCalledWith(tunnel));
+    expect(getState().currentSession).toBe('s2');
+  });
+
   it('does not delete an auto-detached previous session during session transition', async () => {
     const state = getState();
     const oldBrowser = makeBrowser();

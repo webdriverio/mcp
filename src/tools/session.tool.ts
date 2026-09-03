@@ -375,18 +375,22 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     browserName: 'electron',
     ...(args.browserVersion ? { browserVersion: args.browserVersion } : {}),
   };
+  // The standalone Electron service mutates its input capabilities while it
+  // prepares Chromedriver. Keep the caller's Electron capabilities for
+  // recording and replay rather than retaining that runtime-only mutation.
+  const recordedCapabilities = structuredClone(capabilities);
 
   const browser = await startWdioSession([capabilities as never], args.electronRootDir ? { rootDir: args.electronRootDir } : undefined);
   const sessionId = browser.sessionId;
   const metadata: SessionMetadata = {
-    type: 'browser', runtime: 'electron', capabilities, isAttached: false,
+    type: 'browser', runtime: 'electron', capabilities: recordedCapabilities, isAttached: false,
     provider: 'local', trace: args.trace ?? false,
     ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
   registerSession(sessionId, browser, metadata, {
-    sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities, steps: [],
+    sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities: recordedCapabilities, steps: [],
   });
-  if (args.trace) startTrace(sessionId, capabilities, 'browser', { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 });
+  if (args.trace) startTrace(sessionId, recordedCapabilities, 'browser', { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 });
 
   return { content: [{ type: 'text', text: [
     `Electron application started with sessionId: ${sessionId}`,

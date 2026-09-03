@@ -98,7 +98,8 @@ export function registerSession(
           try {
             await oldBrowser.deleteSession();
           } catch {
-            return;
+            // Continue to tunnel teardown. The state entry is removed below,
+            // so this is the last opportunity to release an auto-managed tunnel.
           }
         }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
