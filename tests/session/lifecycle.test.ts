@@ -263,7 +263,7 @@ describe('closeSession', () => {
     expect(callOrder).toEqual(['onSessionClose', 'deleteSession']);
   });
 
-  it('keeps the tunnel running when deleteSession fails while still clearing state', async () => {
+  it('still stops the tunnel when deleteSession fails while clearing state', async () => {
     const browser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('delete failed')) });
     const tunnel = makeTunnel();
     const state = getState();
@@ -274,7 +274,8 @@ describe('closeSession', () => {
 
     await expect(closeSession('delete-failure', false, false)).rejects.toThrow('delete failed');
 
-    expect(mockStopTunnel).not.toHaveBeenCalled();
+    expect(mockStopTunnel).toHaveBeenCalledWith(tunnel);
+    expect(mockStopTunnel).toHaveBeenCalledTimes(1);
     expect(state.browsers.has('delete-failure')).toBe(false);
     expect(state.sessionMetadata.has('delete-failure')).toBe(false);
     expect(state.currentSession).toBeNull();

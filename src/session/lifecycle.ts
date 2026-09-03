@@ -147,15 +147,19 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
-      await browser.deleteSession();
-      // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs. If
-      // session deletion fails, leave the tunnel alone for recovery.
-      if (metadata?.provider && metadata?.tunnelHandle) {
-        try {
-          const provider = getProvider(metadata.provider, metadata.type);
-          await provider.stopTunnel?.(metadata.tunnelHandle);
-        } catch (e) {
-          console.error('[WARN] Failed to stop tunnel:', e);
+      try {
+        await browser.deleteSession();
+      } finally {
+        // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs.
+        // If session deletion fails, still best-effort stop the tunnel so the
+        // teardown path does not leak resources.
+        if (metadata?.provider && metadata?.tunnelHandle) {
+          try {
+            const provider = getProvider(metadata.provider, metadata.type);
+            await provider.stopTunnel?.(metadata.tunnelHandle);
+          } catch (e) {
+            console.error('[WARN] Failed to stop tunnel:', e);
+          }
         }
       }
     }
