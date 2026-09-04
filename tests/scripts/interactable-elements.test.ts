@@ -119,10 +119,26 @@ describe('accessible name', () => {
 });
 
 describe('selector generation', () => {
-  it('uses unique text content', async () => {
+  it('uses explicit test hooks before accessible names', async () => {
+    document.body.innerHTML = '<button data-testid="submit-button">Submit form</button>';
+    const elements = await getInteractableBrowserElements(mockBrowser);
+    expect(elements[0].selector).toBe('[data-testid="submit-button"]');
+  });
+
+  it('supports data-test and data-qa hooks', async () => {
+    document.body.innerHTML = `
+      <button data-test="save">Save</button>
+      <button data-qa="cancel">Cancel</button>
+    `;
+    const elements = await getInteractableBrowserElements(mockBrowser);
+    expect(elements[0].selector).toBe('[data-test="save"]');
+    expect(elements[1].selector).toBe('[data-qa="cancel"]');
+  });
+
+  it('uses accessible name selectors', async () => {
     document.body.innerHTML = '<button>Submit form</button>';
     const elements = await getInteractableBrowserElements(mockBrowser);
-    expect(elements[0].selector).toBe('button*=Submit form');
+    expect(elements[0].selector).toBe('aria/Submit form');
   });
 
   it('uses aria-label selector when text is not unique', async () => {
@@ -145,6 +161,29 @@ describe('selector generation', () => {
     expect(elements[1].selector).toBe('#btn-b');
   });
 
+  it('skips generated ids', async () => {
+    document.body.innerHTML = '<input id="550e8400-e29b-41d4-a716-446655440000" name="email">';
+    const elements = await getInteractableBrowserElements(mockBrowser);
+    expect(elements[0].selector).toBe('input[name="email"]');
+  });
+
+  it('does not use generated ids in CSS path fallback', async () => {
+    document.body.innerHTML = `
+      <section id="550e8400-e29b-41d4-a716-446655440000">
+        <button></button>
+      </section>
+    `;
+    const elements = await getInteractableBrowserElements(mockBrowser);
+    expect(elements[0].selector).not.toContain('550e8400-e29b-41d4-a716-446655440000');
+    expect(elements[0].selector).toBe('body > section > button');
+  });
+
+  it('uses placeholder after name', async () => {
+    document.body.innerHTML = '<input placeholder="Search products">';
+    const elements = await getInteractableBrowserElements(mockBrowser);
+    expect(elements[0].selector).toBe('input[placeholder="Search\\ products"]');
+  });
+
   it('uses unique class selector before CSS path', async () => {
     document.body.innerHTML = `
       <button class="product_111">Add to basket</button>
@@ -162,6 +201,6 @@ describe('selector generation', () => {
     `;
     const elements = await getInteractableBrowserElements(mockBrowser);
     expect(elements[0].selector).not.toBe('button.btn');
-    expect(elements[0].selector).not.toBe('button*=Add to basket');
+    expect(elements[0].selector).not.toBe('aria/Add to basket');
   });
 });
