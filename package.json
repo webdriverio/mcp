@@ -55,6 +55,7 @@
     "@lambdatest/node-tunnel": "^4.0.11",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@toon-format/toon": "^2.1.0",
+    "@wdio/electron-service": "10.0.0",
     "@wdio/protocols": "^9.27.0",
     "@xmldom/xmldom": "^0.9.10",
     "browserstack-local": "^1.5.12",

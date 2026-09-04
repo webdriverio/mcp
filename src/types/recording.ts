@@ -11,6 +11,7 @@ export interface RecordedStep {
 export interface SessionHistory {
   sessionId: string;
   type: 'browser' | 'ios' | 'android';
+  runtime?: 'webdriver' | 'electron';
   startedAt: string;                  // ISO 8601
   endedAt?: string;                   // set on session close
   capabilities: Record<string, unknown>;  // full resolved capabilities

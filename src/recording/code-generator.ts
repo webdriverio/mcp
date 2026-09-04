@@ -24,6 +24,12 @@ function inferExtensionScheme(history: SessionHistory): 'chrome-extension' | 'mo
   return browserName.includes('firefox') ? 'moz-extension' : 'chrome-extension';
 }
 
+function getElectronDeeplinkScheme(history: SessionHistory): string | undefined {
+  const startStep = history.steps.find(step => step.tool === 'start_session' && step.params.platform === 'electron');
+  const scheme = startStep?.params.electronDeeplinkScheme;
+  return typeof scheme === 'string' ? scheme.toLowerCase() : undefined;
+}
+
 function generateAttachSessionStep(params: Record<string, unknown>, history: SessionHistory): string {
   const provider = (params.provider as string | undefined) ?? 'local';
   const platform = params.platform as string;
@@ -233,6 +239,10 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         ].join('\n');
       }
 
+      if (platform === 'electron') {
+        const rootDir = p.electronRootDir;
+        return `browser = await startWdioSession([${indentJson(history.capabilities)}]${rootDir ? `, { rootDir: ${JSON.stringify(rootDir)} }` : ''});`;
+      }
       if (platform === 'browser') {
         const nav = p.navigationUrl ? `\nawait browser.url('${escapeStr(p.navigationUrl)}');` : '';
         return `const browser = await remote({\n  capabilities: ${indentJson(history.capabilities)}\n});${nav}`;
@@ -275,6 +285,23 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       const scriptCode = `'${escapeStr(p.script)}'`;
       const scriptArgs = (p.args as unknown[])?.length ? `, ${indentJson(p.args)}` : '';
       return `await browser.execute(${scriptCode}${scriptArgs});`;
+    }
+    case 'execute_electron_script': {
+      const script = JSON.stringify(p.script);
+      const values = indentJson(p.args ?? []);
+      return `await browser.electron.execute((electron, source, args) => new Function('electron', 'args', source)(electron, args), ${script}, ${values});`;
+    }
+    case 'trigger_electron_deeplink': {
+      const url = JSON.stringify(p.url);
+      return [
+        'if (!electronDeeplinkScheme) {',
+        "  throw new Error('Recorded Electron deeplink is missing electronDeeplinkScheme.');",
+        '}',
+        `if (new URL(${url}).protocol !== \`${'${electronDeeplinkScheme}'}:\`) {`,
+        `  throw new Error(\`Recorded Electron deeplink must use "${'${electronDeeplinkScheme}'}:".\`);`,
+        '}',
+        `await browser.electron.triggerDeeplink(${url});`,
+      ].join('\n');
     }
     case 'open_web_extension': {
       const scheme = p.scheme ?? inferExtensionScheme(history);
@@ -325,6 +352,25 @@ export function generateCode(history: SessionHistory): string {
     .split('\n')
     .map(line => `  ${line}`)
     .join('\n');
+
+  if (history.runtime === 'electron') {
+    const deeplinkScheme = getElectronDeeplinkScheme(history);
+    return [
+      "import { startWdioSession, cleanupWdioSession } from '@wdio/electron-service';",
+      '',
+      `const electronDeeplinkScheme = ${JSON.stringify(deeplinkScheme)};`,
+      '',
+      'let browser;',
+      'try {',
+      steps,
+      '} finally {',
+      '  if (browser) {',
+      '    await cleanupWdioSession(browser);',
+      '    await browser.deleteSession();',
+      '  }',
+      '}',
+    ].join('\n');
+  }
 
   if (history.steps.some(step => step.tool === 'attach_session')) {
     return [

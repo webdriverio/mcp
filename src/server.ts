@@ -82,6 +82,8 @@ import { getContextsTool, getContextsToolDefinition } from './tools/get-contexts
 import { appStateTool, appStateToolDefinition } from './tools/app-state.tool';
 import { getCookiesTool, getCookiesToolDefinition } from './tools/get-cookies.tool';
 import { openWebExtensionTool, openWebExtensionToolDefinition } from './tools/web-extension.tool';
+import { executeElectronScriptTool, executeElectronScriptToolDefinition } from './tools/electron-execute.tool';
+import { triggerElectronDeeplinkTool, triggerElectronDeeplinkToolDefinition } from './tools/electron-deeplink.tool';
 
 console.log = (...args) => console.error('[LOG]', ...args);
 console.info = (...args) => console.error('[INFO]', ...args);
@@ -96,7 +98,7 @@ function createServer(): McpServer {
     description: pkg.description,
     websiteUrl: 'https://github.com/webdriverio/mcp',
   }, {
-    instructions: 'MCP server for browser and mobile app automation using WebDriverIO. Supports Chrome, Firefox, Edge, and Safari browser control plus iOS/Android native app testing via Appium.',
+    instructions: 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.',
     capabilities: {
       tools: {},
       resources: {},
@@ -160,6 +162,8 @@ function createServer(): McpServer {
   registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
+  registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
+  registerTool(triggerElectronDeeplinkToolDefinition, instrument('trigger_electron_deeplink', triggerElectronDeeplinkTool));
   registerTool(getElementsToolDefinition, getElementsTool);
   registerTool(openWebExtensionToolDefinition, instrument('open_web_extension', openWebExtensionTool));
 

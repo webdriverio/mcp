@@ -15,5 +15,5 @@ export default defineConfig({
   platform: 'node',
   outDir: 'lib',
 
-  external: ['zod'],
+  external: ['zod', '@wdio/electron-service'],
 });

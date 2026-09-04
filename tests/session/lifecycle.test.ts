@@ -10,9 +10,16 @@ import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
 
 // Mock the provider registry so lifecycle tests don't depend on real providers
-const mockOnSessionClose = vi.fn().mockResolvedValue(undefined);
+const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime } = vi.hoisted(() => ({
+  mockOnSessionClose: vi.fn().mockResolvedValue(undefined),
+  mockStopTunnel: vi.fn().mockResolvedValue(undefined),
+  mockCleanupSessionRuntime: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../../src/providers/registry', () => ({
-  getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose })),
+  getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose, stopTunnel: mockStopTunnel })),
+}));
+vi.mock('../../src/electron/runtime', () => ({
+  cleanupSessionRuntime: mockCleanupSessionRuntime,
 }));
 
 const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
@@ -47,6 +54,8 @@ beforeEach(() => {
   state.sessionHistory.clear();
   state.currentSession = null;
   mockOnSessionClose.mockResolvedValue(undefined);
+  mockStopTunnel.mockResolvedValue(undefined);
+  mockCleanupSessionRuntime.mockResolvedValue(undefined);
 });
 
 describe('registerSession', () => {
@@ -60,7 +69,7 @@ describe('registerSession', () => {
       capabilities: {},
       steps: []
     };
-    registerSession('s1', browser, meta, history);
+    void registerSession('s1', browser, meta, history);
     expect(getState().currentSession).toBe('s1');
   });
 
@@ -76,12 +85,31 @@ describe('registerSession', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const h2: SessionHistory = { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s2', makeBrowser(), newMeta, h2);
+    void registerSession('s2', makeBrowser(), newMeta, h2);
 
     // Allow fire-and-forget to complete
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object), undefined);
+  });
+
+  it('stops an orphaned managed tunnel when WebDriver deletion fails', async () => {
+    const state = getState();
+    const tunnel = makeTunnel();
+    const oldBrowser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('grid unavailable')) });
+    state.browsers.set('s1', oldBrowser);
+    state.sessionMetadata.set('s1', {
+      type: 'browser', capabilities: {}, isAttached: false, provider: 'saucelabs', tunnelHandle: tunnel,
+    });
+    state.sessionHistory.set('s1', { sessionId: 's1', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 's1';
+
+    registerSession('s2', makeBrowser(), { type: 'browser', capabilities: {}, isAttached: false }, {
+      sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+
+    await vi.waitFor(() => expect(mockStopTunnel).toHaveBeenCalledWith(tunnel));
+    expect(getState().currentSession).toBe('s2');
   });
 
   it('does not delete an auto-detached previous session during session transition', async () => {
@@ -96,7 +124,7 @@ describe('registerSession', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const h2: SessionHistory = { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s2', makeBrowser(), newMeta, h2);
+    void registerSession('s2', makeBrowser(), newMeta, h2);
 
     // Allow fire-and-forget cleanup to complete
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -127,7 +155,7 @@ describe('registerSession', () => {
     });
     state.currentSession = 'external-session';
 
-    registerSession('new-session', makeBrowser(), {
+    void registerSession('new-session', makeBrowser(), {
       type: 'browser',
       capabilities: {},
       isAttached: false,
@@ -168,7 +196,7 @@ describe('registerSession', () => {
       capabilities: {},
       steps: []
     };
-    registerSession('s2', makeBrowser(), meta, h2);
+    void registerSession('s2', makeBrowser(), meta, h2);
 
     expect(h1.steps.length).toBe(1);
     expect(h1.steps[0].tool).toBe('__session_transition__');
@@ -254,6 +282,24 @@ describe('closeSession', () => {
     expect(callOrder).toEqual(['onSessionClose', 'deleteSession']);
   });
 
+  it('still stops the tunnel when deleteSession fails while clearing state', async () => {
+    const browser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('delete failed')) });
+    const tunnel = makeTunnel();
+    const state = getState();
+    state.browsers.set('delete-failure', browser);
+    state.sessionMetadata.set('delete-failure', { type: 'browser', capabilities: {}, isAttached: false, provider: 'browserstack', tunnelHandle: tunnel });
+    state.sessionHistory.set('delete-failure', { sessionId: 'delete-failure', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'delete-failure';
+
+    await expect(closeSession('delete-failure', false, false)).rejects.toThrow('delete failed');
+
+    expect(mockStopTunnel).toHaveBeenCalledWith(tunnel);
+    expect(mockStopTunnel).toHaveBeenCalledTimes(1);
+    expect(state.browsers.has('delete-failure')).toBe(false);
+    expect(state.sessionMetadata.has('delete-failure')).toBe(false);
+    expect(state.currentSession).toBeNull();
+  });
+
   it('still closes the session when onSessionClose fails', async () => {
     const browser = makeBrowser();
     mockOnSessionClose.mockRejectedValue(new Error('close failed'));
@@ -269,6 +315,33 @@ describe('closeSession', () => {
 
     expect(browser.deleteSession).toHaveBeenCalled();
     expect(state.currentSession).toBeNull();
+  });
+
+  it('continues Electron teardown when runtime cleanup fails', async () => {
+    const browser = makeBrowser();
+    const tunnel = makeTunnel();
+    const state = getState();
+    mockCleanupSessionRuntime.mockRejectedValueOnce(new Error('Electron cleanup failed'));
+    state.browsers.set('electron-session', browser);
+    state.sessionMetadata.set('electron-session', {
+      type: 'browser', runtime: 'electron', capabilities: {}, isAttached: false,
+      provider: 'browserstack', tunnelHandle: tunnel,
+    });
+    state.sessionHistory.set('electron-session', {
+      sessionId: 'electron-session', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+    state.currentSession = 'electron-session';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await closeSession('electron-session', false, false);
+
+    expect(error).toHaveBeenCalledWith('[WARN] Failed to clean up session runtime:', expect.any(Error));
+    expect(browser.deleteSession).toHaveBeenCalledOnce();
+    expect(mockStopTunnel).toHaveBeenCalledWith(tunnel);
+    expect(state.browsers.has('electron-session')).toBe(false);
+    expect(state.sessionMetadata.has('electron-session')).toBe(false);
+    expect(state.currentSession).toBeNull();
+    error.mockRestore();
   });
 
   it('does not call onSessionClose when detach=true', async () => {
@@ -359,7 +432,7 @@ describe('registerSession orphaned trace cleanup', () => {
 
     const newMeta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
     const newHistory: SessionHistory = { sessionId: 's-new', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] };
-    registerSession('s-new', makeBrowser(), newMeta, newHistory);
+    void registerSession('s-new', makeBrowser(), newMeta, newHistory);
 
     // The orphan cleanup is fire-and-forget; wait for it to settle
     await vi.waitFor(() => {

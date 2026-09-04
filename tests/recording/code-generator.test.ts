@@ -418,3 +418,57 @@ describe('generateCode - error and sentinel steps', () => {
     expect(code).toContain('// --- new session: new-abc');
   });
 });
+
+describe('generateCode - Electron', () => {
+  it('replays Electron startup, main-process scripts, deeplinks, and standalone cleanup', () => {
+    const history: SessionHistory = {
+      sessionId: 'electron-123', type: 'browser', runtime: 'electron', startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'electron', browserVersion: '33.2.1', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/MyApp' } },
+      steps: [
+        { index: 1, tool: 'start_session', params: { platform: 'electron', electronRootDir: '/project', electronDeeplinkScheme: 'MyApp' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+        { index: 2, tool: 'execute_electron_script', params: { script: 'return electron.app.getName()', args: [] }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+        { index: 3, tool: 'trigger_electron_deeplink', params: { url: 'myapp://open' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+      ],
+    };
+    const code = generateCode(history);
+    expect(code).toContain("import { startWdioSession, cleanupWdioSession } from '@wdio/electron-service';");
+    expect(code).toContain('browser = await startWdioSession([');
+    expect(code).toContain('rootDir: "/project"');
+    expect(code).toContain('browser.electron.execute');
+    expect(code).toContain('const electronDeeplinkScheme = "myapp";');
+    expect(code).toContain('new URL("myapp://open").protocol !== `${electronDeeplinkScheme}:`');
+    expect(code).toContain('browser.electron.triggerDeeplink("myapp://open")');
+    expect(code).toContain('await cleanupWdioSession(browser);');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('fails replay clearly when a recorded deeplink has no configured scheme', () => {
+    const history: SessionHistory = {
+      sessionId: 'electron-no-scheme', type: 'browser', runtime: 'electron', startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'electron', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/MyApp' } },
+      steps: [
+        { index: 1, tool: 'start_session', params: { platform: 'electron' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+        { index: 2, tool: 'trigger_electron_deeplink', params: { url: 'myapp://open' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+      ],
+    };
+
+    const code = generateCode(history);
+    expect(code).toContain('const electronDeeplinkScheme = undefined;');
+    expect(code).toContain('Recorded Electron deeplink is missing electronDeeplinkScheme.');
+  });
+
+  it('guards a recorded deeplink against the configured scheme', () => {
+    const history: SessionHistory = {
+      sessionId: 'electron-scheme-mismatch', type: 'browser', runtime: 'electron', startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'electron', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/MyApp' } },
+      steps: [
+        { index: 1, tool: 'start_session', params: { platform: 'electron', electronDeeplinkScheme: 'myapp' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+        { index: 2, tool: 'trigger_electron_deeplink', params: { url: 'otherapp://open' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+      ],
+    };
+
+    const code = generateCode(history);
+    expect(code).toContain('new URL("otherapp://open").protocol !== `${electronDeeplinkScheme}:`');
+    expect(code).toContain('Recorded Electron deeplink must use "${electronDeeplinkScheme}:".');
+  });
+});

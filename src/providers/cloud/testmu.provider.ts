@@ -144,7 +144,7 @@ export class TestMuProvider implements SessionProvider {
     if (sessionType !== 'browser') {
       try {
         console.error(`[TestMu] Setting mobile session status for ${sessionId}: ${status}`);
-        await browser?.execute('lambda-status=' + status);
+        await (browser as any)?.execute('lambda-status=' + status);
         console.error('[TestMu] Mobile session status set successfully via execute');
       } catch (e) {
         console.error('[TestMu] Failed to set mobile session status via execute:', e);

@@ -8,6 +8,7 @@ import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
+import { cleanupSessionRuntime } from '../electron/runtime.js';
 
 async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
   endTrace(sessionId);
@@ -76,27 +77,37 @@ export function registerSession(
     const oldBrowser = state.browsers.get(oldSessionId);
     const oldMetadata = state.sessionMetadata.get(oldSessionId);
     if (oldBrowser) {
-      // Fire and forget — don't block registration on close
-      void (async () => {
+      // Electron replacement teardown is performed by startElectronSession
+      // before it starts the next standalone service. Registration itself stays
+      // synchronous and orphan cleanup remains non-blocking.
+      const closeOld = async () => {
         if (oldMetadata?.trace) {
-          await finalizeTrace(oldSessionId, oldBrowser);
+          try {
+            await finalizeTrace(oldSessionId, oldBrowser);
+          } catch (e) {
+            console.error('[WARN] Failed to finalize orphaned session trace:', e);
+          }
         }
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {
-          });
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {});
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
-          await oldBrowser.deleteSession().catch(() => {
-            // Ignore errors during force-close of orphaned session
-          });
+          await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
+          try {
+            await oldBrowser.deleteSession();
+          } catch {
+            // Continue to tunnel teardown. The state entry is removed below,
+            // so this is the last opportunity to release an auto-managed tunnel.
+          }
         }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }
-      })();
+      };
+      void closeOld();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
     }
@@ -122,33 +133,44 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
   // Terminate the WebDriver session if:
   // - force is true (override), OR
   // - detach is false AND isAttached is false (normal close)
-  if (force || (!detach && !isAttached)) {
-    if (metadata?.provider) {
+  try {
+    if (force || (!detach && !isAttached)) {
+      if (metadata?.provider) {
+        try {
+          const provider = getProvider(metadata.provider, metadata.type);
+          await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
+        } catch (e) {
+          console.error('[WARN] Failed to run provider onSessionClose:', e);
+        }
+      }
       try {
-        const provider = getProvider(metadata.provider, metadata.type);
-        await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
+        await cleanupSessionRuntime(metadata?.runtime, browser);
       } catch (e) {
-        console.error('[WARN] Failed to run provider onSessionClose:', e);
+        console.error('[WARN] Failed to clean up session runtime:', e);
+      }
+      try {
+        await browser.deleteSession();
+      } finally {
+        // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs.
+        // If session deletion fails, still best-effort stop the tunnel so the
+        // teardown path does not leak resources.
+        if (metadata?.provider && metadata?.tunnelHandle) {
+          try {
+            const provider = getProvider(metadata.provider, metadata.type);
+            await provider.stopTunnel?.(metadata.tunnelHandle);
+          } catch (e) {
+            console.error('[WARN] Failed to stop tunnel:', e);
+          }
+        }
       }
     }
-    await browser.deleteSession();
+  } finally {
+    state.browsers.delete(sessionId);
+    state.sessionMetadata.delete(sessionId);
 
-    // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs
-    if (metadata?.provider && metadata?.tunnelHandle) {
-      try {
-        const provider = getProvider(metadata.provider, metadata.type);
-        await provider.stopTunnel?.(metadata.tunnelHandle);
-      } catch (e) {
-        console.error('[WARN] Failed to stop tunnel:', e);
-      }
+    // Only clear currentSession if it matches the session being closed
+    if (state.currentSession === sessionId) {
+      state.currentSession = null;
     }
-  }
-
-  state.browsers.delete(sessionId);
-  state.sessionMetadata.delete(sessionId);
-
-  // Only clear currentSession if it matches the session being closed
-  if (state.currentSession === sessionId) {
-    state.currentSession = null;
   }
 }
