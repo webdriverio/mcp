@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.12.0](https://github.com/webdriverio/mcp/compare/v3.11.1...v3.12.0) (2026-09-04)
+
+### Features
+
+* **platform:** Add electron support ([#140](https://github.com/webdriverio/mcp/issues/140)) ([322b426](https://github.com/webdriverio/mcp/commit/322b4268164092d21fa1ba3b0e4764a217e33b48))
+
 ## [3.11.1](https://github.com/webdriverio/mcp/compare/v3.11.0...v3.11.1) (2026-07-21)
 
 ### Bug Fixes
