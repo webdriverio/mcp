@@ -224,8 +224,9 @@ cannot be used:
   multiremote. Pass the real capabilities, not the options bag.
 - The published `d.ts` imports its option types from private workspace paths, so `ServiceOptions` resolves to a bare
   shape that rejects `mode`. Hence the cast in `TRACE_MODE_OPTIONS`.
-- Capture attaches to the `remote()` options object. `attach_session` (`attach()`) and Electron
-  (`startWdioSession()`) never go through `remote()`, so `trace: true` is a no-op there.
+- Capture attaches to the options object handed to `remote()` or `attach()` — both honour
+  `beforeCommand`/`afterCommand`, verified by probe. Electron sessions go through `startWdioSession()`
+  instead, so `trace: true` is a no-op there.
 - Output goes to `<cwd>/test-results/trace-<sessionId>.zip`; upstream appends `test-results/` unconditionally and
   the directory is not configurable through our options.
 

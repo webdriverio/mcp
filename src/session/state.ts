@@ -1,4 +1,5 @@
 import type { SessionHistory } from '../types/recording';
+import type { DevtoolsTraceHandle } from './devtools-trace';
 
 export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
@@ -12,8 +13,7 @@ export interface SessionMetadata {
   region?: string;
   tunnelName?: string;
   tunnelHandle?: unknown;
-  trace?: boolean;
-  traceHandle?: unknown;
+  traceHandle?: DevtoolsTraceHandle;
   /** The remote session lifecycle is owned outside this MCP process. */
   externallyManaged?: boolean;
 }

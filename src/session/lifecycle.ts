@@ -7,13 +7,6 @@ import { finishDevtoolsTrace } from './devtools-trace';
 import { clearRefs } from './element-refs';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
 
-async function finalizeTrace(sessionId: string): Promise<void> {
-  const metadata = getState().sessionMetadata.get(sessionId);
-  const handle = metadata?.traceHandle;
-  if (!handle) return;
-  await finishDevtoolsTrace(handle);
-}
-
 function getSessionResult(history: SessionHistory | undefined): SessionResult {
   const errorStep = history?.steps.find(s => s.status === 'error');
   return errorStep
@@ -64,12 +57,10 @@ export function registerSession(
       // before it starts the next standalone service. Registration itself stays
       // synchronous and orphan cleanup remains non-blocking.
       const closeOld = async () => {
-        if (oldMetadata?.trace) {
-          try {
-            await finalizeTrace(oldSessionId);
-          } catch (e) {
-            console.error('[WARN] Failed to finalize orphaned session trace:', e);
-          }
+        try {
+          await finishDevtoolsTrace(oldMetadata?.traceHandle);
+        } catch (e) {
+          console.error('[WARN] Failed to finalize orphaned session trace:', e);
         }
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
@@ -110,9 +101,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
 
   const metadata = state.sessionMetadata.get(sessionId);
 
-  if (metadata?.trace) {
-    await finalizeTrace(sessionId);
-  }
+  await finishDevtoolsTrace(metadata?.traceHandle);
 
   // Terminate the WebDriver session if:
   // - force is true (override), OR

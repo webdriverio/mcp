@@ -6,27 +6,31 @@ import { join, resolve } from 'node:path';
 // project uses node10 module resolution, which ignores the package's exports map
 // (the same reason emulate-device.tool.ts reaches into webdriverio's build dir).
 const showTraceSpecifier = '@wdio/devtools-backend/show-trace';
-const { runShowTraceCli } = (await import(showTraceSpecifier)) as {
-  runShowTraceCli: (args: string[]) => Promise<void>;
-};
 
-function findLatestZip(dir: string): string | null {
+function newestZip(dir: string): string | null {
   if (!existsSync(dir)) {
     return null;
   }
 
-  const newest = readdirSync(dir)
-    .filter((entry) => entry.endsWith('.zip'))
-    .map((entry) => ({ entry, mtime: statSync(join(dir, entry)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime)[0];
+  let newest: { path: string; mtime: number } | null = null;
+  for (const entry of readdirSync(dir)) {
+    if (!entry.endsWith('.zip')) {
+      continue;
+    }
+    const path = join(dir, entry);
+    const mtime = statSync(path).mtimeMs;
+    if (!newest || mtime > newest.mtime) {
+      newest = { path, mtime };
+    }
+  }
 
-  return newest ? join(dir, newest.entry) : null;
+  return newest?.path ?? null;
 }
 
 const argPath = process.argv[2];
 const zipPath = argPath
   ? resolve(argPath)
-  : (findLatestZip(join(process.cwd(), 'test-results')) ?? findLatestZip(join(process.cwd(), '.trace')));
+  : (newestZip(join(process.cwd(), 'test-results')) ?? newestZip(join(process.cwd(), '.trace')));
 
 if (!zipPath || !existsSync(zipPath)) {
   console.error(
@@ -36,4 +40,7 @@ if (!zipPath || !existsSync(zipPath)) {
   process.exit(1);
 }
 
+const { runShowTraceCli } = (await import(showTraceSpecifier)) as {
+  runShowTraceCli: (args: string[]) => Promise<void>;
+};
 await runShowTraceCli([zipPath]);

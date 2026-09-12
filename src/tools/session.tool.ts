@@ -17,6 +17,17 @@ const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
 const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
 const uriScheme = z.string().regex(/^[A-Za-z][A-Za-z0-9+.-]*$/, 'Must be a URI scheme without ":" (for example, "myapp")').transform(value => value.toLowerCase());
 
+// Trace capture hooks go onto the options bag before the session exists, and the
+// capture has to be started before any navigation or the first page load is lost.
+async function startTracedRemote(opts: Parameters<typeof remote>[0], trace: boolean) {
+  const traceHandle = trace ? attachDevtoolsTrace(opts as unknown as Record<string, unknown>) : undefined;
+  const browser = await remote(opts);
+  if (traceHandle) {
+    await beginDevtoolsTrace(traceHandle, browser);
+  }
+  return { browser, traceHandle };
+}
+
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
   description: 'Starts a new browser, local Electron application, or mobile automation session. Only one active session at a time — starting another session closes or detaches from the existing session first. Use attach: true to connect to a running Chrome via CDP.',
@@ -52,7 +63,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     noReset: coerceBoolean.optional().describe('Preserve app data between sessions'),
     fullReset: coerceBoolean.optional().describe('Uninstall app before/after session'),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium command timeout in seconds'),
-    trace: coerceBoolean.optional().default(false).describe('Enable trace recording — produces a Playwright-compatible zip saved to .trace/ on close_session, playable at player.vibium.dev.'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording — writes test-results/trace-<sessionId>.zip on close_session, openable with wdio-show-trace. Local browser sessions also capture network, console and DOM mutations via BiDi. Not available on Electron.'),
     attach: coerceBoolean.optional().default(false).describe('Attach to existing Chrome instead of launching'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -104,7 +115,7 @@ export const attachSessionToolDefinition: ToolDefinition = {
       protocol: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1). Only used with provider: "saucelabs".'),
-    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — writes test-results/trace-<sessionId>.zip on close_session, openable with wdio-show-trace.'),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Capabilities used to register the correct browser or Appium command surface locally; they are not sent to the remote endpoint'),
   },
 };
@@ -272,9 +283,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     : undefined;
 
   const opts = { ...connectionConfig, capabilities: mergedCapabilities };
-  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
-  const wdioBrowser = await remote(opts);
-  if (traceHandle) await beginDevtoolsTrace(traceHandle, wdioBrowser);
+  const { browser: wdioBrowser, traceHandle } = await startTracedRemote(opts, args.trace ?? false);
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
@@ -286,7 +295,6 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     region: args.region,
     tunnelName,
     tunnelHandle,
-    trace: args.trace ?? false,
     traceHandle,
   };
 
@@ -381,7 +389,7 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
   const sessionId = browser.sessionId;
   const metadata: SessionMetadata = {
     type: 'browser', runtime: 'electron', capabilities: recordedCapabilities, isAttached: false,
-    provider: 'local', trace: args.trace ?? false,
+    provider: 'local',
     ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
   registerSession(sessionId, browser, metadata, {
@@ -427,9 +435,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     : undefined;
 
   const opts = { ...serverConfig, capabilities: mergedCapabilities };
-  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
-  const browser = await remote(opts);
-  if (traceHandle) await beginDevtoolsTrace(traceHandle, browser);
+  const { browser, traceHandle } = await startTracedRemote(opts, args.trace ?? false);
 
   const { sessionId } = browser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
@@ -443,7 +449,6 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     region: args.region,
     tunnelName,
     tunnelHandle,
-    trace: args.trace ?? false,
     traceHandle,
   };
 
@@ -494,12 +499,15 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
       ?? (platform === 'ios' ? 'XCUITest' : 'UiAutomator2');
   }
 
-  const browser = await attach({
+  const opts = {
     ...connectionConfig,
     sessionId,
     capabilities: mergedCapabilities,
     requestedCapabilities: mergedCapabilities,
-  });
+  };
+  const traceHandle = args.trace ? attachDevtoolsTrace(opts as unknown as Record<string, unknown>) : undefined;
+  const browser = await attach(opts);
+  if (traceHandle) await beginDevtoolsTrace(traceHandle, browser);
   const sessionType = provider.getSessionType(args as Record<string, unknown>);
 
   const metadata: SessionMetadata = {
@@ -509,7 +517,7 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
     externallyManaged: true,
     provider: providerName,
     region: args.region,
-    trace: args.trace ?? false,
+    traceHandle,
   };
 
   registerSession(sessionId, browser, metadata, {
@@ -526,8 +534,6 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
     }),
     steps: [],
   });
-
-  // Tracing off here: attach() reuses an existing session, it never goes through remote(), so beforeCommand/afterCommand hooks never run.
 
   const protocol = connectionConfig.protocol ?? 'http';
   const hostname = connectionConfig.hostname ?? '127.0.0.1';
@@ -570,9 +576,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     connectionRetryCount: 3,
     capabilities,
   };
-  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
-  const browser = await remote(opts);
-  if (traceHandle) await beginDevtoolsTrace(traceHandle, browser);
+  const { browser, traceHandle } = await startTracedRemote(opts, args.trace ?? false);
 
   const { sessionId } = browser;
 
@@ -581,7 +585,6 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     capabilities,
     isAttached: true,
     provider: 'local',
-    trace: args.trace ?? false,
     traceHandle,
   };
 

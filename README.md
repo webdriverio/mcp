@@ -1250,8 +1250,8 @@ This eliminates the need to manually handle permission popups during automated t
 - Traces are now written to `test-results/trace-<sessionId>.zip` (previously `.trace/<ISO timestamp>-<session id>.zip`),
   in upstream's format rather than the previous hand-rolled one.
 - Timeline actions are WebdriverIO command names, not MCP tool names, so the selector-aware action titles are gone.
-- `trace: true` is a no-op on `attach_session` and Electron sessions — neither creates its session through
-  `remote()`, so the command hooks upstream captures from never run.
+- `trace: true` is a no-op on Electron sessions — they are created through the Electron service rather than
+  `remote()`/`attach()`, so the command hooks upstream captures from never run.
 - `yazl`/`yauzl` are no longer dependencies; `@wdio/devtools-service` and `@wdio/devtools-backend` are.
 
 ### Session Recording & Code Export

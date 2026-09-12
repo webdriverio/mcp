@@ -29,10 +29,10 @@ function makeBrowser(overrides: Record<string, unknown> = {}) {
 function setupTracedSession(sessionId: string) {
   const state = getState();
   const browser = makeBrowser();
-  const traceHandle = { sessionId };
+  const traceHandle = { sessionId } as unknown as SessionMetadata['traceHandle'];
   state.browsers.set(sessionId, browser);
   state.currentSession = sessionId;
-  state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached: false, trace: true, traceHandle });
+  state.sessionMetadata.set(sessionId, { type: 'browser', capabilities: {}, isAttached: false, traceHandle });
   state.sessionHistory.set(sessionId, { sessionId, type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
   return { browser, traceHandle };
 }
@@ -389,7 +389,7 @@ describe('closeSession trace lifecycle', () => {
     expect(callOrder).toEqual(['finishDevtoolsTrace', 'deleteSession']);
   });
 
-  it('does not finish the trace when trace is disabled', async () => {
+  it('passes no handle when the session was not traced', async () => {
     const state = getState();
     state.browsers.set('s-no-trace', makeBrowser());
     state.currentSession = 's-no-trace';
@@ -398,7 +398,7 @@ describe('closeSession trace lifecycle', () => {
 
     await closeSession('s-no-trace', false, false);
 
-    expect(finishDevtoolsTrace).not.toHaveBeenCalled();
+    expect(finishDevtoolsTrace).toHaveBeenCalledWith(undefined);
   });
 });
 
