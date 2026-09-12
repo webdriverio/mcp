@@ -3,7 +3,6 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     server: 'src/server.ts',
-    snapshot: 'src/snapshot.ts',
     trace: 'src/trace.ts',
     'show-trace': 'src/show-trace.ts',
   },
@@ -15,5 +14,5 @@ export default defineConfig({
   platform: 'node',
   outDir: 'lib',
 
-  external: ['zod', '@wdio/electron-service'],
+  external: ['zod', '@wdio/electron-service', '@wdio/elements'],
 });

@@ -26,7 +26,7 @@ npx vitest tests/trace/                                 # watch mode for a direc
 ```
 src/
 ├── server.ts          # MCP server entry — registers all tools + resources
-├── session/           # Session state (state.ts) + lifecycle (lifecycle.ts)
+├── session/           # Session state (state.ts), lifecycle (lifecycle.ts), element-refs.ts (eN ref store)
 ├── providers/         # SessionProvider implementations
 │   ├── registry.ts    # getProvider() — routes to local or cloud provider
 │   ├── local-browser.provider.ts  # Chrome/Firefox/Edge/Safari
@@ -41,8 +41,6 @@ src/
 ├── tools/             # One file per MCP tool (see Tool Pattern below)
 ├── resources/         # One file per MCP resource (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
-├── scripts/           # Browser/mobile scripts executed via browser.execute() — no try/catch, raw data only
-├── locators/          # Element detection, selector generation, XML parsing (mobile)
 ├── config/            # appium.config.ts — iOS/Android capability builders
 ├── utils/             # parse-variables.ts, zod-helpers.ts (coerceBoolean)
 └── types/             # ToolDefinition, ResourceDefinition, RecordedStep interfaces
@@ -114,7 +112,8 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 **Live page state (current session):**
 - `wdio://session/current/elements` — interactable elements (viewport-only; use `get_elements` tool with `inViewportOnly: false` for all)
-- `wdio://session/current/accessibility` — accessibility tree
+- `wdio://session/current/snapshot` — depth-indented page tree with `eN` element refs accepted by `click_element`, `set_value`, `tap_element`, `drag_and_drop`
+- `wdio://session/current/accessibility` — accessibility tree (viewport-only; the unfiltered tree is ~10x the tokens)
 - `wdio://session/current/screenshot` — screenshot (base64)
 - `wdio://session/current/cookies` — browser cookies
 - `wdio://session/current/tabs` — open browser tabs
@@ -135,9 +134,9 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 - **tsup** bundles `src/server.ts` → `lib/server.js` (ESM)
 - Shebang preserved for CLI execution
-- `zod` externalized
+- `zod` and `@wdio/elements` externalized
 - Two `bin` entries: `wdio-mcp` (the server) and `wdio-show-trace` (`src/show-trace.ts` — inspect a recorded trace)
-- Package subpath exports: `.` (server), `./snapshot` (`src/snapshot.ts`), `./trace` (`src/trace.ts`)
+- Package subpath exports: `.` (server), `./trace` (`src/trace.ts`). Element utilities are no longer re-exported — import them from `@wdio/elements` directly.
 
 ## Key Files
 
@@ -146,17 +145,17 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/server.ts`                                    | MCP server init, tool + resource registration |
 | `src/session/state.ts`                             | Session state maps, `getBrowser()`, `getState()` |
 | `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
+| `src/session/element-refs.ts`                       | `eN` snapshot ref store + `withRefs()` resolver for action tools |
 | `src/providers/registry.ts`                        | `getProvider()` — routes to local or cloud provider |
 | `src/providers/types.ts`                           | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
 | `src/providers/cloud/browserstack.provider.ts`     | BrowserStack provider — tunnel lifecycle + session result marking via `onSessionClose()` |
 | `src/providers/cloud/testingbot.provider.ts`       | TestingBot provider — `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
 | `src/providers/cloud/digitalai.provider.ts`        | Digital.ai provider — `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<id>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
-| `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
+| `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination; delegates to `@wdio/elements` |
 | `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Digital.ai uses Bearer auth; registered in `server.ts`) |
 | `src/resources/`                                   | All MCP resource definitions (one per URI)    |
-| `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
-| `src/locators/`                                    | Mobile element detection + locator generation |
+| `src/resources/snapshot.resource.ts`               | `wdio://session/current/snapshot` — `getSnapshot()` + ref-store write |
 | `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps tools for step logging |
 | `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
 | `src/utils/zod-helpers.ts`                         | `coerceBoolean` for client interop            |
@@ -180,11 +179,6 @@ console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 ```
 
-### Browser Scripts Must Be Self-Contained
-
-`get-interactable-browser-elements.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
-external imports.
-
 ### Auto-Detach Behavior
 
 Sessions created with `noReset: true` or without `appPath` automatically detach on close (don't terminate on Appium
@@ -194,9 +188,13 @@ server).
 
 The MCP SDK only supports path-segment templates `{param}` in resource URIs — NOT RFC 6570 query param syntax `{?param}`. Resources using `{?param}` silently return "Resource not found". Keep resources at fixed URIs; expose parameterised access via tools instead.
 
-### Scripts vs Tools vs Resources
+### Element Detection Ownership
 
-Computation logic belongs in `src/scripts/` (no try/catch, returns raw data). Tools wrap scripts with try/catch and return `{ isError: true, content: [...] }` on failure. Resources wrap scripts and set `mimeType` in the response.
+All element detection — browser DOM scripts, mobile page-source parsing, locator generation, accessibility tree and `getSnapshot()` — lives in the `@wdio/elements` package. This repo only wraps it: tools/resources call the package, add try/catch and set `mimeType`/TOON encoding. Do not re-implement detection here.
+
+### Snapshot refs vs selectors
+
+`get_elements` and the accessibility resource return **selectors**. `wdio://session/current/snapshot` returns a tree of **`eN` refs** and is the only writer of `src/session/element-refs.ts`. Action tools wrapped with `withRefs()` (in `server.ts`) resolve `eN` to a real selector *before* recording/tracing, so generated code and step logs always contain runnable selectors. Refs are per-process memory: a stale or unknown ref fails with a re-snapshot hint, and `closeSession()` drops the session's refs.
 
 ### Error Handling
 

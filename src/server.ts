@@ -42,6 +42,7 @@ import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chr
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import { withTrace } from './trace/recorder.js';
+import { withRefs } from './session/element-refs';
 import {
   accessibilityResource,
   appStateResource,
@@ -57,6 +58,7 @@ import {
   elementsResource,
   geolocationResource,
   screenshotResource,
+  snapshotResource,
   sessionCodeResource,
   sessionCurrentCodeResource,
   sessionCurrentStepsResource,
@@ -145,15 +147,15 @@ function createServer(): McpServer {
 
   registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
 
-  registerTool(clickToolDefinition, instrument('click_element', clickTool));
-  registerTool(setValueToolDefinition, instrument('set_value', setValueTool));
+  registerTool(clickToolDefinition, withRefs(instrument('click_element', clickTool)));
+  registerTool(setValueToolDefinition, withRefs(instrument('set_value', setValueTool)));
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
-  registerTool(tapElementToolDefinition, instrument('tap_element', tapElementTool));
+  registerTool(tapElementToolDefinition, withRefs(instrument('tap_element', tapElementTool)));
   registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
-  registerTool(dragAndDropToolDefinition, instrument('drag_and_drop', dragAndDropTool));
+  registerTool(dragAndDropToolDefinition, withRefs(instrument('drag_and_drop', dragAndDropTool)));
 
   registerTool(switchContextToolDefinition, switchContextTool);
 
@@ -198,6 +200,7 @@ function createServer(): McpServer {
   registerResource(contextResource);
   registerResource(geolocationResource);
   registerResource(tabsResource);
+  registerResource(snapshotResource);
 
   return server;
 }

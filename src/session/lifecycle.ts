@@ -6,6 +6,7 @@ import type { SessionMetadata } from './state';
 import { getState } from './state';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
+import { clearRefs } from './element-refs';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
@@ -110,6 +111,7 @@ export function registerSession(
       void closeOld();
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
+      clearRefs(oldSessionId);
     }
   }
 }
@@ -167,6 +169,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
   } finally {
     state.browsers.delete(sessionId);
     state.sessionMetadata.delete(sessionId);
+    clearRefs(sessionId);
 
     // Only clear currentSession if it matches the session being closed
     if (state.currentSession === sessionId) {

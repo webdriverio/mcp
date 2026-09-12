@@ -2,13 +2,13 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { getBrowser } from '../session/state';
-import { getElements } from '../scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
-  description: 'Returns interactable elements on the current page with selectors, text, and bounding boxes. Supports filtering by element type, viewport visibility, and pagination. Use when the wdio://session/current/elements resource does not return desired elements.',
+  description: 'Flat list of interactable elements with selectors, text, and bounding boxes. Supports viewport filtering, container inclusion, bounds, and pagination — use when you need a paginated or programmatic query rather than a page overview. For exploring a page, prefer wdio://session/current/snapshot (cheaper, hierarchical, returns clickable refs).',
   annotations: { title: 'Get Visible Elements', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only return elements visible in the current viewport (default: false).'),

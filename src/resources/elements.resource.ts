@@ -1,12 +1,12 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
-import { getElements } from '../scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { encode } from '@toon-format/toon';
 
 export const elementsResource: ResourceDefinition = {
   name: 'session-current-elements',
   uri: 'wdio://session/current/elements',
-  description: 'Interactable elements on the current page. Prefer this over screenshot — returns ready-to-use selectors, faster, and far fewer tokens. Only use screenshot for visual verification or debugging.',
+  description: 'Flat list of interactable elements on the current page with ready-to-use selectors — faster and far fewer tokens than a screenshot. For page structure and clickable refs prefer wdio://session/current/snapshot. Only use screenshot for visual verification or debugging.',
   handler: async () => {
     try {
       const browser = getBrowser();

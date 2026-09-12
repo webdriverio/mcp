@@ -12,7 +12,7 @@ export const clickToolDefinition: ToolDefinition = {
   description: 'Waits for an element, scrolls it into view, and fires element.click(). May trigger navigation, form submission, or modals. Browser sessions only — on iOS element.click() is silently ignored; use tap_element instead. Default timeout: 3000ms.',
   annotations: { title: 'Click Element', destructiveHint: false },
   inputSchema: {
-    selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text")'),
+    selector: z.string().describe('Value for the selector, in the form of css selector or xpath ("button.my-class" or "//button[@class=\'my-class\']" or "button=Exact text with spaces" or "a*=Link containing text"), or an `eN` ref from wdio://session/current/snapshot'),
     scrollToView: coerceBoolean.optional().describe('Whether to scroll the element into view before clicking').default(true),
     timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
   },

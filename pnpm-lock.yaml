@@ -31,12 +31,12 @@ importers:
       '@wdio/electron-service':
         specifier: 10.3.0
         version: 10.3.0(expect-webdriverio@5.7.0)(tsx@4.23.13)(webdriverio@9.31.6(puppeteer-core@24.43.1))(yauzl@3.4.0)
+      '@wdio/elements':
+        specifier: ^1.1.2
+        version: 1.1.2(webdriverio@9.31.6(puppeteer-core@24.43.1))
       '@wdio/protocols':
         specifier: ^9.27.0
         version: 9.31.5
-      '@xmldom/xmldom':
-        specifier: ^0.9.10
-        version: 0.9.12
       browserstack-local:
         specifier: ^1.5.12
         version: 1.5.13
@@ -55,9 +55,6 @@ importers:
       webdriverio:
         specifier: ^9.27.0
         version: 9.31.6(puppeteer-core@24.43.1)
-      xpath:
-        specifier: ^0.0.34
-        version: 0.0.34
       yazl:
         specifier: ^3.3.1
         version: 3.3.1
@@ -1695,6 +1692,11 @@ packages:
     peerDependenciesMeta:
       electron:
         optional: true
+
+  '@wdio/elements@1.1.2':
+    resolution: {integrity: sha512-wL7fvShEIDNx5+idligxpwnp83nl4eVyBMcipFeFN33I7tQiGuA8ZmpFge6JqhsEWX4/+xLrzOvSMf5+MigEGQ==}
+    peerDependencies:
+      webdriverio: ^9.0.0
 
   '@wdio/eslint@0.1.3':
     resolution: {integrity: sha512-4NErobvTiuUXZnXCsB5e1lBZq5699hL4UW6q8lZcRWghcMEc7LHhcNeaEyt1DzdkLMcuA0OBLwbNRcXSjQRNig==}
@@ -6161,6 +6163,12 @@ snapshots:
       - tsx
       - utf-8-validate
       - yauzl
+
+  '@wdio/elements@1.1.2(webdriverio@9.31.6(puppeteer-core@24.43.1))':
+    dependencies:
+      '@xmldom/xmldom': 0.9.12
+      webdriverio: 9.31.6(puppeteer-core@24.43.1)
+      xpath: 0.0.34
 
   '@wdio/eslint@0.1.3(@typescript-eslint/eslint-plugin@8.57.2(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:

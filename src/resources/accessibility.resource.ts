@@ -1,6 +1,6 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
-import { getBrowserAccessibilityTree } from '../scripts/get-browser-accessibility-tree';
+import { getBrowserAccessibilityTree } from '@wdio/elements';
 import { encode } from '@toon-format/toon';
 
 export async function readAccessibilityTree(params: {
@@ -20,7 +20,7 @@ export async function readAccessibilityTree(params: {
 
     const { limit = 0, offset = 0, roles } = params;
 
-    let nodes = await getBrowserAccessibilityTree(browser);
+    let nodes = await getBrowserAccessibilityTree(browser, { inViewportOnly: true });
 
     if (nodes.length === 0) {
       return { mimeType: 'text/plain', text: 'No accessibility tree available' };
@@ -68,7 +68,7 @@ export async function readAccessibilityTree(params: {
 export const accessibilityResource: ResourceDefinition = {
   name: 'session-current-accessibility',
   uri: 'wdio://session/current/accessibility',
-  description: 'Accessibility tree for the current page. Returns all elements by default.',
+  description: 'Accessibility tree for the current page, limited to elements in the current viewport.',
   handler: async () => {
     const result = await readAccessibilityTree({});
     return { contents: [{ uri: 'wdio://session/current/accessibility', mimeType: result.mimeType, text: result.text }] };

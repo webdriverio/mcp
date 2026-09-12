@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccessibilityNode } from '../../src/scripts/get-browser-accessibility-tree';
+import type { AccessibilityNode } from '@wdio/elements';
 
-vi.mock('../../src/scripts/get-browser-accessibility-tree', () => ({
+vi.mock('@wdio/elements', () => ({
   getBrowserAccessibilityTree: vi.fn(),
 }));
 
-import { getBrowserAccessibilityTree } from '../../src/scripts/get-browser-accessibility-tree';
+import { getBrowserAccessibilityTree } from '@wdio/elements';
 
 vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(() => ({ isAndroid: false, isIOS: false })),
@@ -36,6 +36,14 @@ function makeNode(overrides: Partial<AccessibilityNode>): AccessibilityNode {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('viewport scope', () => {
+  it('requests viewport-only nodes — the unfiltered tree costs ~10x the tokens', async () => {
+    mockGetTree.mockResolvedValue([makeNode({})]);
+    await callRead({});
+    expect(mockGetTree).toHaveBeenCalledWith(expect.anything(), { inViewportOnly: true });
+  });
 });
 
 describe('column trimming', () => {

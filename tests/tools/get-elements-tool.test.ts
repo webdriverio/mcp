@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getElements } from '../../src/scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { getBrowser } from '../../src/session/state';
 import { getElementsTool } from '../../src/tools/get-elements.tool';
 
-vi.mock('../../src/scripts/get-elements', () => ({
+vi.mock('@wdio/elements', () => ({
   getElements: vi.fn(),
 }));
 
