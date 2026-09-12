@@ -6,6 +6,7 @@ lib
 build
 
 .trace
+test-results/
 
 settings.local.json
 *.tgz

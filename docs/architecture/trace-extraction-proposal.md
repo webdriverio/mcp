@@ -1,6 +1,10 @@
 # `@wdio/trace` — Extracting Trace Recording into a Standalone Package
 
-**Status:** Proposal — not yet implemented.
+**Status:** Implemented, but not as proposed. This proposal's own objection was correct — MCP-specific
+trace recording was the wrong layer — and it was resolved by delegating to the upstream
+`@wdio/devtools-service` pipeline rather than extracting a `@wdio/trace` package. `src/trace/`,
+`withTrace()`, `TOOL_MAP` and `recordNavigation` are all gone; what remains is the wiring in
+`src/session/devtools-trace.ts`. Read the tables below as history, not as pending work.
 
 ---
 

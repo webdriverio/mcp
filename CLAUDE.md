@@ -16,7 +16,7 @@ npm run start:http  # Built server with HTTP transport (for browser-based MCP cl
 # Single test file / focused run (vitest is not exposed via an npm script):
 npx vitest run tests/tools/get-elements-tool.test.ts   # one file
 npx vitest run -t "filter pattern"                      # tests matching a name
-npx vitest tests/trace/                                 # watch mode for a directory
+npx vitest tests/session/                               # watch mode for a directory
 ```
 
 `vitest.config.ts` sets `environment: 'happy-dom'` and typechecks tests against `tsconfig.test.json`.
@@ -26,7 +26,8 @@ npx vitest tests/trace/                                 # watch mode for a direc
 ```
 src/
 ├── server.ts          # MCP server entry — registers all tools + resources
-├── session/           # Session state (state.ts), lifecycle (lifecycle.ts), element-refs.ts (eN ref store)
+├── session/           # Session state (state.ts), lifecycle (lifecycle.ts), element-refs.ts (eN ref store),
+│                      #   devtools-trace.ts (trace capture wiring)
 ├── providers/         # SessionProvider implementations
 │   ├── registry.ts    # getProvider() — routes to local or cloud provider
 │   ├── local-browser.provider.ts  # Chrome/Firefox/Edge/Safari
@@ -37,7 +38,6 @@ src/
 │       ├── testmu.provider.ts        # TestMu / LambdaTest (browser + mobile)
 │       ├── testingbot.provider.ts    # TestingBot (browser + mobile + Storage)
 │       └── digitalai.provider.ts     # Digital.ai Testing (browser + mobile; accessKey cap, deviceQuery)
-├── trace/             # Playwright-compatible trace recording (recorder.ts, tool-mapping.ts, zip-writer.ts)
 ├── tools/             # One file per MCP tool (see Tool Pattern below)
 ├── resources/         # One file per MCP resource (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
@@ -134,9 +134,9 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 - **tsup** bundles `src/server.ts` → `lib/server.js` (ESM)
 - Shebang preserved for CLI execution
-- `zod` and `@wdio/elements` externalized
-- Two `bin` entries: `wdio-mcp` (the server) and `wdio-show-trace` (`src/show-trace.ts` — inspect a recorded trace)
-- Package subpath exports: `.` (server), `./trace` (`src/trace.ts`). Element utilities are no longer re-exported — import them from `@wdio/elements` directly.
+- `zod`, `@wdio/elements` and the `@wdio/devtools-*` packages externalized
+- Two `bin` entries: `wdio-mcp` (the server) and `wdio-show-trace` (`src/show-trace.ts` — opens a trace zip in upstream's player)
+- Package subpath export: `.` (server) only. Element utilities are no longer re-exported — import them from `@wdio/elements` directly.
 
 ## Key Files
 
@@ -146,6 +146,8 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/session/state.ts`                             | Session state maps, `getBrowser()`, `getState()` |
 | `src/session/lifecycle.ts`                         | `registerSession()`, `closeSession()`, session transitions |
 | `src/session/element-refs.ts`                       | `eN` snapshot ref store + `withRefs()` resolver for action tools |
+| `src/session/devtools-trace.ts`                     | Trace capture wiring — `attachDevtoolsTrace()` / `beginDevtoolsTrace()` / `finishDevtoolsTrace()` around `@wdio/devtools-service` |
+| `src/show-trace.ts`                                | `wdio-show-trace` bin — resolves a trace zip and opens it in upstream's player |
 | `src/providers/registry.ts`                        | `getProvider()` — routes to local or cloud provider |
 | `src/providers/types.ts`                           | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
 | `src/providers/cloud/browserstack.provider.ts`     | BrowserStack provider — tunnel lifecycle + session result marking via `onSessionClose()` |
@@ -209,6 +211,24 @@ Refs are **positional** — upstream renumbers them on every snapshot (`buildSna
 
 Do not try to validate a ref by comparing `SnapshotElement.tagName` against `getTagName()` — upstream's `tagName` carries the role-ish name (`textbox`, `searchbox`) whenever the role is more specific than the DOM tag, so the comparison fails on every form control.
 
+### Tracing is upstream's, wired by hand
+
+Element detection is not the only thing delegated upstream — trace recording is `@wdio/devtools-service`'s.
+`src/session/devtools-trace.ts` is the only file that imports it, because upstream's own standalone entry point
+cannot be used:
+
+- `setupForDevtools()` constructs the service with no options, and trace export is gated on `mode === 'trace'`, so
+  it writes nothing. We construct `new DevToolsHookService({ mode: 'trace', traceFormat: 'zip' })` ourselves and
+  wire `beforeCommand`/`afterCommand` the same way it does.
+- `beforeSession()` refuses a capabilities object without a top-level `browserName`/`platformName`, reporting it as
+  multiremote. Pass the real capabilities, not the options bag.
+- The published `d.ts` imports its option types from private workspace paths, so `ServiceOptions` resolves to a bare
+  shape that rejects `mode`. Hence the cast in `TRACE_MODE_OPTIONS`.
+- Capture attaches to the `remote()` options object. `attach_session` (`attach()`) and Electron
+  (`startWdioSession()`) never go through `remote()`, so `trace: true` is a no-op there.
+- Output goes to `<cwd>/test-results/trace-<sessionId>.zip`; upstream appends `test-results/` unconditionally and
+  the directory is not configurable through our options.
+
 ### Error Handling
 
 Tools return errors as text content, never throw. Keeps MCP protocol stable:
@@ -263,5 +283,5 @@ See `docs/architecture/` for proposals:
 - `session-configuration-proposal.md` — Cloud provider pattern — BrowserStack, SauceLabs, TestMu, TestingBot, and Digital.ai implemented; `providers/registry.ts` + `providers/cloud/` is the extension point for new providers
 - `multi-session-proposal.md` — Parallel sessions for sub-agent coordination
 - `interaction-sequencing-proposal.md` — Sequencing model for tool interactions
-- `trace-recording-and-replay.md` — Playwright-compatible trace recording (implemented in `src/trace/`)
+- `trace-recording-and-replay.md` — Trace recording (implemented via `@wdio/devtools-service`, wired in `src/session/devtools-trace.ts`)
 - `trace-extraction-proposal.md` — Trace data extraction and analysis

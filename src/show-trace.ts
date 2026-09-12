@@ -1,86 +1,39 @@
 #!/usr/bin/env node
-import { createServer } from 'node:http';
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { resolve, basename, join } from 'node:path';
-import { exec } from 'node:child_process';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
-function openBrowser(url: string): void {
-  const cmd =
-    process.platform === 'darwin'
-      ? `open "${url}"`
-      : process.platform === 'win32'
-        ? `start "" "${url}"`
-        : `xdg-open "${url}"`;
-  exec(cmd);
-}
+// The specifier is a variable so TypeScript does not try to resolve it: this
+// project uses node10 module resolution, which ignores the package's exports map
+// (the same reason emulate-device.tool.ts reaches into webdriverio's build dir).
+const showTraceSpecifier = '@wdio/devtools-backend/show-trace';
+const { runShowTraceCli } = (await import(showTraceSpecifier)) as {
+  runShowTraceCli: (args: string[]) => Promise<void>;
+};
 
-function findLatestTrace(): string | null {
-  const traceDir = join(process.cwd(), '.trace');
-  if (!existsSync(traceDir)) return null;
+function findLatestZip(dir: string): string | null {
+  if (!existsSync(dir)) {
+    return null;
+  }
 
-  const zips = readdirSync(traceDir)
-    .filter((f) => f.endsWith('.zip'))
-    .map((f) => ({ name: f, mtime: statSync(join(traceDir, f)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime);
+  const newest = readdirSync(dir)
+    .filter((entry) => entry.endsWith('.zip'))
+    .map((entry) => ({ entry, mtime: statSync(join(dir, entry)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)[0];
 
-  return zips.length > 0 ? join(traceDir, zips[0].name) : null;
+  return newest ? join(dir, newest.entry) : null;
 }
 
 const argPath = process.argv[2];
-let absolutePath: string;
+const zipPath = argPath
+  ? resolve(argPath)
+  : (findLatestZip(join(process.cwd(), 'test-results')) ?? findLatestZip(join(process.cwd(), '.trace')));
 
-if (argPath) {
-  absolutePath = resolve(argPath);
-  if (!existsSync(absolutePath)) {
-    console.error(`File not found: ${absolutePath}`);
-    process.exit(1);
-  }
-} else {
-  const latest = findLatestTrace();
-  if (!latest) {
-    console.error('No trace found. Run a session with trace enabled, or pass a zip path.');
-    process.exit(1);
-  }
-  absolutePath = latest;
-  console.error(`Using latest trace: ${absolutePath}`);
+if (!zipPath || !existsSync(zipPath)) {
+  console.error(
+    zipPath ? `File not found: ${zipPath}` : 'No trace found — run a session with trace enabled, or pass a zip path.',
+  );
+  console.error('Usage: wdio-show-trace [trace.zip]');
+  process.exit(1);
 }
 
-const fileName = basename(absolutePath);
-const fileData = readFileSync(absolutePath);
-
-const server = createServer((req, res) => {
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': 'https://player.vibium.dev',
-      'Access-Control-Allow-Methods': 'GET',
-    });
-    res.end();
-    return;
-  }
-
-  if (req.url === `/${fileName}`) {
-    res.writeHead(200, {
-      'Content-Type': 'application/zip',
-      'Content-Length': String(fileData.length),
-      'Access-Control-Allow-Origin': 'https://player.vibium.dev',
-    });
-    res.end(fileData);
-    return;
-  }
-
-  res.writeHead(404);
-  res.end();
-});
-
-server.listen(0, '127.0.0.1', () => {
-  const addr = server.address();
-  const port = typeof addr === 'object' && addr ? addr.port : 0;
-  const traceUrl = `http://localhost:${port}/${fileName}`;
-  const viewerUrl = `https://player.vibium.dev/?record=${encodeURIComponent(traceUrl)}`;
-
-  console.error(`Serving ${fileName} on ${traceUrl}`);
-  console.error(`Opening ${viewerUrl}`);
-  console.error('Press Ctrl+C to stop.');
-
-  openBrowser(viewerUrl);
-});
+await runShowTraceCli([zipPath]);

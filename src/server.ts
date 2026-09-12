@@ -42,7 +42,6 @@ import { getSnapshotTool, getSnapshotToolDefinition } from './tools/get-snapshot
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
-import { withTrace } from './trace/recorder.js';
 import { withRefs } from './session/element-refs';
 import {
   accessibilityResource,
@@ -133,30 +132,27 @@ function createServer(): McpServer {
     }
   };
 
-  const instrument = (name: string, cb: ToolCallback): ToolCallback =>
-    withTrace(name, withRecording(name, cb));
-
   registerTool(startSessionToolDefinition, withRecording('start_session', startSessionTool));
   registerTool(attachSessionToolDefinition, withRecording('attach_session', attachSessionTool));
   registerTool(closeSessionToolDefinition, closeSessionTool);
-  registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
+  registerTool(launchChromeToolDefinition, withRecording('launch_chrome', launchChromeTool));
   registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
-  registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
+  registerTool(navigateToolDefinition, withRecording('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
   registerTool(switchFrameToolDefinition, withRefs('switch_frame', switchFrameTool));
 
-  registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
+  registerTool(scrollToolDefinition, withRecording('scroll', scrollTool));
 
-  registerTool(clickToolDefinition, withRefs('click_element', instrument('click_element', clickTool)));
-  registerTool(setValueToolDefinition, withRefs('set_value', instrument('set_value', setValueTool)));
+  registerTool(clickToolDefinition, withRefs('click_element', withRecording('click_element', clickTool)));
+  registerTool(setValueToolDefinition, withRefs('set_value', withRecording('set_value', setValueTool)));
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
-  registerTool(tapElementToolDefinition, withRefs('tap_element', instrument('tap_element', tapElementTool)));
-  registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
-  registerTool(dragAndDropToolDefinition, withRefs('drag_and_drop', instrument('drag_and_drop', dragAndDropTool)));
+  registerTool(tapElementToolDefinition, withRefs('tap_element', withRecording('tap_element', tapElementTool)));
+  registerTool(swipeToolDefinition, withRecording('swipe', swipeTool));
+  registerTool(dragAndDropToolDefinition, withRefs('drag_and_drop', withRecording('drag_and_drop', dragAndDropTool)));
 
   registerTool(switchContextToolDefinition, switchContextTool);
 
@@ -164,12 +160,12 @@ function createServer(): McpServer {
   registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
   registerTool(setGeolocationToolDefinition, setGeolocationTool);
 
-  registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
-  registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
-  registerTool(triggerElectronDeeplinkToolDefinition, instrument('trigger_electron_deeplink', triggerElectronDeeplinkTool));
+  registerTool(executeScriptToolDefinition, withRecording('execute_script', executeScriptTool));
+  registerTool(executeElectronScriptToolDefinition, withRecording('execute_electron_script', executeElectronScriptTool));
+  registerTool(triggerElectronDeeplinkToolDefinition, withRecording('trigger_electron_deeplink', triggerElectronDeeplinkTool));
   registerTool(getElementsToolDefinition, getElementsTool);
   registerTool(getSnapshotToolDefinition, getSnapshotTool);
-  registerTool(openWebExtensionToolDefinition, instrument('open_web_extension', openWebExtensionTool));
+  registerTool(openWebExtensionToolDefinition, withRecording('open_web_extension', openWebExtensionTool));
 
   registerTool(listAppsToolDefinition, listAppsTool);
   registerTool(uploadAppToolDefinition, uploadAppTool);

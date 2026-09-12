@@ -15,10 +15,6 @@
     ".": {
       "import": "./lib/server.js",
       "types": "./lib/server.d.ts"
-    },
-    "./trace": {
-      "import": "./lib/trace.js",
-      "types": "./lib/trace.d.ts"
     }
   },
   "bin": {
@@ -51,6 +47,8 @@
     "@lambdatest/node-tunnel": "^4.0.11",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@toon-format/toon": "^2.1.0",
+    "@wdio/devtools-backend": "^1.10.0",
+    "@wdio/devtools-service": "^10.9.1",
     "@wdio/electron-service": "10.3.0",
     "@wdio/elements": "^1.1.2",
     "@wdio/protocols": "^9.27.0",
@@ -60,14 +58,11 @@
     "sharp": "^0.35.3",
     "testingbot-tunnel-launcher": "^1.1.18",
     "webdriverio": "^9.27.0",
-    "yazl": "^3.3.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^10.0.6",
     "@types/node": "^20.19.37",
-    "@types/yauzl": "^3.4.0",
-    "@types/yazl": "^3.3.1",
     "@wdio/eslint": "^0.1.3",
     "@wdio/types": "^9.27.0",
     "eslint": "^9.39.4",
@@ -79,11 +74,18 @@
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vitest": "^4.1.2",
-    "yauzl": "^3.3.0"
+    "vitest": "^4.1.2"
   },
   "packageManager": "pnpm@10.32.1",
   "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "devtools"
+      ],
+      "allowedVersions": {
+        "@wdio/protocols": "9"
+      }
+    },
     "overrides": {
       "release-it>undici": "^6.24.0",
       "basic-ftp": "^5.3.1",

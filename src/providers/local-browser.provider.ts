@@ -72,6 +72,12 @@ export class LocalBrowserProvider implements SessionProvider {
         break;
     }
 
+    // BiDi is what upstream's trace capture needs for DOM mutations, network
+    // and console. safaridriver has no BiDi and may reject the capability.
+    if (options.trace && selectedBrowser !== 'safari') {
+      capabilities.webSocketUrl = true;
+    }
+
     const mergedCapabilities: Record<string, unknown> = {
       ...capabilities,
       ...userCapabilities,

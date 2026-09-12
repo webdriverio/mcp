@@ -3,7 +3,6 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     server: 'src/server.ts',
-    trace: 'src/trace.ts',
     'show-trace': 'src/show-trace.ts',
   },
   format: ['esm'],

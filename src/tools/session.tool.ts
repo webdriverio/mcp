@@ -8,7 +8,7 @@ import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
-import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
+import { attachDevtoolsTrace, beginDevtoolsTrace } from '../session/devtools-trace';
 import { getElectronService } from '../electron/runtime.js';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
@@ -271,7 +271,10 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
     : undefined;
 
-  const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
+  const opts = { ...connectionConfig, capabilities: mergedCapabilities };
+  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
+  const wdioBrowser = await remote(opts);
+  if (traceHandle) await beginDevtoolsTrace(traceHandle, wdioBrowser);
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
@@ -284,6 +287,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     tunnelName,
     tunnelHandle,
     trace: args.trace ?? false,
+    traceHandle,
   };
 
   registerSession(sessionId, wdioBrowser, sessionMetadata, {
@@ -294,10 +298,6 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     steps: [],
   });
 
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
-  }
-
   let sizeNote = '';
   try {
     await wdioBrowser.setWindowSize(windowWidth, windowHeight);
@@ -307,9 +307,6 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
 
   if (navigationUrl) {
     await wdioBrowser.url(navigationUrl);
-    if (args.trace) {
-      await recordInitialNavigation(sessionId, navigationUrl);
-    }
   }
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
@@ -390,7 +387,7 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
   registerSession(sessionId, browser, metadata, {
     sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities: recordedCapabilities, steps: [],
   });
-  if (args.trace) startTrace(sessionId, recordedCapabilities, 'browser', { width: args.windowWidth ?? 1920, height: args.windowHeight ?? 1080 });
+  // Tracing off here: Electron goes through startWdioSession, not remote(), so beforeCommand/afterCommand hooks never run.
 
   return { content: [{ type: 'text', text: [
     `Electron application started with sessionId: ${sessionId}`,
@@ -429,7 +426,10 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
     : undefined;
 
-  const browser = await remote({ ...serverConfig, capabilities: mergedCapabilities });
+  const opts = { ...serverConfig, capabilities: mergedCapabilities };
+  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
+  const browser = await remote(opts);
+  if (traceHandle) await beginDevtoolsTrace(traceHandle, browser);
 
   const { sessionId } = browser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
@@ -444,6 +444,7 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     tunnelName,
     tunnelHandle,
     trace: args.trace ?? false,
+    traceHandle,
   };
 
   registerSession(sessionId, browser, metadata, {
@@ -454,10 +455,6 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     appiumConfig: { hostname: serverConfig.hostname, port: serverConfig.port, path: serverConfig.path },
     steps: [],
   });
-
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, sessionType);
-  }
 
   const sessionKind = isMobileBrowser ? 'mobile browser' : 'app';
   const appInfo = isMobileBrowser
@@ -530,12 +527,7 @@ async function attachExistingSession(args: AttachSessionArgs): Promise<CallToolR
     steps: [],
   });
 
-  if (args.trace) {
-    const viewport = platform === 'browser'
-      ? { width: 1920, height: 1080 }
-      : undefined;
-    startTrace(sessionId, mergedCapabilities, sessionType, viewport);
-  }
+  // Tracing off here: attach() reuses an existing session, it never goes through remote(), so beforeCommand/afterCommand hooks never run.
 
   const protocol = connectionConfig.protocol ?? 'http';
   const hostname = connectionConfig.hostname ?? '127.0.0.1';
@@ -573,11 +565,14 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     },
   };
 
-  const browser = await remote({
+  const opts = {
     connectionRetryTimeout: 30000,
     connectionRetryCount: 3,
     capabilities,
-  });
+  };
+  const traceHandle = args.trace ? attachDevtoolsTrace(opts, opts.capabilities) : undefined;
+  const browser = await remote(opts);
+  if (traceHandle) await beginDevtoolsTrace(traceHandle, browser);
 
   const { sessionId } = browser;
 
@@ -587,6 +582,7 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     isAttached: true,
     provider: 'local',
     trace: args.trace ?? false,
+    traceHandle,
   };
 
   registerSession(sessionId, browser, sessionMetadata, {
@@ -597,20 +593,10 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
     steps: [],
   });
 
-  if (args.trace) {
-    startTrace(sessionId, capabilities, 'browser', { width: 1920, height: 1080 });
-  }
-
   if (navigationUrl) {
     await browser.url(navigationUrl);
-    if (args.trace) {
-      await recordInitialNavigation(sessionId, navigationUrl);
-    }
   } else if (activeTabUrl) {
     await restoreAndSwitchToActiveTab(browser, activeTabUrl, allTabUrls);
-    if (args.trace) {
-      await recordInitialNavigation(sessionId, activeTabUrl);
-    }
   }
 
   const title = await browser.getTitle();

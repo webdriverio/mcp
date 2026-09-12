@@ -1,35 +1,17 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState } from './state';
 import { getProvider } from '../providers/registry';
-import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
+import { finishDevtoolsTrace } from './devtools-trace';
 import { clearRefs } from './element-refs';
-import { deleteTraceSession, getTraceSession } from '../trace/state.js';
-import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
 
-async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
-  endTrace(sessionId);
-  captureTraceScreenshot(sessionId, browser);
-  const traceSession = getTraceSession(sessionId);
-  if (!traceSession) return;
-  try {
-    await traceSession.screenshotChain;
-    const traceDir = join(process.cwd(), '.trace');
-    mkdirSync(traceDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const outPath = join(traceDir, `${timestamp}-${sessionId.slice(0, 8)}.zip`);
-    const zipBuffer = await buildTraceZip(traceSession);
-    writeFileSync(outPath, zipBuffer);
-    console.error(`[TRACE] Saved to ${outPath}`);
-  } catch (e) {
-    console.error('[TRACE] Failed to save trace:', e);
-  } finally {
-    deleteTraceSession(sessionId);
-  }
+async function finalizeTrace(sessionId: string): Promise<void> {
+  const metadata = getState().sessionMetadata.get(sessionId);
+  const handle = metadata?.traceHandle;
+  if (!handle) return;
+  await finishDevtoolsTrace(handle);
 }
 
 function getSessionResult(history: SessionHistory | undefined): SessionResult {
@@ -84,7 +66,7 @@ export function registerSession(
       const closeOld = async () => {
         if (oldMetadata?.trace) {
           try {
-            await finalizeTrace(oldSessionId, oldBrowser);
+            await finalizeTrace(oldSessionId);
           } catch (e) {
             console.error('[WARN] Failed to finalize orphaned session trace:', e);
           }
@@ -129,7 +111,7 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
   const metadata = state.sessionMetadata.get(sessionId);
 
   if (metadata?.trace) {
-    await finalizeTrace(sessionId, browser);
+    await finalizeTrace(sessionId);
   }
 
   // Terminate the WebDriver session if:

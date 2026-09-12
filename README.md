@@ -1244,6 +1244,16 @@ This eliminates the need to manually handle permission popups during automated t
 - `@xmldom/xmldom` and `xpath` are no longer direct dependencies — they come transitively via `@wdio/elements`.
 - Mobile locator generation ignores the session's `automationName`: Android selectors are always UiAutomator2-style, so they will not resolve on Espresso sessions. Upstream limitation, not workaround-able via options.
 
+### Breaking changes (trace migration to `@wdio/devtools-service`)
+
+- The `@wdio/mcp/trace` subpath export is removed (`src/trace.ts` and `src/trace/` deleted).
+- Traces are now written to `test-results/trace-<sessionId>.zip` (previously `.trace/<ISO timestamp>-<session id>.zip`),
+  in upstream's format rather than the previous hand-rolled one.
+- Timeline actions are WebdriverIO command names, not MCP tool names, so the selector-aware action titles are gone.
+- `trace: true` is a no-op on `attach_session` and Electron sessions — neither creates its session through
+  `remote()`, so the command hooks upstream captures from never run.
+- `yazl`/`yauzl` are no longer dependencies; `@wdio/devtools-service` and `@wdio/devtools-backend` are.
+
 ### Session Recording & Code Export
 
 Every tool call is automatically recorded to a session history. You can inspect sessions and export runnable code via
@@ -1261,41 +1271,27 @@ with automatic session result marking via the provider's REST API.
 
 ### Trace Recording
 
-Passing `trace: true` to `start_session` produces a Playwright-compatible `.trace` zip in the `.trace/` directory when
-the session closes. The zip is playable at [player.vibium.dev](https://player.vibium.dev) and shows a filmstrip of
-screenshots alongside the action timeline.
+Passing `trace: true` to `start_session` records the session through
+[`@wdio/devtools-service`](https://github.com/webdriverio/devtools) and writes
+`test-results/trace-<sessionId>.zip` when the session closes — the same artifact that service produces under a
+test runner.
 
-**How screenshots are timed**
+Capture happens at the command level, so timeline actions are the WebdriverIO commands the tools issued (`url`,
+`element.click`, `element.setValue`) rather than MCP tool names. The local browser provider requests BiDi
+(`webSocketUrl`) when tracing, which is what adds the HAR network log, browser console output and the DOM mutation
+stream to the zip. Each action also gets a screenshot plus its element snapshot and page-source text.
 
-Appium's `takeScreenshot` round-trip takes 700–1300 ms on a local emulator, which is long enough for the previous
-action's animations to settle. We exploit this: each screenshot is captured **before** the next action fires, so what
-the Appium server returns is already the settled result of the prior action.
+Mobile sessions have no CDP, so the filmstrip recorder falls back to polling `takeScreenshot` every 200 ms; per-action
+screenshots are captured the same way on both platforms.
 
-The tricky part is making the trace player show that screenshot under the right action. The player associates a
-`screencast-frame` event with whichever action's time window contains the frame's `timestamp` field. If the timestamp
-is set to "now" (capture time), it falls before the current action's `startTime` and the player labels it as the
-*before* state of the next action — one action out of sync.
+Open a trace with:
 
-The fix: stamp each `screencast-frame` with `lastAfterEndTime` — the `endTime` of the action that just completed. That
-places the frame inside the previous action's window, so the player shows it as the result of that action, not the
-precursor to the next one.
-
-```
-Timeline (monotonic ms):
-
-  prev.endTime ← frame timestamp stamped here
-        │
-        │   [screenshot captured here — shows settled state after prev action]
-        │
-  curr.startTime
-        │
-        │   [action executes]
-        │
-  curr.endTime ← next frame will be stamped here
+```bash
+npx wdio-show-trace                                         # newest zip in test-results/ (or legacy .trace/)
+npx wdio-show-trace test-results/trace-<sessionId>.zip      # a specific one
 ```
 
-The final screenshot at session close is stamped with the last action's `endTime`, so it renders under that action
-rather than appearing as an orphaned frame after the timeline ends.
+This hands off to upstream's player, which boots a local server and opens the timeline in your browser.
 
 ### Session Logs
 
