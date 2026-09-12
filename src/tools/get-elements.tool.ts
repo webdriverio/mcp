@@ -8,7 +8,7 @@ import { coerceBoolean } from '../utils/zod-helpers';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
-  description: 'Flat list of interactable elements with selectors, text, and bounding boxes. Supports viewport filtering, container inclusion, bounds, and pagination — use when you need a paginated or programmatic query rather than a page overview. For exploring a page, prefer wdio://session/current/snapshot (cheaper, hierarchical, returns clickable refs).',
+  description: 'Flat list of interactable elements with selectors, text, and bounding boxes. Supports viewport filtering, container inclusion, bounds, and pagination — use when you need a paginated or programmatic query rather than a page overview. For exploring a page, prefer get_snapshot (cheaper, hierarchical, returns clickable refs).',
   annotations: { title: 'Get Visible Elements', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only return elements visible in the current viewport (default: false).'),
@@ -35,7 +35,7 @@ export const getElementsTool: ToolCallback = async ({
   try {
     const browser = getBrowser();
     const result = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset });
-    const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
+    const text = encode(result);
     return { content: [{ type: 'text' as const, text }] };
   } catch (e) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `Error getting elements: ${e}` }] };

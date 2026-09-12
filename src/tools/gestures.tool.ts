@@ -13,7 +13,7 @@ export const tapElementToolDefinition: ToolDefinition = {
     selector: z
       .string()
       .optional()
-      .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator), or an `eN` ref from wdio://session/current/snapshot'),
+      .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator), or an `eN` ref returned by get_snapshot'),
     x: z.number().optional().describe('X coordinate for screen tap (if no selector provided)'),
     y: z.number().optional().describe('Y coordinate for screen tap (if no selector provided)'),
   },
@@ -132,8 +132,8 @@ export const dragAndDropToolDefinition: ToolDefinition = {
   description: 'Drags an element to another element or to relative x/y offsets. x and y are offsets from the source element, not absolute screen coordinates (unlike tap_element). Provide targetSelector OR both x and y. Mobile-only.',
   annotations: { title: 'Drag and Drop', destructiveHint: false },
   inputSchema: {
-    sourceSelector: z.string().describe('Source element selector to drag, or an `eN` ref from wdio://session/current/snapshot'),
-    targetSelector: z.string().optional().describe('Target element selector to drop onto, or an `eN` ref from wdio://session/current/snapshot'),
+    sourceSelector: z.string().describe('Source element selector to drag, or an `eN` ref returned by get_snapshot'),
+    targetSelector: z.string().optional().describe('Target element selector to drop onto, or an `eN` ref returned by get_snapshot'),
     x: z.number().optional().describe('Target X offset (if no targetSelector)'),
     y: z.number().optional().describe('Target Y offset (if no targetSelector)'),
     duration: z.number().min(100).max(5000).optional().describe('Drag duration in milliseconds'),

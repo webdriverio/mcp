@@ -7,6 +7,7 @@ export async function readAccessibilityTree(params: {
   limit?: number;
   offset?: number;
   roles?: string[];
+  inViewportOnly?: boolean;
 }): Promise<{ mimeType: string; text: string }> {
   try {
     const browser = getBrowser();
@@ -18,9 +19,9 @@ export async function readAccessibilityTree(params: {
       };
     }
 
-    const { limit = 0, offset = 0, roles } = params;
+    const { limit = 0, offset = 0, roles, inViewportOnly = true } = params;
 
-    let nodes = await getBrowserAccessibilityTree(browser, { inViewportOnly: true });
+    let nodes = await getBrowserAccessibilityTree(browser, { inViewportOnly });
 
     if (nodes.length === 0) {
       return { mimeType: 'text/plain', text: 'No accessibility tree available' };
@@ -57,7 +58,7 @@ export async function readAccessibilityTree(params: {
       nodes: trimmed,
     };
 
-    const toon = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
+    const toon = encode(result);
 
     return { mimeType: 'text/plain', text: toon };
   } catch (e) {

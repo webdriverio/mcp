@@ -1236,6 +1236,14 @@ This eliminates the need to manually handle permission popups during automated t
 - **Data Format:** TOON (Token-Oriented Object Notation) for efficient LLM communication
 - **Element Detection:** XML-based page source parsing with intelligent filtering and multi-strategy locator generation
 
+### Breaking changes (`@wdio/elements` migration)
+
+- The `@wdio/mcp/snapshot` subpath export is removed (`src/snapshot.ts` deleted). Import
+  `getInteractableBrowserElements`, `getBrowserAccessibilityTree`, or `getMobileVisibleElements` from
+  `@wdio/elements` instead.
+- `@xmldom/xmldom` and `xpath` are no longer direct dependencies — they come transitively via `@wdio/elements`.
+- Mobile locator generation ignores the session's `automationName`: Android selectors are always UiAutomator2-style, so they will not resolve on Espresso sessions. Upstream limitation, not workaround-able via options.
+
 ### Session Recording & Code Export
 
 Every tool call is automatically recorded to a session history. You can inspect sessions and export runnable code via

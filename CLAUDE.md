@@ -112,7 +112,7 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 **Live page state (current session):**
 - `wdio://session/current/elements` — interactable elements (viewport-only; use `get_elements` tool with `inViewportOnly: false` for all)
-- `wdio://session/current/snapshot` — depth-indented page tree with `eN` element refs accepted by `click_element`, `set_value`, `tap_element`, `drag_and_drop`
+- `wdio://session/current/snapshot` — depth-indented page tree with `eN` element refs accepted by `click_element`, `set_value`, `tap_element`, `drag_and_drop`; viewport-only, with a footer reporting the element count and page load state (`get_snapshot` tool for the whole page)
 - `wdio://session/current/accessibility` — accessibility tree (viewport-only; the unfiltered tree is ~10x the tokens)
 - `wdio://session/current/screenshot` — screenshot (base64)
 - `wdio://session/current/cookies` — browser cookies
@@ -155,7 +155,8 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination; delegates to `@wdio/elements` |
 | `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Digital.ai uses Bearer auth; registered in `server.ts`) |
 | `src/resources/`                                   | All MCP resource definitions (one per URI)    |
-| `src/resources/snapshot.resource.ts`               | `wdio://session/current/snapshot` — `getSnapshot()` + ref-store write |
+| `src/resources/snapshot.resource.ts`               | `readSnapshot()` — `getSnapshot()` + ref-store write + count/page-state footer; backs both the snapshot resource and the `get_snapshot` tool |
+| `src/tools/get-snapshot.tool.ts`                   | `get_snapshot` — same tree without the viewport filter |
 | `src/recording/step-recorder.ts`                   | `withRecording(toolName, cb)` HOF — wraps tools for step logging |
 | `src/recording/code-generator.ts`                  | Generates runnable WebdriverIO JS from `SessionHistory` |
 | `src/utils/zod-helpers.ts`                         | `coerceBoolean` for client interop            |
@@ -192,9 +193,21 @@ The MCP SDK only supports path-segment templates `{param}` in resource URIs — 
 
 All element detection — browser DOM scripts, mobile page-source parsing, locator generation, accessibility tree and `getSnapshot()` — lives in the `@wdio/elements` package. This repo only wraps it: tools/resources call the package, add try/catch and set `mimeType`/TOON encoding. Do not re-implement detection here.
 
+### Snapshot subpath removed
+
+`src/snapshot.ts` and the `@wdio/mcp/snapshot` subpath export are gone — import `getInteractableBrowserElements`, `getBrowserAccessibilityTree`, `getMobileVisibleElements` from `@wdio/elements` instead.
+
+### Espresso selectors unsupported
+
+Upstream `packages/core/src/element-snapshot.ts` hardcodes `automationName` to `"uiautomator2"` for Android (`platform === "android" ? "uiautomator2" : "xcuitest"`), ignoring the session's `appium:automationName`. Espresso sessions get UiAutomator2-style selectors that won't resolve; not workaround-able via options.
+
 ### Snapshot refs vs selectors
 
-`get_elements` and the accessibility resource return **selectors**. `wdio://session/current/snapshot` returns a tree of **`eN` refs** and is the only writer of `src/session/element-refs.ts`. Action tools wrapped with `withRefs()` (in `server.ts`) resolve `eN` to a real selector *before* recording/tracing, so generated code and step logs always contain runnable selectors. Refs are per-process memory: a stale or unknown ref fails with a re-snapshot hint, and `closeSession()` drops the session's refs.
+`get_elements` and the accessibility resource return **selectors**. `wdio://session/current/snapshot` and the `get_snapshot` tool return a tree of **`eN` refs**; both write `src/session/element-refs.ts`, last snapshot wins. Action tools wrapped with `withRefs()` (in `server.ts`) resolve `eN` to a real selector *before* recording/tracing, so generated code and step logs always contain runnable selectors.
+
+Refs are **positional** — upstream renumbers them on every snapshot (`buildSnapshot()` runs a fresh `e${counter++}` over interactive nodes in discovery order), so `e7` can mean one element in one snapshot and a different one in the next. `readSnapshot()` therefore stamps every ref in the tree with a generation (`e7@3`), and `resolveRef()` rejects a ref whose generation is not current. Never strip the suffix. Refs are per-process memory; `closeSession()` and orphan replacement drop the session's refs.
+
+Do not try to validate a ref by comparing `SnapshotElement.tagName` against `getTagName()` — upstream's `tagName` carries the role-ish name (`textbox`, `searchbox`) whenever the role is more specific than the DOM tag, so the comparison fails on every form control.
 
 ### Error Handling
 

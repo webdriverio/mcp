@@ -1,4 +1,5 @@
-import { getBrowser } from '../session/state';
+import { getBrowser, getState } from '../session/state';
+import { clearRefs } from '../session/element-refs';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -17,6 +18,7 @@ export const navigateAction = async (url: string): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
     await browser.url(url);
+    clearRefs(getState().currentSession ?? '');
     return {
       content: [{ type: 'text', text: `Navigated to ${url}` }],
     };

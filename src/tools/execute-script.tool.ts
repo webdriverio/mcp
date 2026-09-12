@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { resolveRef } from '../session/element-refs';
 
 export const executeScriptToolDefinition: ToolDefinition = {
   name: 'execute_script',
@@ -27,14 +28,19 @@ export const executeScriptTool: ToolCallback = async (args: {
       scriptArgs.map(async (arg) => {
         // If it's a string that looks like a selector and we're in browser context, try to resolve it
         if (typeof arg === 'string' && !script.startsWith('mobile:')) {
+          const ref = arg.trim();
+          const selector = /^e\d+@\d+$/.test(ref) ? resolveRef(ref) : arg;
           try {
-            const element = await browser.$(arg);
+            const element = await browser.$(selector);
             if (await element.isExisting()) {
               return element;
             }
           } catch {
             // Not a valid selector, pass as-is
           }
+          // Hand back what the caller passed — a ref that resolved to nothing must
+          // not leak the resolved selector into the script in place of its argument.
+          return arg;
         }
         return arg;
       })

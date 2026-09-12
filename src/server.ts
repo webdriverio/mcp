@@ -38,6 +38,7 @@ import {
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
 import { getElementsTool, getElementsToolDefinition } from './tools/get-elements.tool';
+import { getSnapshotTool, getSnapshotToolDefinition } from './tools/get-snapshot.tool';
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
@@ -143,19 +144,19 @@ function createServer(): McpServer {
   registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
-  registerTool(switchFrameToolDefinition, switchFrameTool);
+  registerTool(switchFrameToolDefinition, withRefs('switch_frame', switchFrameTool));
 
   registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
 
-  registerTool(clickToolDefinition, withRefs(instrument('click_element', clickTool)));
-  registerTool(setValueToolDefinition, withRefs(instrument('set_value', setValueTool)));
+  registerTool(clickToolDefinition, withRefs('click_element', instrument('click_element', clickTool)));
+  registerTool(setValueToolDefinition, withRefs('set_value', instrument('set_value', setValueTool)));
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
 
-  registerTool(tapElementToolDefinition, withRefs(instrument('tap_element', tapElementTool)));
+  registerTool(tapElementToolDefinition, withRefs('tap_element', instrument('tap_element', tapElementTool)));
   registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
-  registerTool(dragAndDropToolDefinition, withRefs(instrument('drag_and_drop', dragAndDropTool)));
+  registerTool(dragAndDropToolDefinition, withRefs('drag_and_drop', instrument('drag_and_drop', dragAndDropTool)));
 
   registerTool(switchContextToolDefinition, switchContextTool);
 
@@ -167,6 +168,7 @@ function createServer(): McpServer {
   registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
   registerTool(triggerElectronDeeplinkToolDefinition, instrument('trigger_electron_deeplink', triggerElectronDeeplinkTool));
   registerTool(getElementsToolDefinition, getElementsTool);
+  registerTool(getSnapshotToolDefinition, getSnapshotTool);
   registerTool(openWebExtensionToolDefinition, instrument('open_web_extension', openWebExtensionTool));
 
   registerTool(listAppsToolDefinition, listAppsTool);

@@ -2,7 +2,8 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from '../session/state';
+import { getBrowser, getState } from '../session/state';
+import { clearRefs } from '../session/element-refs';
 
 export const switchContextToolDefinition: ToolDefinition = {
   name: 'switch_context',
@@ -30,12 +31,14 @@ export const switchContextTool: ToolCallback = async (args: {
       if (index >= 0 && index < contexts.length) {
         const targetContext = contexts[index] as string;
         await browser.switchContext(targetContext);
+        clearRefs(getState().currentSession ?? '');
         return { content: [{ type: 'text', text: `Switched to context: ${targetContext}` }] };
       }
       throw new Error(`Error: Invalid context index ${context}. Available contexts: ${contexts.length}`);
     }
 
     await browser.switchContext(context);
+    clearRefs(getState().currentSession ?? '');
 
     return {
       content: [{ type: 'text', text: `Switched to context: ${context}` }],
