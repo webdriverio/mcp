@@ -17,6 +17,11 @@ npm run start:http  # Built server with HTTP transport (for browser-based MCP cl
 npx vitest run tests/tools/get-elements-tool.test.ts   # one file
 npx vitest run -t "filter pattern"                      # tests matching a name
 npx vitest tests/trace/                                 # watch mode for a directory
+
+# Type-check. Use the repo-pinned TypeScript, not bare `npx tsc` — that resolves a newer
+# build which rejects this repo's own tsconfig (moduleResolution=node10, baseUrl removed)
+# and reports TS5108/TS5102 instead of any real error.
+./node_modules/.bin/tsc --noEmit
 ```
 
 `vitest.config.ts` sets `environment: 'happy-dom'` and typechecks tests against `tsconfig.test.json`.
@@ -131,6 +136,58 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - `wdio://testmu/local-binary`
 - `wdio://testingbot/local-binary` (single cross-platform Java JAR, requires Java 11+)
 
+**WebdriverIO documentation:**
+- `wdio://docs/index` — every docs page: title, source path, slug
+- `wdio://docs/page/{slug}` — full markdown of one page (see Documentation Search below)
+
+### Documentation Search
+
+`query_docs` answers WebdriverIO API/config questions from the official docs corpus at
+`https://webdriver.io/llms-full.txt` (~2.97 MB, ~438 pages) without injecting it into context.
+
+- Corpus is fetched lazily on first query and cached at `~/.wdio-mcp/llms-full.txt` with an
+  `llms-full.meta.json` sidecar holding `etag` + `fetchedAt`. Within 24 h the cache is used as-is;
+  past that it revalidates with a conditional `GET` and reuses the body on `304`.
+- Set `WDIO_MCP_CACHE_DIR` to relocate the cache (used by the tests; also useful when `$HOME` is read-only).
+- `chunkCorpus` splits on page headings and ignores `#` lines inside fenced code blocks. Fences are
+  tracked by backtick-run length and an info string is allowed, but a table-padded fence line — the
+  ones ending in a `|`, present ~69 times in the corpus — may only *close* a fence, never open one.
+  Getting this rule wrong produces hundreds of phantom pages.
+- **Page paths come from positional alignment, not a title map.** Corpus pages appear in TOC order,
+  but 21 of 438 have no TOC entry, so a title→path map cannot address a page — it handed both
+  `waitUntil` pages both paths. `resolvePagePaths` walks both sequences in step and gives each page
+  exactly one path. A desync stalls the pointer and strands every later entry, so the failure is
+  massive and loud; it degrades to `console.error` rather than throwing, and the test suite pins it.
+- **Three BM25 fields**, each with its own `lengths`/`avgdl`: whole tokens (weight 1.0), camelCase
+  sub-segments ≥3 chars (0.4), and page title + section trail (1.0). The third field is why a page
+  *titled* `click` outranks prose that merely mentions it. Field 0 indexes whole tokens only, so a
+  query term is never looked up in a field that never held that form of it.
+- **Queries are filtered to content words** by `queryTerms`, which drops closed-class English
+  function words before scoring, falling back to the raw tokens if that would empty the query.
+  `before`/`after`/`on`/`is`/`until`/`set` are struck from the list because they are WDIO API
+  surface, not English. The list is derived grammatically, not by frequency: `i` has df 59 and
+  idf 2.299, so no corpus statistic distinguishes it from a content word.
+- **Keyword queries are the supported form, and the tool description says so.** Agents read that
+  description, so it is the interface: it names the working examples (`appium setup`, `devtools
+  trace.zip`, `allure reporter`), warns that a sentence dilutes the ranking and that a word can
+  collide with an unrelated page (`wire` matches Wire Protocol, `tracing` is near-unique at df 3 and
+  drags in Lighthouse), and points at the two resources. Changing ranking behaviour means changing
+  that description too — a mechanism the agent is not told about does not exist.
+- A coverage multiplier over content words was implemented, measured, and removed: it fixed neither
+  failing query and demoted pages that answer the question with a single term. An idf-ratio gate was
+  designed and killed before implementation — in a sentence, the max-idf term is usually the noise
+  (`wire` 3.415, `i` 2.299), so such a gate anchors on the wrong token.
+- `/docs/mcp/*` pages score at 0.25 unless the query contains `mcp` — this server's own docs would
+  otherwise outrank framework pages for generic questions.
+- The tool is session-independent, so it is registered without `withRecording`.
+- Two resources read the same corpus: `wdio://docs/index` lists every TOC entry as title, path and
+  slug; `wdio://docs/page/{slug}` returns one full page. The slug encodes the path with `~` in place
+  of `/` (`docs~appium.md`), because MCP resource templates match a single path segment. `~` is
+  RFC 3986 unreserved and appears in no path, so the mapping is injective by construction.
+- The ranking and alignment assertions in `tests/utils/docs-index.test.ts` need the real corpus and
+  `it.skipIf` out when `~/.wdio-mcp/llms-full.txt` is absent. A green run without that cache proves
+  nothing about retrieval — populate it (`WDIO_MCP_CACHE_DIR` to relocate) before trusting one.
+
 ### Build
 
 - **tsup** bundles `src/server.ts` → `lib/server.js` (ESM)
@@ -154,6 +211,10 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 | `src/tools/session.tool.ts`                        | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts`                   | `get_elements` — all elements with filtering + pagination |
 | `src/tools/cloud-provider.tool.ts`                 | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Digital.ai uses Bearer auth; registered in `server.ts`) |
+| `src/tools/query-docs.tool.ts`                     | `query_docs` — BM25 search over the WebdriverIO docs corpus; session-independent, so not wrapped in `withRecording` |
+| `src/utils/docs-index.ts`                          | Docs corpus fetch/cache, fence-aware chunking, path alignment, 3-field BM25 index + search |
+| `src/utils/docs-client.ts`                         | Boundary layer for the docs corpus — resolves the cache dir and loads the index |
+| `src/resources/docs.resource.ts`                   | `wdio://docs/index` + `wdio://docs/page/{slug}` |
 | `src/resources/`                                   | All MCP resource definitions (one per URI)    |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection             |
 | `src/locators/`                                    | Mobile element detection + locator generation |
@@ -166,7 +227,7 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 
 ### Dev Reload vs Reconnect
 
-`npm run dev` runs `tsx --watch` — code changes reload in-process. Only tool/resource **schema changes** (Zod definitions, new tools, parameter additions) require an MCP client reconnect to re-advertise capabilities. No need to rebundle or restart the dev server for implementation-only changes.
+`npm run dev` runs `tsx --watch` — code changes reload in-process, including ranking and search logic. Only tool/resource **schema changes** (Zod definitions, new tools, parameter additions) require an MCP client reconnect to re-advertise capabilities. Adding a resource counts even with no schema edit: the client caches the resource list at handshake, so new URIs stay invisible until reconnect. No need to rebundle or restart the dev server for implementation-only changes.
 
 ### Console Output
 

@@ -13,3 +13,4 @@ export * from './app-state.resource';
 export * from './contexts.resource';
 export * from './geolocation.resource';
 export * from './tabs.resource';
+export * from './docs.resource';
