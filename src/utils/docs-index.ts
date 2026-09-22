@@ -8,7 +8,7 @@ export const EXCERPT_CHAR_CAP = 1200;
 
 export interface TocEntry { title: string; path: string }
 export interface DocChunk { page: number; title: string; trail: string[]; text: string; path: string | null }
-export interface DocHit { chunkIndex: number; page: number; title: string; trail: string[]; path: string | null; score: number; excerpt: string }
+export interface DocHit { page: number; title: string; trail: string[]; path: string | null; score: number; excerpt: string }
 export interface DocField { postings: Map<string, Map<number, number>>; lengths: number[]; avgdl: number }
 export interface DocsIndex { chunks: DocChunk[]; fields: DocField[]; toc: TocEntry[] }
 export interface SearchOptions { demotePathPrefix?: string; demoteFactor?: number }
@@ -20,9 +20,9 @@ export interface LoadCorpusOptions {
   ttlMs?: number;
 }
 
-const CACHE_FILE = 'llms-full.txt';
-const META_FILE = 'llms-full.meta.json';
-const FULL_DOCS_MARKER = '# Full Documentation Content';
+export const CACHE_FILE = 'llms-full.txt';
+export const META_FILE = 'llms-full.meta.json';
+export const FULL_DOCS_MARKER = '# Full Documentation Content';
 const TOC_ENTRY = /^- \[([^\]]+)\]\(([^)]+\.md)\)/;
 const FENCE_OPEN = /^\s*(`{3,})\s*([A-Za-z0-9_+.-]*)\s*$/;
 const FENCE_CLOSE = /^\s*(`{3,})\s*\|?\s*$/;
@@ -62,17 +62,28 @@ export const MCP_PATH_PREFIX = '/docs/mcp/';
 export const MCP_DEMOTE_FACTOR = 0.25;
 
 // A reader must never observe a half-written corpus, and a truncated cache would index
-// as a valid one. Same-directory rename is atomic on POSIX.
+// as a valid one. Same-directory rename is atomic on POSIX. The pid keeps two concurrent
+// writers from sharing one temp name, where either rename could publish a half-written file.
 function writeAtomic(path: string, data: string): void {
-  writeFileSync(`${path}.tmp`, data);
-  renameSync(`${path}.tmp`, path);
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, data);
+  renameSync(tmp, path);
 }
+
+// Serving from disk re-reads the ~3 MB corpus and yields a fresh string, so getIndex's
+// identity check degrades to a full string compare on every call. This keeps the last
+// served text and its TTL in memory, keyed by path so a caller with a different cacheDir
+// is not served another's corpus.
+let memory: { path: string; text: string; fetchedAt: number } | null = null;
 
 export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   const { url, cacheDir, fetchImpl, ttlMs = CACHE_TTL_MS } = opts;
   // ponytail: single home-dir cache path, no OS-specific cache dir, upgrade to `env-paths` if users complain about polluting `$HOME`.
   const cachePath = join(cacheDir, CACHE_FILE);
   const metaPath = join(cacheDir, META_FILE);
+  if (memory !== null && memory.path === cachePath && Date.now() - memory.fetchedAt < ttlMs) {
+    return memory.text;
+  }
   let cached: string | null = null;
   if (existsSync(cachePath)) {
     try {
@@ -88,13 +99,18 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
     try {
       const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { etag?: string | null; fetchedAt?: number };
       etag = meta.etag ?? null;
-      fetchedAt = meta.fetchedAt ?? 0;
+      // A future fetchedAt makes the age negative, which would serve an obsolete corpus until that time arrives.
+      const raw = meta.fetchedAt ?? 0;
+      fetchedAt = raw > 0 && raw <= Date.now() ? raw : 0;
     } catch {
       etag = null;
       fetchedAt = 0;
     }
   }
-  if (cached !== null && Date.now() - fetchedAt < ttlMs) { return cached; }
+  if (cached !== null && Date.now() - fetchedAt < ttlMs) {
+    memory = { path: cachePath, text: cached, fetchedAt };
+    return cached;
+  }
   const stale = (reason: unknown): string => {
     if (cached !== null) return cached;
     throw new Error(`Failed to load WebdriverIO docs from ${url}: ${reason}. No cached copy at ${cachePath}.`);
@@ -110,7 +126,9 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   if (res.status === 304) {
     if (cached === null) return stale('HTTP 304');
     mkdirSync(cacheDir, { recursive: true });
-    writeAtomic(metaPath, JSON.stringify({ etag, fetchedAt: Date.now() }));
+    const now = Date.now();
+    writeAtomic(metaPath, JSON.stringify({ etag, fetchedAt: now }));
+    memory = { path: cachePath, text: cached, fetchedAt: now };
     return cached;
   }
   if (!res.ok) return stale(`HTTP ${res.status}`);
@@ -125,7 +143,9 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   if (!text.includes(FULL_DOCS_MARKER)) { return stale('malformed corpus'); }
   mkdirSync(cacheDir, { recursive: true });
   writeAtomic(cachePath, text);
-  writeAtomic(metaPath, JSON.stringify({ etag: res.headers.get('etag'), fetchedAt: Date.now() }));
+  const now = Date.now();
+  writeAtomic(metaPath, JSON.stringify({ etag: res.headers.get('etag'), fetchedAt: now }));
+  memory = { path: cachePath, text, fetchedAt: now };
   return text;
 }
 
@@ -378,7 +398,7 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
   }
   const { demotePathPrefix, demoteFactor } = opts;
   const demote = Boolean(demotePathPrefix && demoteFactor) && !tokens.some((t) => t.toLowerCase() === 'mcp');
-  const terms = queryTerms(query).flatMap(termsOf);
+  const terms = tokens.flatMap(termsOf);
   return [...scores]
     .filter(([, score]) => score > 0)
     .map(([i, score]) => {
@@ -390,6 +410,6 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
     .slice(0, limit)
     .map(([i, score]) => {
       const chunk = index.chunks[i];
-      return { chunkIndex: i, page: chunk.page, title: chunk.title, trail: chunk.trail, path: chunk.path, score, excerpt: excerptChunk(chunk, terms) };
+      return { page: chunk.page, title: chunk.title, trail: chunk.trail, path: chunk.path, score, excerpt: excerptChunk(chunk, terms) };
     });
 }

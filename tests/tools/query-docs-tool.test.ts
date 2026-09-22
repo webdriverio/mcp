@@ -1,17 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { decode } from '@toon-format/toon';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { EXCERPT_CHAR_CAP } from '../../src/utils/docs-index';
+import { CACHE_FILE, EXCERPT_CHAR_CAP, FULL_DOCS_MARKER } from '../../src/utils/docs-index';
 import { queryDocsTool, queryDocsToolDefinition } from '../../src/tools/query-docs.tool';
-import { DOCS_FIXTURE as FIXTURE } from '../helpers/docs-fixture';
+import { DOCS_FIXTURE as FIXTURE, useDocsCacheDir } from '../helpers/docs-fixture';
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { type: string; text: string }[]; isError?: boolean }>;
 const callTool = queryDocsTool as unknown as ToolFn;
 
-let tempDir: string;
-let prevEnv: string | undefined;
+const { dir } = useDocsCacheDir('wdio-docs-');
 
 const BIG_FIXTURE = `${FIXTURE}\n${Array.from({ length: 120 }, (_, i) => `zzfiller line ${i} padding the page body`).join('\n')}\n`;
 
@@ -24,22 +23,9 @@ function stubFetchOk(corpus = FIXTURE) {
   }));
 }
 
-beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'wdio-docs-'));
-  prevEnv = process.env.WDIO_MCP_CACHE_DIR;
-  process.env.WDIO_MCP_CACHE_DIR = tempDir;
-  stubFetchOk();
-});
+const FALLBACK_CACHE = join(homedir(), '.wdio-mcp', CACHE_FILE);
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  if (prevEnv === undefined) {
-    delete process.env.WDIO_MCP_CACHE_DIR;
-  } else {
-    process.env.WDIO_MCP_CACHE_DIR = prevEnv;
-  }
-  rmSync(tempDir, { recursive: true, force: true });
-});
+beforeEach(() => { stubFetchOk(); });
 
 describe('query_docs tool', () => {
   it('exposes a tool definition', () => {
@@ -68,7 +54,7 @@ describe('query_docs tool', () => {
       '',
       '- [waitUntil](/docs/api/browser/waitUntil.md)',
       '',
-      '# Full Documentation Content',
+      FULL_DOCS_MARKER,
       '',
       '# waitUntil',
       '',
@@ -94,7 +80,7 @@ describe('query_docs tool', () => {
       '',
       '- [waitUntil](/docs/api/browser/waitUntil.md)',
       '',
-      '# Full Documentation Content',
+      FULL_DOCS_MARKER,
       '',
       '# waitUntil',
       '',
@@ -114,6 +100,56 @@ describe('query_docs tool', () => {
     expect(full.hits[0].excerpt).toContain('zzsplit tail paragraph.');
   });
 
+  it('does not let one split page starve the others under a fullPage limit', async () => {
+    const saturatedPage = [
+      '# Docs',
+      '',
+      '- [zzalpha](/docs/zzalpha.md)',
+      '- [zzbeta](/docs/zzbeta.md)',
+      '- [zzgamma](/docs/zzgamma.md)',
+      '',
+      FULL_DOCS_MARKER,
+      '',
+      '# zzalpha',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzterm zzalpha filler ${i}`),
+      '',
+      '## Section 2',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzterm zzalpha filler s2 ${i}`),
+      '',
+      '## Section 3',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzterm zzalpha filler s3 ${i}`),
+      '',
+      '## Section 4',
+      '',
+      'zzterm tail.',
+      '',
+      '# zzbeta',
+      '',
+      ...Array.from({ length: 30 }, (_, i) => `zzbeta filler ${i}`),
+      '',
+      'zzterm once.',
+      '',
+      '# zzgamma',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzterm zzgamma filler ${i}`),
+      '',
+      '## Later',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzterm zzgamma filler later ${i}`),
+      '',
+    ].join('\n');
+    stubFetchOk(saturatedPage);
+    const excerpted = decode((await callTool({ query: 'zzterm' })).content[0].text) as { hits: { path: string | null }[] };
+    const full = decode((await callTool({ query: 'zzterm', fullPage: true, limit: 2 })).content[0].text) as { hits: { path: string | null }[] };
+    expect(excerpted.hits).toHaveLength(5);
+    expect(new Set(excerpted.hits.map((h) => h.path)).size).toBeGreaterThan(1);
+    expect(full.hits).toHaveLength(2);
+    expect(new Set(full.hits.map((h) => h.path)).size).toBe(2);
+  });
+
   it('returns a well-formed response for a query matching nothing', async () => {
     const result = await callTool({ query: 'zzzznotfound' });
     expect(result.isError).toBeFalsy();
@@ -123,16 +159,11 @@ describe('query_docs tool', () => {
 
   it('writes the cache file after a successful call', async () => {
     await callTool({ query: 'waitUntil' });
-    expect(existsSync(join(tempDir, 'llms-full.txt'))).toBe(true);
+    expect(existsSync(join(dir(), CACHE_FILE))).toBe(true);
   });
 
-  it('falls back to ~/.wdio-mcp when WDIO_MCP_CACHE_DIR is unset', async () => {
+  it.skipIf(!existsSync(FALLBACK_CACHE))('falls back to ~/.wdio-mcp when WDIO_MCP_CACHE_DIR is unset', async () => {
     delete process.env.WDIO_MCP_CACHE_DIR;
-    const cachePath = join(homedir(), '.wdio-mcp', 'llms-full.txt');
-    if (!existsSync(cachePath)) {
-      console.warn(`Skipping fallback-dir test: no cached copy at ${cachePath}. Run the tool once with network access to populate it.`);
-      return;
-    }
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     const result = await callTool({ query: 'waitUntil' });
     expect(result.isError).toBeFalsy();
@@ -141,8 +172,8 @@ describe('query_docs tool', () => {
 
   it('returns isError with "No cached copy at" when offline with no cache', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-    for (const entry of readdirSync(tempDir)) {
-      rmSync(join(tempDir, entry), { recursive: true, force: true });
+    for (const entry of readdirSync(dir())) {
+      rmSync(join(dir(), entry), { recursive: true, force: true });
     }
     const result = await callTool({ query: 'waitUntil' });
     expect(result.isError).toBe(true);

@@ -779,6 +779,12 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 | `hide_keyboard`   | Hide on-screen keyboard                                                                                 |
 | `set_geolocation` | Set device GPS location                                                                                 |
 
+### Documentation Search
+
+| Tool         | Description                                                                                                                     |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `query_docs` | Search the official WebdriverIO documentation and return the most relevant excerpts with page, section and source URL. `query` is required (2-3 distinctive keywords — a sentence dilutes the ranking); `limit` defaults to 5 (max 20); `fullPage` (default: false) returns the full matched pages instead of excerpts. Session-independent |
+
 ### MCP Resources (read-only, no tool call needed)
 
 | Resource                                      | Description                                              |
@@ -803,6 +809,8 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 | `wdio://saucelabs/local-binary`               | Sauce Connect binary download URL and start command      |
 | `wdio://testmu/local-binary`                  | TestMu Tunnel binary download URL and start command       |
 | `wdio://testingbot/local-binary`              | TestingBot Tunnel JAR download URL and start command (Java 11+) |
+| `wdio://docs/index`                           | Every page of the official WebdriverIO documentation as tab-separated title, source path and slug |
+| `wdio://docs/page/{slug}`                     | Full markdown of one documentation page, truncated at 40000 characters. Slugs come from `wdio://docs/index` ("~" in place of "/") |
 
 ## Usage Examples
 

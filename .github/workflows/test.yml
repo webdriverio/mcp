@@ -31,7 +31,7 @@ jobs:
         run: pnpm install
 
       - name: Fetch Docs Corpus
-        run: curl -sfL https://webdriver.io/llms-full.txt --create-dirs -o $HOME/.wdio-mcp/llms-full.txt
+        run: curl -sfL https://webdriver.io/llms-full.txt --create-dirs -o $HOME/.wdio-mcp/llms-full.txt && test -s "$HOME/.wdio-mcp/llms-full.txt"
 
       - name: Run Tests
         run: pnpm test

@@ -6,6 +6,8 @@ import { coerceBoolean } from '../utils/zod-helpers';
 import { MCP_DEMOTE_FACTOR, MCP_PATH_PREFIX, capPageText, pageText, search } from '../utils/docs-index';
 import { loadDocsIndex } from '../utils/docs-client';
 
+const DEFAULT_LIMIT = 5;
+
 export const queryDocsToolDefinition: ToolDefinition = {
   name: 'query_docs',
   description: [
@@ -20,7 +22,7 @@ export const queryDocsToolDefinition: ToolDefinition = {
   ].join('\n'),
   inputSchema: {
     query: z.string().describe('2-3 distinctive keywords: an API name, config key, page title or feature (e.g. "appium setup", "devtools trace.zip", "browserstack capabilities"). A sentence dilutes the ranking.'),
-    limit: z.number().int().min(1).max(20).optional().default(5),
+    limit: z.number().int().min(1).max(20).optional().default(DEFAULT_LIMIT),
     fullPage: coerceBoolean.optional().default(false).describe('Return the full matched pages instead of excerpts'),
   },
   annotations: { title: 'Query WebdriverIO Docs', readOnlyHint: true, idempotentHint: true },
@@ -33,10 +35,14 @@ type QueryDocsArgs = {
 };
 
 export const queryDocsTool: ToolCallback = async (args: QueryDocsArgs) => {
-  const { query, limit, fullPage } = args;
+  const { query, limit = DEFAULT_LIMIT, fullPage } = args;
   try {
     const index = await loadDocsIndex();
-    const results = search(index, query, limit, {
+    // The dedup below runs after search's slice, so without over-fetching a page split into
+    // sibling chunks crowds out whole pages. ponytail: 10× over-fetch; raise only if a page
+    // with >10 sibling chunks starves real queries.
+    const candidates = fullPage ? Math.min(limit * 10, index.chunks.length) : limit;
+    const results = search(index, query, candidates, {
       demotePathPrefix: MCP_PATH_PREFIX,
       demoteFactor: MCP_DEMOTE_FACTOR,
     });
@@ -48,8 +54,16 @@ export const queryDocsTool: ToolCallback = async (args: QueryDocsArgs) => {
     }
     // results are score-descending, so each page's first hit is its best one; without
     // this a large page ships its capped body once per sibling chunk that co-ranks.
+    const seen = new Set<number>();
     const hits = results
-      .filter((hit, i) => !fullPage || results.findIndex((h) => h.page === hit.page) === i)
+      .filter((hit) => {
+        if (!fullPage || !seen.has(hit.page)) {
+          seen.add(hit.page);
+          return true;
+        }
+        return false;
+      })
+      .slice(0, limit)
       .map((hit) => ({
         title: hit.title,
         trail: hit.trail,

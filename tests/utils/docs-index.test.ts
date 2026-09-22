@@ -1,16 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import {
   BM25_B,
   BM25_K1,
-  DOCS_URL,
+  CACHE_FILE,
   CACHE_TTL_MS,
   CHUNK_LINE_CAP,
+  DOCS_URL,
   EXCERPT_CHAR_CAP,
+  FULL_DOCS_MARKER,
   MCP_DEMOTE_FACTOR,
   MCP_PATH_PREFIX,
+  META_FILE,
   PAGE_CHAR_CAP,
   buildIndex,
   chunkCorpus,
@@ -25,7 +27,7 @@ import {
   tokenize,
 } from '../../src/utils/docs-index';
 import { docsCacheDir } from '../../src/utils/docs-client';
-import { DOCS_FIXTURE as FIXTURE } from '../helpers/docs-fixture';
+import { DOCS_FIXTURE as FIXTURE, useDocsCacheDir } from '../helpers/docs-fixture';
 
 const DEMOTE = { demotePathPrefix: MCP_PATH_PREFIX, demoteFactor: MCP_DEMOTE_FACTOR };
 
@@ -41,9 +43,7 @@ describe('docs-index constants', () => {
   });
 });
 
-const CACHE_FILE = 'llms-full.txt';
-const META_FILE = 'llms-full.meta.json';
-const MARKER = '# Full Documentation Content';
+const MARKER = FULL_DOCS_MARKER;
 
 function corpusBody(title: string): string {
   return [MARKER, '', `# ${title}`, '', `${title} body text`, ''].join('\n');
@@ -70,24 +70,21 @@ function stubFetch(...responses: StubResponse[]): { fetchImpl: typeof fetch; cal
 }
 
 describe('loadCorpus', () => {
-  let dir: string;
-  const cache = (): string => join(dir, CACHE_FILE);
-  const meta = (): string => join(dir, META_FILE);
+  const { dir } = useDocsCacheDir('docs-');
+  const cache = (): string => join(dir(), CACHE_FILE);
+  const meta = (): string => join(dir(), META_FILE);
   const writeMeta = (etag: string | null, fetchedAt: number): void => {
     writeFileSync(meta(), JSON.stringify({ etag, fetchedAt }));
   };
   const readMeta = (): { etag: string | null; fetchedAt: number } => JSON.parse(readFileSync(meta(), 'utf8'));
   const STALE_AT = Date.now() - 60_000;
 
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'docs-')); });
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
-
   it('serves a cache within the TTL without fetching', async () => {
     const body = corpusBody('Cached');
     writeFileSync(cache(), body);
     writeMeta('"v1"', Date.now());
     const { fetchImpl, calls } = stubFetch();
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: CACHE_TTL_MS })).resolves.toBe(body);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: CACHE_TTL_MS })).resolves.toBe(body);
     expect(calls).toHaveLength(0);
   });
 
@@ -96,7 +93,7 @@ describe('loadCorpus', () => {
     writeFileSync(cache(), body);
     writeMeta('"v1"', STALE_AT);
     const { fetchImpl, calls } = stubFetch({ status: 304 });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(body);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).resolves.toBe(body);
     expect(calls[0].url).toBe(DOCS_URL);
     expect(calls[0].headers['If-None-Match']).toBe('"v1"');
     expect(readMeta().fetchedAt).toBeGreaterThan(STALE_AT);
@@ -107,7 +104,7 @@ describe('loadCorpus', () => {
     writeMeta('"v1"', STALE_AT);
     const fresh = corpusBody('New');
     const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
     expect(readFileSync(cache(), 'utf8')).toBe(fresh);
     expect(readMeta()).toEqual({ etag: '"v2"', fetchedAt: expect.any(Number) });
     expect(readMeta().fetchedAt).toBeGreaterThan(STALE_AT);
@@ -118,19 +115,29 @@ describe('loadCorpus', () => {
     writeFileSync(meta(), '{ not json');
     const fresh = corpusBody('New');
     const { fetchImpl, calls } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
     expect(calls[0].headers['If-None-Match']).toBeUndefined();
     expect(readFileSync(cache(), 'utf8')).toBe(fresh);
   });
 
+  it('refetches when the meta timestamp is in the future', async () => {
+    writeFileSync(cache(), corpusBody('Cached'));
+    writeMeta('"v1"', Date.now() + 86_400_000);
+    const fresh = corpusBody('New');
+    const { fetchImpl, calls } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: CACHE_TTL_MS })).resolves.toBe(fresh);
+    expect(calls).toHaveLength(1);
+    expect(readMeta().fetchedAt).toBeLessThanOrEqual(Date.now());
+  });
+
   it('rejects when there is no cache and the fetch fails', async () => {
     const fetchImpl = (async () => { throw new Error('network down'); }) as unknown as typeof fetch;
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
   });
 
   it('rejects when there is no cache and the response is not ok', async () => {
     const { fetchImpl } = stubFetch({ status: 503 });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
   });
 
   it('treats a marker-less cache file as no cache', async () => {
@@ -138,7 +145,7 @@ describe('loadCorpus', () => {
     writeMeta('"v1"', STALE_AT);
     const fresh = corpusBody('New');
     const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
     expect(readFileSync(cache(), 'utf8')).toBe(fresh);
   });
 
@@ -147,13 +154,13 @@ describe('loadCorpus', () => {
     writeFileSync(cache(), body);
     writeMeta('"v1"', STALE_AT);
     const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: '<html>error page</html>' });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(body);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).resolves.toBe(body);
     expect(readFileSync(cache(), 'utf8')).toBe(body);
   });
 
   it('rejects a marker-less body when there is no cache to fall back on', async () => {
     const { fetchImpl } = stubFetch({ status: 200, body: '<html>error page</html>' });
-    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir(), fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
     expect(existsSync(cache())).toBe(false);
   });
 });
@@ -490,59 +497,60 @@ function rankOf(hits: { title: string; path: string | null }[], want: Expectatio
   return hits.findIndex((h) => (want.title !== undefined && h.title === want.title) || (want.path !== undefined && h.path === want.path));
 }
 
+const corpusPath = join(docsCacheDir(), CACHE_FILE);
+const available = existsSync(corpusPath);
+
 describe('live corpus (optional)', () => {
-  const cachePath = join(docsCacheDir(), 'llms-full.txt');
-  const available = existsSync(cachePath);
+  // Read and index once: ~30 EXPECTATIONS rows otherwise re-read a ~3 MB file each.
+  // Guarded because an unguarded read throws at collect time, which skips nothing.
+  const liveText = available ? readFileSync(corpusPath, 'utf8') : '';
+  const liveChunks = chunkCorpus(liveText);
+  const liveIndex = getIndex(liveText);
 
   it.skipIf(!available)('chunks cleanly and resolves one path per page', () => {
-    const chunks = chunkCorpus(readFileSync(cachePath, 'utf8'));
-    expect(chunks.length).toBeGreaterThanOrEqual(550);
-    expect(chunks.length).toBeLessThanOrEqual(650);
-    const titles = new Set(chunks.map((c) => c.title));
+    expect(liveChunks.length).toBeGreaterThanOrEqual(550);
+    expect(liveChunks.length).toBeLessThanOrEqual(650);
+    const titles = new Set(liveChunks.map((c) => c.title));
     for (const phantom of ['Bad - Class that might change', 'Add Tauri to Cargo.toml', 'or', 'By default, Powershell uses TLS 1.0 the site security requires TLS 1.2']) {
       expect(titles.has(phantom)).toBe(false);
     }
     expect([...titles].some((t) => t.includes('Direct link to'))).toBe(false);
-    expect(chunks.filter((c) => c.path !== null).length).toBeGreaterThan(chunks.length / 2);
+    expect(liveChunks.filter((c) => c.path !== null).length).toBeGreaterThan(liveChunks.length / 2);
   });
 
   it.skipIf(!available)('aligns every TOC entry to a page', () => {
-    const text = readFileSync(cachePath, 'utf8');
-    const entries = tocEntries(text);
+    const entries = tocEntries(liveText);
     expect(entries.length).toBeGreaterThanOrEqual(380);
     expect(entries.every((e) => !e.path.includes('~'))).toBe(true);
     expect(new Set(entries.map((e) => slugOf(e.path))).size).toBe(entries.length);
-    const paths = new Set(chunkCorpus(text).map((c) => c.path));
+    const paths = new Set(liveChunks.map((c) => c.path));
     expect(entries.every((e) => paths.has(e.path))).toBe(true);
   });
 
   it.skipIf(!available)('gives every chunk of a split page its page path', () => {
-    const chunks = chunkCorpus(readFileSync(cachePath, 'utf8'));
     const byPage = new Map<number, (string | null)[]>();
-    for (const c of chunks) { byPage.set(c.page, [...(byPage.get(c.page) ?? []), c.path]); }
+    for (const c of liveChunks) { byPage.set(c.page, [...(byPage.get(c.page) ?? []), c.path]); }
     for (const paths of byPage.values()) {
       expect(new Set(paths).size).toBe(1);
     }
-    expect(new Set(chunks.map((c) => c.path).filter(Boolean)).size).toBe(417);
+    expect(new Set(liveChunks.map((c) => c.path).filter(Boolean)).size).toBe(434);
   });
 
   it.skipIf(!available)('gives the two waitUntil pages different paths', () => {
-    const hits = search(getIndex(readFileSync(cachePath, 'utf8')), 'waitUntil', 2, DEMOTE);
+    const hits = search(liveIndex, 'waitUntil', 2, DEMOTE);
     expect(hits.map((h) => h.path)).toEqual(['/docs/api/browser/waitUntil.md', '/docs/api/element/waitUntil.md']);
   });
 
   it.skipIf(!available)('never puts an mcp page in the top 3 of a framework question', () => {
-    const index = getIndex(readFileSync(cachePath, 'utf8'));
     for (const query of ['how to wire up appium in this config file', 'how do I set up a custom reporter']) {
-      const top = search(index, query, 3, DEMOTE);
+      const top = search(liveIndex, query, 3, DEMOTE);
       expect(top.some((h) => h.path?.startsWith(MCP_PATH_PREFIX))).toBe(false);
     }
   });
 
   for (const want of EXPECTATIONS) {
     it.skipIf(!available)(`ranks "${want.query}" within ${want.maxRank}`, () => {
-      const index = getIndex(readFileSync(cachePath, 'utf8'));
-      const rank = rankOf(search(index, want.query, 10, DEMOTE), want);
+      const rank = rankOf(search(liveIndex, want.query, 10, DEMOTE), want);
       expect(rank).toBeGreaterThanOrEqual(0);
       expect(rank).toBeLessThan(want.maxRank);
     });

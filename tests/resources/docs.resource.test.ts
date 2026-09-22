@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { docsIndexResource, docsPageResource } from '../../src/resources/docs.resource';
+import { FULL_DOCS_MARKER } from '../../src/utils/docs-index';
+import { useDocsCacheDir } from '../helpers/docs-fixture';
 import type { TemplateResourceDefinition } from '../../src/types/resource';
 
 const FIXTURE = [
@@ -13,7 +12,7 @@ const FIXTURE = [
   '',
   '---',
   '',
-  '# Full Documentation Content',
+  FULL_DOCS_MARKER,
   '',
   '# Appium Setup',
   '',
@@ -39,29 +38,15 @@ async function pageText(slug: string): Promise<string> {
   return (result.contents[0] as TextContent).text;
 }
 
-let tempDir: string;
-let prevEnv: string | undefined;
+useDocsCacheDir('wdio-docs-resource-');
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'wdio-docs-resource-'));
-  prevEnv = process.env.WDIO_MCP_CACHE_DIR;
-  process.env.WDIO_MCP_CACHE_DIR = tempDir;
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
     headers: new Headers({ etag: '"test-etag"' }),
     text: async () => FIXTURE,
   }));
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  if (prevEnv === undefined) {
-    delete process.env.WDIO_MCP_CACHE_DIR;
-  } else {
-    process.env.WDIO_MCP_CACHE_DIR = prevEnv;
-  }
-  rmSync(tempDir, { recursive: true, force: true });
 });
 
 describe('wdio://docs/index', () => {

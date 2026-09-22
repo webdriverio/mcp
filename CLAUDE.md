@@ -151,9 +151,11 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - A rare-term idf gate and a coverage multiplier were both **measured and rejected**; don't re-propose
   either without new measurements.
 - Registered without `withRecording` (session-independent).
-- The docs tests `it.skipIf` out when `~/.wdio-mcp/llms-full.txt` is absent, so a local green run
-  means nothing unless the cache is populated. `.github/workflows/test.yml` curls the corpus before
-  `pnpm test`, so CI does exercise the ranking gate.
+- The ranking tests read the live corpus from the `~/.wdio-mcp` cache via `docsCacheDir()` and
+  `it.skipIf` out when it is absent, so a local run needs a populated cache;
+  `.github/workflows/test.yml` curls the corpus before `pnpm test` so CI runs the gate. Upstream
+  corpus drift can fail these tests — accepted risk; refresh the pinned expectations (chunk bounds,
+  path count, EXPECTATIONS rows) in `tests/utils/docs-index.test.ts` when it happens.
 
 ### Build
 
