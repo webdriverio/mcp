@@ -33,7 +33,7 @@ type QueryDocsArgs = {
 };
 
 export const queryDocsTool: ToolCallback = async (args: QueryDocsArgs) => {
-  const { query, limit = 5, fullPage = false } = args;
+  const { query, limit, fullPage } = args;
   try {
     const index = await loadDocsIndex();
     const results = search(index, query, limit, {
@@ -46,13 +46,17 @@ export const queryDocsTool: ToolCallback = async (args: QueryDocsArgs) => {
         pages.set(page, capPageText(pageText(index, page)));
       }
     }
-    const hits = results.map((hit) => ({
-      title: hit.title,
-      trail: hit.trail,
-      path: hit.path,
-      score: Math.round(hit.score * 100) / 100,
-      excerpt: pages.get(hit.page) ?? hit.excerpt,
-    }));
+    // results are score-descending, so each page's first hit is its best one; without
+    // this a large page ships its capped body once per sibling chunk that co-ranks.
+    const hits = results
+      .filter((hit, i) => !fullPage || results.findIndex((h) => h.page === hit.page) === i)
+      .map((hit) => ({
+        title: hit.title,
+        trail: hit.trail,
+        path: hit.path,
+        score: Math.round(hit.score * 100) / 100,
+        excerpt: pages.get(hit.page) ?? hit.excerpt,
+      }));
     return { content: [{ type: 'text' as const, text: encode({ query, hits }) }] };
   } catch (e) {
     return { isError: true as const, content: [{ type: 'text' as const, text: `Error: ${e}` }] };

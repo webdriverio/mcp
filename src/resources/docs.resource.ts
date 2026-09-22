@@ -23,18 +23,18 @@ export const docsPageResource: ResourceDefinition = {
   template: new ResourceTemplate('wdio://docs/page/{slug}', { list: undefined }),
   description: `Full markdown of one WebdriverIO documentation page, truncated at ${PAGE_CHAR_CAP} characters. Read this when an excerpt from query_docs is not enough. Slugs come from wdio://docs/index and encode the docs-site path with "~" in place of "/" — e.g. docs~appium.md is /docs/appium.md.`,
   handler: async (uri, variables) => {
-    const failed = (text: string): { contents: { uri: string; mimeType: string; text: string }[] } => ({
-      contents: [{ uri: uri.href, mimeType: 'text/markdown', text }],
+    const respond = (text: string, mimeType: 'text/markdown' | 'text/plain'): { contents: { uri: string; mimeType: string; text: string }[] } => ({
+      contents: [{ uri: uri.href, mimeType, text }],
     });
     try {
       const index = await loadDocsIndex();
       const page = pageBySlug(index, variables.slug);
       if (!page) {
-        return failed(`No page for slug "${variables.slug}". Slugs are listed in wdio://docs/index.`);
+        return respond(`No page for slug "${variables.slug}". Slugs are listed in wdio://docs/index.`, 'text/plain');
       }
-      return failed(capPageText(page.text));
+      return respond(capPageText(page.text), 'text/markdown');
     } catch (e) {
-      return failed(`Error: ${e}`);
+      return respond(`Error: ${e}`, 'text/plain');
     }
   },
 };

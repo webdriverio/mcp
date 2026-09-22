@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import {
+  BM25_B,
+  BM25_K1,
   DOCS_URL,
   CACHE_TTL_MS,
   CHUNK_LINE_CAP,
@@ -13,6 +15,7 @@ import {
   buildIndex,
   chunkCorpus,
   getIndex,
+  loadCorpus,
   pageBySlug,
   pathOf,
   queryTerms,
@@ -21,6 +24,7 @@ import {
   tocEntries,
   tokenize,
 } from '../../src/utils/docs-index';
+import { docsCacheDir } from '../../src/utils/docs-client';
 import { DOCS_FIXTURE as FIXTURE } from '../helpers/docs-fixture';
 
 const DEMOTE = { demotePathPrefix: MCP_PATH_PREFIX, demoteFactor: MCP_DEMOTE_FACTOR };
@@ -32,6 +36,125 @@ describe('docs-index constants', () => {
     expect(EXCERPT_CHAR_CAP).toBe(1200);
     expect(CACHE_TTL_MS).toBeGreaterThan(0);
     expect(PAGE_CHAR_CAP).toBeGreaterThan(EXCERPT_CHAR_CAP);
+    expect(BM25_K1).toBe(1.2);
+    expect(BM25_B).toBe(0.75);
+  });
+});
+
+const CACHE_FILE = 'llms-full.txt';
+const META_FILE = 'llms-full.meta.json';
+const MARKER = '# Full Documentation Content';
+
+function corpusBody(title: string): string {
+  return [MARKER, '', `# ${title}`, '', `${title} body text`, ''].join('\n');
+}
+
+interface StubResponse { status: number; etag?: string | null; body?: string }
+interface StubCall { url: string; headers: Record<string, string> }
+
+// The loader touches only status/ok/headers.get/text, so a plain object stands in for Response.
+function stubFetch(...responses: StubResponse[]): { fetchImpl: typeof fetch; calls: StubCall[] } {
+  const calls: StubCall[] = [];
+  const fetchImpl = (async (url: string, init?: { headers?: Record<string, string> }) => {
+    calls.push({ url: String(url), headers: init?.headers ?? {} });
+    const res = responses.shift();
+    if (!res) { throw new Error('stubFetch: unexpected extra request'); }
+    return {
+      status: res.status,
+      ok: res.status >= 200 && res.status < 300,
+      headers: { get: (name: string) => (name.toLowerCase() === 'etag' ? res.etag ?? null : null) },
+      text: async () => res.body ?? '',
+    };
+  }) as unknown as typeof fetch;
+  return { fetchImpl, calls };
+}
+
+describe('loadCorpus', () => {
+  let dir: string;
+  const cache = (): string => join(dir, CACHE_FILE);
+  const meta = (): string => join(dir, META_FILE);
+  const writeMeta = (etag: string | null, fetchedAt: number): void => {
+    writeFileSync(meta(), JSON.stringify({ etag, fetchedAt }));
+  };
+  const readMeta = (): { etag: string | null; fetchedAt: number } => JSON.parse(readFileSync(meta(), 'utf8'));
+  const STALE_AT = Date.now() - 60_000;
+
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'docs-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('serves a cache within the TTL without fetching', async () => {
+    const body = corpusBody('Cached');
+    writeFileSync(cache(), body);
+    writeMeta('"v1"', Date.now());
+    const { fetchImpl, calls } = stubFetch();
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: CACHE_TTL_MS })).resolves.toBe(body);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('revalidates a stale cache and reuses the body on 304', async () => {
+    const body = corpusBody('Cached');
+    writeFileSync(cache(), body);
+    writeMeta('"v1"', STALE_AT);
+    const { fetchImpl, calls } = stubFetch({ status: 304 });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(body);
+    expect(calls[0].url).toBe(DOCS_URL);
+    expect(calls[0].headers['If-None-Match']).toBe('"v1"');
+    expect(readMeta().fetchedAt).toBeGreaterThan(STALE_AT);
+  });
+
+  it('rewrites cache and meta on a fresh 200', async () => {
+    writeFileSync(cache(), corpusBody('Old'));
+    writeMeta('"v1"', STALE_AT);
+    const fresh = corpusBody('New');
+    const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    expect(readFileSync(cache(), 'utf8')).toBe(fresh);
+    expect(readMeta()).toEqual({ etag: '"v2"', fetchedAt: expect.any(Number) });
+    expect(readMeta().fetchedAt).toBeGreaterThan(STALE_AT);
+  });
+
+  it('refetches unconditionally when the meta file is corrupt', async () => {
+    writeFileSync(cache(), corpusBody('Old'));
+    writeFileSync(meta(), '{ not json');
+    const fresh = corpusBody('New');
+    const { fetchImpl, calls } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    expect(calls[0].headers['If-None-Match']).toBeUndefined();
+    expect(readFileSync(cache(), 'utf8')).toBe(fresh);
+  });
+
+  it('rejects when there is no cache and the fetch fails', async () => {
+    const fetchImpl = (async () => { throw new Error('network down'); }) as unknown as typeof fetch;
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+  });
+
+  it('rejects when there is no cache and the response is not ok', async () => {
+    const { fetchImpl } = stubFetch({ status: 503 });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+  });
+
+  it('treats a marker-less cache file as no cache', async () => {
+    writeFileSync(cache(), '');
+    writeMeta('"v1"', STALE_AT);
+    const fresh = corpusBody('New');
+    const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: fresh });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(fresh);
+    expect(readFileSync(cache(), 'utf8')).toBe(fresh);
+  });
+
+  it('keeps the previous cache when the fetched body has no marker', async () => {
+    const body = corpusBody('Cached');
+    writeFileSync(cache(), body);
+    writeMeta('"v1"', STALE_AT);
+    const { fetchImpl } = stubFetch({ status: 200, etag: '"v2"', body: '<html>error page</html>' });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).resolves.toBe(body);
+    expect(readFileSync(cache(), 'utf8')).toBe(body);
+  });
+
+  it('rejects a marker-less body when there is no cache to fall back on', async () => {
+    const { fetchImpl } = stubFetch({ status: 200, body: '<html>error page</html>' });
+    await expect(loadCorpus({ url: DOCS_URL, cacheDir: dir, fetchImpl, ttlMs: 1 })).rejects.toThrow(/Failed to load/);
+    expect(existsSync(cache())).toBe(false);
   });
 });
 
@@ -368,7 +491,7 @@ function rankOf(hits: { title: string; path: string | null }[], want: Expectatio
 }
 
 describe('live corpus (optional)', () => {
-  const cachePath = join(homedir(), '.wdio-mcp', 'llms-full.txt');
+  const cachePath = join(docsCacheDir(), 'llms-full.txt');
   const available = existsSync(cachePath);
 
   it.skipIf(!available)('chunks cleanly and resolves one path per page', () => {
@@ -389,6 +512,8 @@ describe('live corpus (optional)', () => {
     expect(entries.length).toBeGreaterThanOrEqual(380);
     expect(entries.every((e) => !e.path.includes('~'))).toBe(true);
     expect(new Set(entries.map((e) => slugOf(e.path))).size).toBe(entries.length);
+    const paths = new Set(chunkCorpus(text).map((c) => c.path));
+    expect(entries.every((e) => paths.has(e.path))).toBe(true);
   });
 
   it.skipIf(!available)('gives every chunk of a split page its page path', () => {

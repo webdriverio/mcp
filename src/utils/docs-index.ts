@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const DOCS_URL = 'https://webdriver.io/llms-full.txt';
@@ -35,6 +35,8 @@ const WORD = /[A-Za-z0-9]+/g;
 // one field cannot express that, BM25 saturation leaves the false positive standing.
 // Field 2 exists so a page *named* `click` outranks prose that merely mentions it.
 const FIELD_WEIGHTS = [1.0, 0.4, 1.0];
+export const BM25_K1 = 1.2;
+export const BM25_B = 0.75;
 const SUB_SEGMENT_MIN_LEN = 3;
 const TITLE_FIELD = 2;
 // Closed-class English function words. Derived grammatically, not from corpus frequency:
@@ -59,6 +61,13 @@ export const PAGE_CHAR_CAP = 40_000;
 export const MCP_PATH_PREFIX = '/docs/mcp/';
 export const MCP_DEMOTE_FACTOR = 0.25;
 
+// A reader must never observe a half-written corpus, and a truncated cache would index
+// as a valid one. Same-directory rename is atomic on POSIX.
+function writeAtomic(path: string, data: string): void {
+  writeFileSync(`${path}.tmp`, data);
+  renameSync(`${path}.tmp`, path);
+}
+
 export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   const { url, cacheDir, fetchImpl, ttlMs = CACHE_TTL_MS } = opts;
   // ponytail: single home-dir cache path, no OS-specific cache dir, upgrade to `env-paths` if users complain about polluting `$HOME`.
@@ -67,7 +76,8 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   let cached: string | null = null;
   if (existsSync(cachePath)) {
     try {
-      cached = readFileSync(cachePath, 'utf8');
+      const text = readFileSync(cachePath, 'utf8');
+      cached = text.includes(FULL_DOCS_MARKER) ? text : null;
     } catch {
       cached = null;
     }
@@ -92,7 +102,7 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   let res: Response;
   try {
     const headers: Record<string, string> = {};
-    if (etag) { headers['If-None-Match'] = etag; }
+    if (etag && cached !== null) { headers['If-None-Match'] = etag; }
     res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(30_000) });
   } catch (e) {
     return stale(e instanceof Error ? e.message : String(e));
@@ -100,7 +110,7 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   if (res.status === 304) {
     if (cached === null) return stale('HTTP 304');
     mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(metaPath, JSON.stringify({ etag, fetchedAt: Date.now() }));
+    writeAtomic(metaPath, JSON.stringify({ etag, fetchedAt: Date.now() }));
     return cached;
   }
   if (!res.ok) return stale(`HTTP ${res.status}`);
@@ -110,9 +120,12 @@ export async function loadCorpus(opts: LoadCorpusOptions): Promise<string> {
   } catch (e) {
     return stale(e instanceof Error ? e.message : String(e));
   }
+  // An error page answers 200 as readily as the corpus does; storing it would replace a
+  // good cache with garbage and index an empty corpus.
+  if (!text.includes(FULL_DOCS_MARKER)) { return stale('malformed corpus'); }
   mkdirSync(cacheDir, { recursive: true });
-  writeFileSync(cachePath, text);
-  writeFileSync(metaPath, JSON.stringify({ etag: res.headers.get('etag'), fetchedAt: Date.now() }));
+  writeAtomic(cachePath, text);
+  writeAtomic(metaPath, JSON.stringify({ etag: res.headers.get('etag'), fetchedAt: Date.now() }));
   return text;
 }
 
@@ -344,8 +357,8 @@ function excerptChunk(chunk: DocChunk, terms: string[]): string {
 }
 
 export function search(index: DocsIndex, query: string, limit: number, opts: SearchOptions = {}): DocHit[] {
-  const k1 = 1.2;
-  const b = 0.75;
+  const k1 = BM25_K1;
+  const b = BM25_B;
   const n = index.chunks.length;
   const scores = new Map<number, number>();
   const tokens = queryTerms(query);
@@ -365,7 +378,7 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
   }
   const { demotePathPrefix, demoteFactor } = opts;
   const demote = Boolean(demotePathPrefix && demoteFactor) && !tokens.some((t) => t.toLowerCase() === 'mcp');
-  const terms = tokenize(query);
+  const terms = queryTerms(query).flatMap(termsOf);
   return [...scores]
     .filter(([, score]) => score > 0)
     .map(([i, score]) => {

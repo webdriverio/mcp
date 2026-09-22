@@ -86,5 +86,15 @@ describe('wdio://docs/page/{slug}', () => {
     const text = await pageText('docs~nope.md');
     expect(text).toContain('No page for slug');
     expect(text).toContain('wdio://docs/index');
+    const result = await callPage.handler(new URL('wdio://docs/page/docs~nope.md'), { slug: 'docs~nope.md' });
+    expect((result.contents[0] as TextContent).mimeType).toBe('text/plain');
+  });
+
+  it('marks a corpus load failure as text/plain', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const result = await callPage.handler(new URL('wdio://docs/page/docs~appium.md'), { slug: 'docs~appium.md' });
+    const content = result.contents[0] as TextContent;
+    expect(content.mimeType).toBe('text/plain');
+    expect(content.text).toContain('Error:');
   });
 });

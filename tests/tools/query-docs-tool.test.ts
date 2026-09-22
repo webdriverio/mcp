@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { decode } from '@toon-format/toon';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
@@ -83,6 +84,34 @@ describe('query_docs tool', () => {
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain('Body A about waitUntil.');
     expect(result.content[0].text).toContain('Body B about waitUntil.');
+    const decoded = decode(result.content[0].text) as { hits: unknown[] };
+    expect(decoded.hits).toHaveLength(2);
+  });
+
+  it("collapses a page's sibling chunks into one fullPage record", async () => {
+    const splitPage = [
+      '# Docs',
+      '',
+      '- [waitUntil](/docs/api/browser/waitUntil.md)',
+      '',
+      '# Full Documentation Content',
+      '',
+      '# waitUntil',
+      '',
+      ...Array.from({ length: 210 }, (_, i) => `zzsplit filler line ${i}`),
+      '',
+      '## Second Section',
+      '',
+      'zzsplit tail paragraph.',
+      '',
+    ].join('\n');
+    stubFetchOk(splitPage);
+    const excerpted = decode((await callTool({ query: 'zzsplit' })).content[0].text) as { hits: unknown[] };
+    const full = decode((await callTool({ query: 'zzsplit', fullPage: true })).content[0].text) as { hits: { excerpt: string }[] };
+    expect(excerpted.hits.length).toBeGreaterThan(1);
+    expect(full.hits).toHaveLength(1);
+    expect(full.hits[0].excerpt).toContain('zzsplit filler line 0');
+    expect(full.hits[0].excerpt).toContain('zzsplit tail paragraph.');
   });
 
   it('returns a well-formed response for a query matching nothing', async () => {
