@@ -734,8 +734,8 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 | `execute_script`         | Execute arbitrary JavaScript in the browser, or Appium mobile commands on devices                                                                                                                      |
 | `execute_electron_script` | Execute privileged JavaScript in the Electron main process (Electron sessions only)                                                                                                                   |
 | `trigger_electron_deeplink` | Trigger an Electron deeplink whose scheme was explicitly configured at session start                                                                                                                 |
-| `mock` | Configure a session-scoped mock by kind (currently Electron API functions) |
-| `get_mock_calls` | Inspect call arguments for a session-scoped mock |
+| `mock` | Configure a session-scoped mock: an Electron main-process API function or a browser network request |
+| `get_mock_calls` | Inspect call arguments (Electron) or intercepted request records (browser) for a session-scoped mock |
 | `manage_mock` | Clear, reset, or restore a session-scoped mock |
 | `switch_tab`             | Switch to a different browser tab by handle or 0-based index. Browser-only.                                                                                                                            |
 | `switch_frame`           | Switch into an iframe by CSS/XPath selector, or back to the top-level frame if no selector is given. Browser-only.                                                                                     |
@@ -883,6 +883,44 @@ start_session({
 })
 ```
 
+### Mocking
+
+Mocking is available through `mock`, `get_mock_calls`, and `manage_mock`, for both Electron main-process API functions and browser network requests.
+
+`mockType` accepts `'electron'` or `'browser'`. Browser mocks are the default in WebDriver sessions when `mockType` is omitted. Electron sessions require an explicit selection because they can target both kinds of mocks. iOS/Android Appium sessions do not support mocking.
+
+```js
+mock({
+  mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog',
+  behavior: 'mockResolvedValue', value: { canceled: false, filePaths: ['/tmp/example.txt'] }
+})
+// Interact with the renderer to open the application's file picker, then inspect its calls.
+get_mock_calls({ mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog' })
+manage_mock({ mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog', action: 'restore' })
+```
+
+Electron `behavior` defaults to `mockReturnValue`; `mockResolvedValue` and `mockRejectedValue` support async APIs. Each has a `Once` variant for queued responses. Repeated configuration preserves the existing mock and call history. Values must be JSON; omit `value` for `undefined`. `clear` removes call history, `reset` also removes behavior and queued responses, and `restore` reinstates the original function. These tools support individual API functions; class mocks and arbitrary mock implementations are not exposed.
+
+Browser mocks intercept network requests matching a `url` glob (for example `**/api/todos`) with an optional `method` filter. `behavior` is optional: omit it to passively record matching requests without altering them — the mock still continues every request. `respond` and `respondOnce` require `value` (the JSON response body) and accept optional `statusCode` and `headers`; `abort`/`abortOnce` fail the request, and `redirect`/`redirectOnce` send it to the URL in `value`. `get_mock_calls` returns `{ calls, callCount }` for the intercepted requests, and `manage_mock` takes `clear`, `reset`, or `restore`.
+
+```js
+start_session({ platform: 'browser', browser: 'chrome', capabilities: { webSocketUrl: true } })
+
+// Observe-only: record every request to /api/todos without changing responses.
+mock({ mockType: 'browser', url: '**/api/todos' })
+navigate({ url: 'https://example.com/todos' })
+get_mock_calls({ mockType: 'browser', url: '**/api/todos' })
+
+// Or overwrite the response instead.
+mock({ mockType: 'browser', url: '**/api/todos', method: 'GET', behavior: 'respond', value: [{ id: 1, title: 'Buy milk' }], statusCode: 200 })
+
+// Interact with the page, then inspect the intercepted requests.
+get_mock_calls({ mockType: 'browser', url: '**/api/todos', method: 'GET' })
+manage_mock({ mockType: 'browser', url: '**/api/todos', method: 'GET', action: 'restore' })
+```
+
+Browser mocks require a BiDi-enabled session — start it with `capabilities: { webSocketUrl: true }`. Attached sessions default to BiDi off, so browser mocks do not work there unless the attached session negotiated BiDi; in Electron sessions browser mocks additionally require BiDi. Handles belong to the active browser session and cannot be reused after it closes or is replaced. All three tools participate in tracing and generated replay.
+
 ### Electron applications
 
 Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.12 or newer. Put service options such as `appBinaryPath`, `appEntryPoint`, and `appArgs` in `capabilities['wdio:electronServiceOptions']`; use top-level `electronRootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
@@ -903,24 +941,7 @@ start_session({
 execute_electron_script({ script: 'return electron.app.getName()' })
 ```
 
-Existing browser DOM tools work against the Electron renderer. `close_session` always tears down MCP-managed Electron sessions; `detach: true` is intentionally unsupported. Main/renderer log capture can be enabled with `captureMainProcessLogs` or `captureRendererLogs` plus `logDir`. Electron function mocks are available through `mock`, `get_mock_calls`, and `manage_mock`.
-
-```js
-mock({
-  mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog',
-  behavior: 'mockResolvedValue', value: { canceled: false, filePaths: ['/tmp/example.txt'] }
-})
-// Interact with the renderer to open the application's file picker, then inspect its calls.
-get_mock_calls({ mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog' })
-manage_mock({ mockType: 'electron', apiName: 'dialog', funcName: 'showOpenDialog', action: 'restore' })
-```
-
-`mockType` accepts `'electron'` or `'browser'`. WebDriver browser sessions default to `'browser'` when omitted. Electron sessions require an explicit selection because they can target both types of mocks. Use `mockType: 'electron'` with `apiName` and `funcName` for main-process API functions in an active Electron session. Browser mocking is not implemented yet and returns a clear error for either runtime. iOS/Android Appium sessions do not support mocking.
-
-`behavior` defaults to `mockReturnValue`; `mockResolvedValue` and `mockRejectedValue` support async APIs. Each has a `Once` variant for queued responses. Repeated configuration preserves the existing mock and call history. Values must be JSON; omit `value` for `undefined`. `clear` removes call history, `reset` also removes behavior and queued responses, and `restore` reinstates the original function. Handles belong to the active browser session and cannot be reused after it closes or is replaced. These tools support individual API functions; class mocks and arbitrary mock implementations are not exposed. All three tools participate in tracing and generated replay.
-
-
-To trigger an app deeplink, explicitly configure its URI scheme when starting the Electron session. The scheme has no colon and only URLs with that exact scheme can be dispatched:
+Existing browser DOM tools work against the Electron renderer. `close_session` always tears down MCP-managed Electron sessions; `detach: true` is intentionally unsupported. Main/renderer log capture can be enabled with `captureMainProcessLogs` or `captureRendererLogs` plus `logDir`. To trigger an app deeplink, explicitly configure its URI scheme when starting the Electron session. The scheme has no colon and only URLs with that exact scheme can be dispatched:
 
 ```javascript
 start_session({

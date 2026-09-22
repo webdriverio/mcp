@@ -1,6 +1,6 @@
 // tests/recording/code-generator.test.ts
 import { describe, expect, it } from 'vitest';
-import { generateCode } from '../../src/recording/code-generator';
+import { browserMockKey, generateCode } from '../../src/recording/code-generator';
 import type { SessionHistory, RecordedStep } from '../../src/types/recording';
 
 const START_BROWSER_STEP: RecordedStep = {
@@ -474,20 +474,38 @@ describe('generateCode - Electron', () => {
 });
 
 describe('generateCode - Electron mocks', () => {
-  it.each(['mock', 'get_mock_calls', 'manage_mock'].flatMap(tool => [undefined, 'browser', 'unknown'].map(mockType => ({ tool, mockType }))))('rejects recorded $tool with selector $mockType', async ({ tool, mockType }) => {
-    const history = makeHistory([{ tool, params: { mockType, action: 'restore' } }]);
-    history.runtime = 'electron';
-    history.steps[0].params = { platform: 'electron' };
-    const code = generateCode(history).replace(/^import .*;\n/m, '');
-    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
-    let cleaned = false;
-    let deleted = false;
-    await expect(new AsyncFunction('startWdioSession', 'cleanupWdioSession', code)(
-      async () => ({ deleteSession: async () => { deleted = true; } }),
-      async () => { cleaned = true; },
-    )).rejects.toThrow('Unsupported or missing recorded mockType');
-    expect(cleaned).toBe(true);
-    expect(deleted).toBe(true);
+  it.each([
+    ['mock', 'await browser.mock("**/api/todos")'],
+    ['get_mock_calls', '.calls'],
+    ['manage_mock', '.restore();'],
+  ] as const)('routes recorded %s without an electron mockType to the browser branch', (tool, emitted) => {
+    const history = makeHistory([{ tool, params: { url: '**/api/todos', action: 'restore' } }]);
+    const code = generateCode(history);
+    expect(code).toContain('const browserMocks = new Map();');
+    expect(code).toContain(emitted);
+  });
+
+  it('normalizes recorded method casing in the browser mock key', () => {
+    const history = makeHistory([
+      { tool: 'mock', params: { mockType: 'browser', url: '**/api/todos', method: 'GET', behavior: 'respond', value: 'x' } },
+      { tool: 'get_mock_calls', params: { mockType: 'browser', url: '**/api/todos', method: 'get' } },
+    ]);
+    const code = generateCode(history);
+    const key = browserMockKey({ url: '**/api/todos', method: 'get' });
+    expect(code).toContain(`browserMocks.has(${key})`);
+    expect(code).toContain(`browserMocks.get(${key}).respond`);
+    expect(code).toContain(`browserMocks.get(${key}).calls`);
+  });
+
+  it('treats a recorded empty method filter as omitted in the key', () => {
+    const history = makeHistory([
+      { tool: 'mock', params: { mockType: 'browser', url: '**/api/todos', method: '', value: 'x' } },
+      { tool: 'get_mock_calls', params: { mockType: 'browser', url: '**/api/todos' } },
+    ]);
+    const code = generateCode(history);
+    const key = browserMockKey({ url: '**/api/todos' });
+    expect(code).toContain(`browserMocks.has(${key})`);
+    expect(code).toContain(`browserMocks.get(${key}).calls`);
   });
 
   it('executes repeated configuration, inspection, reset, restore, and recreation in order', async () => {
@@ -528,5 +546,124 @@ describe('generateCode - Electron mocks', () => {
       ['app', 'getName'], ['return', 'default'], ['once', 'once'], 'update', [['argument']],
       'clear', 'reset', 'restore', ['app', 'getName'], ['return', undefined], 'cleanup', 'delete',
     ]);
+  });
+});
+
+describe('generateCode - Browser mocks', () => {
+  it('creates the mock with a method filter and configures respond with statusCode/headers', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'mock',
+      params: {
+        mockType: 'browser',
+        url: '**/api/todos',
+        method: 'GET',
+        behavior: 'respond',
+        value: { ok: true },
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    }]));
+    const key = browserMockKey({ url: '**/api/todos', method: 'get' });
+    expect(code).toContain(`if (!browserMocks.has(${key})) browserMocks.set(${key}, await browser.mock("**/api/todos", {"method":"get"}));`);
+    expect(code).toContain(`await browserMocks.get(${key}).respond({"ok":true}, {"statusCode":200,"headers":{"content-type":"application/json"}});`);
+  });
+
+  it('omits the method filter and respond params when absent', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'mock',
+      params: { url: '**/api/todos', behavior: 'respond', value: 'x' },
+    }]));
+    const key = browserMockKey({ url: '**/api/todos' });
+    expect(code).toContain(`browserMocks.set(${key}, await browser.mock("**/api/todos"));`);
+    expect(code).toContain(`await browserMocks.get(${key}).respond("x");`);
+    expect(code).not.toContain('{"method"');
+  });
+
+  it('emits only the creation line for a browser mock without behavior', () => {
+    const code = generateCode(makeHistory([{ tool: 'mock', params: { mockType: 'browser', url: '**/api/todos' } }]));
+    expect(code).toContain('await browser.mock("**/api/todos")');
+    expect(code).not.toContain('.respond');
+    expect(code).not.toContain('.abort');
+  });
+
+  it('emits abort and redirect behaviors', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'mock', params: { url: '**/a', behavior: 'abort' } },
+      { tool: 'mock', params: { url: '**/b', behavior: 'redirect', value: 'https://example.com' } },
+    ]));
+    expect(code).toContain('.abort();');
+    expect(code).toContain('.redirect("https://example.com");');
+  });
+
+  it('reads the calls getter for browser get_mock_calls', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'get_mock_calls',
+      params: { url: '**/api/todos' },
+    }]));
+    const key = browserMockKey({ url: '**/api/todos' });
+    expect(code).toContain(`console.log(browserMocks.get(${key}).calls);`);
+    expect(code).not.toContain('.update()');
+    expect(code).not.toContain('.calls()');
+  });
+
+  it('maps manage_mock actions and deletes the handle on restore', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'manage_mock', params: { url: '**/a', action: 'clear' } },
+      { tool: 'manage_mock', params: { url: '**/b', action: 'reset' } },
+      { tool: 'manage_mock', params: { url: '**/c', action: 'restore' } },
+    ]));
+    const key = (url: string) => browserMockKey({ url });
+    expect(code).toContain(`await browserMocks.get(${key('**/a')}).clear();`);
+    expect(code).toContain(`await browserMocks.get(${key('**/b')}).reset();`);
+    expect(code).toContain(`await browserMocks.get(${key('**/c')}).restore();`);
+    expect(code).toContain(`browserMocks.delete(${key('**/c')});`);
+    expect(code).not.toContain(`browserMocks.delete(${key('**/a')});`);
+  });
+
+  it('declares browserMocks exactly once for repeated browser mock steps', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'mock', params: { url: '**/a', value: 1 } },
+      { tool: 'mock', params: { url: '**/a', value: 2 } },
+    ]));
+    expect(code.match(/const browserMocks = new Map\(\);/g)).toHaveLength(1);
+  });
+
+  it('does not declare browserMocks without browser mock steps', () => {
+    const code = generateCode(makeHistory([{ tool: 'navigate', params: { url: 'https://example.com' } }]));
+    expect(code).not.toContain('browserMocks');
+  });
+
+  it('does not declare browserMocks when every browser mock step failed', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'mock',
+      params: { mockType: 'browser', url: '**/api/todos', behavior: 'respond' },
+      status: 'error',
+      error: 'respond behaviors require value',
+    }]));
+    expect(code).not.toContain('const browserMocks = new Map();');
+  });
+
+  it('does not declare browserMocks for an electron-only mock history', () => {
+    const history = makeHistory([{
+      tool: 'mock',
+      params: { mockType: 'electron', apiName: 'app', funcName: 'getName', value: 'x' },
+    }]);
+    history.runtime = 'electron';
+    history.steps[0].params = { platform: 'electron' };
+    const code = generateCode(history);
+    expect(code).toContain('const electronMocks = new Map();');
+    expect(code).not.toContain('browserMocks');
+  });
+
+  it('declares browserMocks alongside electronMocks when both are recorded', () => {
+    const history = makeHistory([
+      { tool: 'mock', params: { mockType: 'electron', apiName: 'app', funcName: 'getName', value: 'x' } },
+      { tool: 'mock', params: { url: '**/api/todos', value: 'y' } },
+    ]);
+    history.runtime = 'electron';
+    history.steps[0].params = { platform: 'electron' };
+    const code = generateCode(history);
+    expect(code).toContain('const electronMocks = new Map();');
+    expect(code.match(/const browserMocks = new Map\(\);/g)).toHaveLength(1);
   });
 });

@@ -1,5 +1,6 @@
 // src/recording/code-generator.ts
 import type { RecordedStep, SessionHistory } from '../types/recording';
+import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
 
 /** Escape single quotes so generated JS string literals are valid. */
 function escapeStr(value: unknown): string {
@@ -28,6 +29,12 @@ function getElectronDeeplinkScheme(history: SessionHistory): string | undefined 
   const startStep = history.steps.find(step => step.tool === 'start_session' && step.params.platform === 'electron');
   const scheme = startStep?.params.electronDeeplinkScheme;
   return typeof scheme === 'string' ? scheme.toLowerCase() : undefined;
+}
+
+const MOCK_TOOLS = new Set(['mock', 'get_mock_calls', 'manage_mock']);
+
+export function browserMockKey(p: Record<string, unknown>): string {
+  return JSON.stringify(JSON.stringify([p.url, normalizeBrowserMethod(p.method)]));
 }
 
 function generateAttachSessionStep(params: Record<string, unknown>, history: SessionHistory): string {
@@ -292,18 +299,35 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       return `await browser.electron.execute((electron, source, args) => new Function('electron', 'args', source)(electron, args), ${script}, ${values});`;
     }
     case 'mock': {
-      if (p.mockType !== 'electron') return 'throw new Error("Unsupported or missing recorded mockType; only electron mocking is implemented.");';
+      if (p.mockType !== 'electron') {
+        const key = browserMockKey(p);
+        const method = normalizeBrowserMethod(p.method);
+        const methodFilter = method !== undefined ? `, ${JSON.stringify({ method })}` : '';
+        const create = `if (!browserMocks.has(${key})) browserMocks.set(${key}, await browser.mock(${JSON.stringify(p.url)}${methodFilter}));`;
+        if (p.behavior === undefined) return create;
+        const behavior = String(p.behavior);
+        const args = behavior.startsWith('abort') ? '' : JSON.stringify(p.value);
+        const params = behavior.startsWith('respond') ? respondParams(p as { statusCode?: number; headers?: Record<string, string> }) : undefined;
+        return `${create}\nawait browserMocks.get(${key}).${behavior}(${args}${params !== undefined ? `, ${JSON.stringify(params)}` : ''});`;
+      }
       const key = JSON.stringify(JSON.stringify([p.apiName, p.funcName]));
       const behavior = JSON.stringify(p.behavior ?? 'mockReturnValue');
       return `if (!electronMocks.has(${key})) electronMocks.set(${key}, await browser.electron.mock(${JSON.stringify(p.apiName)}, ${JSON.stringify(p.funcName)}));\nawait electronMocks.get(${key})[${behavior}](${JSON.stringify(p.value) ?? 'undefined'});`;
     }
     case 'get_mock_calls': {
-      if (p.mockType !== 'electron') return 'throw new Error("Unsupported or missing recorded mockType; only electron mocking is implemented.");';
+      if (p.mockType !== 'electron') {
+        const key = browserMockKey(p);
+        return `console.log(browserMocks.get(${key}).calls);`;
+      }
       const key = JSON.stringify(JSON.stringify([p.apiName, p.funcName]));
       return `await electronMocks.get(${key}).update();\nconsole.log(electronMocks.get(${key}).mock.calls);`;
     }
     case 'manage_mock': {
-      if (p.mockType !== 'electron') return 'throw new Error("Unsupported or missing recorded mockType; only electron mocking is implemented.");';
+      if (p.mockType !== 'electron') {
+        const key = browserMockKey(p);
+        const action = String(p.action);
+        return `await browserMocks.get(${key}).${action}();${action === 'restore' ? `\nbrowserMocks.delete(${key});` : ''}`;
+      }
       const key = JSON.stringify(JSON.stringify([p.apiName, p.funcName]));
       const method = { clear: 'mockClear', reset: 'mockReset', restore: 'mockRestore' }[String(p.action)];
       return `await electronMocks.get(${key}).${method}();${p.action === 'restore' ? `\nelectronMocks.delete(${key});` : ''}`;
@@ -363,8 +387,13 @@ export function generateCode(history: SessionHistory): string {
       : isLambdaTest ? (ltOptions?.tunnel === true)
         : (tbOptions?.tunnel === true);
 
-  const steps = history.steps
-    .map(step => generateStep(step, history))
+  const stepLines = history.steps.map(step => generateStep(step, history));
+  // Failed mock steps emit only an error comment, so they must not pull in the declaration either.
+  if (history.steps.some(step => MOCK_TOOLS.has(step.tool) && step.params.mockType !== 'electron' && step.status !== 'error')) {
+    stepLines.unshift('const browserMocks = new Map();');
+  }
+
+  const steps = stepLines
     .join('\n')
     .split('\n')
     .map(line => `  ${line}`)
