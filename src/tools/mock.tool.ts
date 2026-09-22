@@ -43,8 +43,9 @@ type MockAdapter = {
   describe(target: Target): string;
 };
 const kindLabels = { electron: 'Electron', browser: 'Browser' } as const;
+type MockEntry = { adapter: MockAdapter; handle: unknown };
 // Browser ownership keeps handles isolated and lets teardown release them without another cleanup hook.
-const sessionMocks = new WeakMap<WebdriverIO.Browser, Map<string, unknown>>();
+const sessionMocks = new WeakMap<WebdriverIO.Browser, Map<string, MockEntry>>();
 const sessionOperations = new WeakMap<WebdriverIO.Browser, Map<string, Promise<void>>>();
 
 function electronBridge(browser: WebdriverIO.Browser): ElectronBridge {
@@ -153,6 +154,17 @@ function errorResult(error: unknown) {
   return { isError: true, content: [{ type: 'text' as const, text: `Error with mock: ${error instanceof Error ? error.message : String(error)}` }] };
 }
 
+// Detached sessions outlive this registry: restore every handle so interception cannot outlive MCP's handle on the browser.
+export async function releaseSessionMocks(browser: WebdriverIO.Browser): Promise<void> {
+  const mocks = sessionMocks.get(browser);
+  const operations = sessionOperations.get(browser);
+  if (!mocks) return;
+  if (operations) await Promise.allSettled(operations.values());
+  await Promise.allSettled([...mocks.values()].map(entry => entry.adapter.restore(entry.handle)));
+  sessionMocks.delete(browser);
+  sessionOperations.delete(browser);
+}
+
 export const mockToolDefinition: ToolDefinition = {
   name: 'mock',
   description: 'Configure a session-scoped mock. mockType defaults to browser in WebDriver sessions and is required in Electron sessions. Browser mocks intercept network requests matched by a url glob and require a BiDi-enabled session (start_session with capabilities: { webSocketUrl: true }); in Electron sessions they additionally require the session to have negotiated BiDi. Electron mocks require apiName and funcName. Appium sessions are unsupported. Repeated calls preserve history and queued once values.',
@@ -169,16 +181,21 @@ export const mockTool: ToolCallback = async (args: MockArgs) => {
   try {
     return await withTarget(args, async ({ browser, mocks, key, kind, adapter, target }) => {
       const behavior = args.behavior ? behaviorSchema.parse(args.behavior) : adapter.defaultBehavior;
-      let mock = mocks.get(key);
-      if (!mock) {
-        mock = await adapter.create(browser, target);
+      let entry = mocks.get(key);
+      const existed = entry !== undefined;
+      if (!entry) {
+        entry = { adapter, handle: await adapter.create(browser, target) };
         // Retain immediately so a failed configuration can still be restored or retried.
-        mocks.set(key, mock);
+        mocks.set(key, entry);
       }
       if (behavior === undefined) {
-        return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock created: ${adapter.describe(target)} (observing)` }] };
+        // The text is the agent's only state channel: an existing mock keeps its overwrites, so "observing" here would be a lie.
+        const text = existed
+          ? `${kindLabels[kind]} mock already exists: ${adapter.describe(target)} — existing behavior still active; run manage_mock with action reset for observe-only`
+          : `${kindLabels[kind]} mock created: ${adapter.describe(target)} (observing)`;
+        return { content: [{ type: 'text' as const, text }] };
       }
-      await adapter.configure(mock, { ...args, behavior });
+      await adapter.configure(entry.handle, { ...args, behavior });
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock configured: ${adapter.describe(target)} (${behavior})` }] };
     });
   } catch (error) { return errorResult(error); }
@@ -193,9 +210,9 @@ export const getMockCallsToolDefinition: ToolDefinition = {
 export const getMockCallsTool: ToolCallback = async (args: Target) => {
   try {
     return await withTarget(args, async ({ mocks, key, adapter }) => {
-      const mock = mocks.get(key);
-      if (!mock) throw new Error('mock not found; call mock first.');
-      const { calls, callCount } = await adapter.inspect(mock);
+      const entry = mocks.get(key);
+      if (!entry) throw new Error('mock not found; call mock first.');
+      const { calls, callCount } = await adapter.inspect(entry.handle);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ calls, callCount }) }] };
     });
   } catch (error) { return errorResult(error); }
@@ -211,9 +228,9 @@ export const manageMockTool: ToolCallback = async (args: ManageArgs) => {
   try {
     const action = actionSchema.parse(args.action);
     return await withTarget(args, async ({ mocks, key, kind, adapter, target }) => {
-      const mock = mocks.get(key);
-      if (!mock) throw new Error('mock not found; call mock first.');
-      await adapter[action](mock);
+      const entry = mocks.get(key);
+      if (!entry) throw new Error('mock not found; call mock first.');
+      await adapter[action](entry.handle);
       if (action === 'restore') mocks.delete(key);
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock ${action} completed: ${adapter.describe(target)}` }] };
     });

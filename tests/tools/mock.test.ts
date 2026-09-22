@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { getState } from '../../src/session/state';
-import { mockTool, mockToolDefinition, getMockCallsTool, getMockCallsToolDefinition, manageMockTool, manageMockToolDefinition } from '../../src/tools/mock.tool';
+import { mockTool, mockToolDefinition, getMockCallsTool, getMockCallsToolDefinition, manageMockTool, manageMockToolDefinition, releaseSessionMocks } from '../../src/tools/mock.tool';
 
 type TestTool = (args: Record<string, unknown>) => ReturnType<typeof mockTool>;
 const configure = mockTool as unknown as TestTool;
@@ -394,6 +394,26 @@ describe('Browser mocks', () => {
     expect(browserMock.respond).not.toHaveBeenCalled();
     expect(browserMock.abort).not.toHaveBeenCalled();
     expect(message(await inspect(browserTarget))).toContain('"callCount":');
+  });
+
+  it('reports an existing mock when observing an already-configured target', async () => {
+    const { browserMock, createBrowserMock } = session('browser', { runtime: 'webdriver', isBidi: true });
+    await configure({ ...browserTarget, behavior: 'respond', value: 'x' });
+    const result = await configure(browserTarget);
+    expect(message(result)).toBe('Browser mock already exists: **/api/todos — existing behavior still active; run manage_mock with action reset for observe-only');
+    expect(createBrowserMock).toHaveBeenCalledOnce();
+    expect(browserMock.respond).toHaveBeenCalledOnce();
+  });
+
+  it('releaseSessionMocks restores every handle and clears the registry', async () => {
+    const { browserMock } = session('browser', { runtime: 'webdriver', isBidi: true });
+    await configure({ ...browserTarget, behavior: 'respond', value: 'x' });
+    const browser = getState().browsers.get('browser') as WebdriverIO.Browser;
+    await releaseSessionMocks(browser);
+    expect(browserMock.restore).toHaveBeenCalledOnce();
+    const result = await inspect(browserTarget);
+    expect(result.isError).toBe(true);
+    expect(message(result)).toContain('mock not found');
   });
 
   it.each([undefined, null])('rejects respond with %s value but retains the handle', async value => {

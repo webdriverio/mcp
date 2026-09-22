@@ -9,6 +9,7 @@ import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
+import { releaseSessionMocks } from '../tools/mock.tool.js';
 
 async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
   endTrace(sessionId);
@@ -88,6 +89,10 @@ export function registerSession(
             console.error('[WARN] Failed to finalize orphaned session trace:', e);
           }
         }
+        if (oldMetadata?.isAttached || oldMetadata?.externallyManaged) {
+          // The dropped browser object is the only handle on its mocks; release them before losing it.
+          await releaseSessionMocks(oldBrowser).catch(() => {});
+        }
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
@@ -163,6 +168,9 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
           }
         }
       }
+    } else {
+      // Detached: the external browser outlives MCP, so live interception must not survive the handle drop.
+      await releaseSessionMocks(browser).catch(() => {});
     }
   } finally {
     state.browsers.delete(sessionId);
