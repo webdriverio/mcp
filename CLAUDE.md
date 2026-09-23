@@ -49,6 +49,7 @@ src/
 ├── resources/         # One file per MCP resource (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
 ├── scripts/           # Browser/mobile scripts executed via browser.execute() — no try/catch, raw data only
+├── ui5/               # wdi5 boundary (runtime.ts — bridge/service by dist path) + ui5: selector codec
 ├── locators/          # Element detection, selector generation, XML parsing (mobile)
 ├── config/            # appium.config.ts — iOS/Android capability builders
 ├── utils/             # auth.ts, parse-args.ts, http-helpers.ts, zod-helpers.ts (coerceBoolean),
@@ -184,6 +185,7 @@ Only files whose purpose is not evident from the tree above.
 | `src/utils/docs-client.ts` | Boundary layer for the docs corpus — resolves the cache dir and loads the index |
 | `src/resources/docs.resource.ts` | `wdio://docs/index` + `wdio://docs/page/{slug}` |
 | `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection |
+| `src/ui5/runtime.ts` | wdi5 boundary — loads the bridge/service by dist path, owns the wdi5 ambient globals |
 | `src/recording/code-generator.ts` | Generates runnable WebdriverIO JS from `SessionHistory` |
 
 ## Gotchas
@@ -220,6 +222,10 @@ The MCP SDK only supports path-segment templates `{param}` in resource URIs — 
 
 Computation logic belongs in `src/scripts/` (no try/catch, returns raw data). Tools wrap scripts with try/catch and return `{ isError: true, content: [...] }` on failure. Resources wrap scripts and set `mimeType` in the response.
 
+### UI5 Sessions (wdi5)
+
+`platform: 'ui5'` runs a local Chrome/Edge session with wdi5 initialized against a required `baseUrl`. `wdio-ui5-service` is pinned exact and loaded by dist path in `src/ui5/runtime.ts` (its `exports` map blocks subpaths and the main entry pulls the wdio testrunner launcher); `.npmrc` sets `auto-install-peers=false` to keep the testrunner peers out. Codegen is excluded for ui5 sessions — `generateCode` returns a notice, since `ui5:` selectors are not runnable through `browser.$()`. Steps still record normally. OAuth redirects drop the injected bridge; discovery and ui5 action tools re-inject via `ensureUi5Injected` before use.
+
 ### Error Handling
 
 Tools return errors as text content, never throw. Keeps MCP protocol stable:
@@ -233,6 +239,8 @@ catch (e) {
 ## Selector Syntax Reference
 
 **Web:** CSS (`#id`, `.class`), XPath (`//button`), Text (`button=Exact`, `a*=Contains`)
+
+**UI5 (ui5 sessions):** `ui5:` + JSON control selector, e.g. `ui5:{"controlType":"sap.m.Button","viewName":"test.Main"}` — emitted by `get_elements` on ui5 sessions, accepted by `click_element`/`set_value` (resolved via wdi5's `asControl`, never `browser.$`)
 
 **Mobile:**
 
@@ -255,6 +263,8 @@ catch (e) {
 | `TESTINGBOT_SECRET` | TestingBot sessions + tools |
 | `DIGITALAI_CLOUD_URL` | Digital.ai sessions + tools (cloud host, e.g. `https://cloud.example.com`) |
 | `DIGITALAI_ACCESS_KEY` | Digital.ai sessions + tools |
+| `wdi5_username` | wdi5 authentication (`wdi5:authentication` capability on ui5 sessions) |
+| `wdi5_password` | wdi5 authentication (`wdi5:authentication` capability on ui5 sessions) |
 
 ## Planned Improvements
 

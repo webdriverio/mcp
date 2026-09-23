@@ -7,14 +7,19 @@ vi.mock('../../src/scripts/get-elements', () => ({
   getElements: vi.fn(),
 }));
 
+const { mockState } = vi.hoisted(() => ({
+  mockState: {
+    browsers: new Map(),
+    currentSession: null as string | null,
+    sessionMetadata: new Map<string, Record<string, unknown>>(),
+    sessionHistory: new Map(),
+  },
+}));
+
 vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(),
-  getState: vi.fn(() => ({
-    browsers: new Map(),
-    currentSession: null,
-    sessionMetadata: new Map(),
-    sessionHistory: new Map(),
-  })),
+  getState: vi.fn(() => mockState),
+  isUi5Session: () => mockState.sessionMetadata.get(mockState.currentSession)?.runtime === 'ui5',
 }));
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{
@@ -30,6 +35,10 @@ const defaultResult = { total: 1, showing: 1, hasMore: false, elements: [{ name:
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockState.browsers.clear();
+  mockState.sessionMetadata.clear();
+  mockState.sessionHistory.clear();
+  mockState.currentSession = null;
   mockGetBrowser.mockReturnValue({ isAndroid: false, isIOS: false });
   mockGetVisible.mockResolvedValue(defaultResult);
 });
@@ -61,6 +70,26 @@ describe('get_elements tool', () => {
     expect(mockGetVisible).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ limit: 10, offset: 5 })
+    );
+  });
+
+  it('passes ui5 false when the current session is not a UI5 session', async () => {
+    await callTool({});
+    expect(mockGetVisible).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ui5: false })
+    );
+  });
+
+  it('passes ui5 true when the current session runtime is ui5', async () => {
+    mockState.currentSession = 's1';
+    mockState.sessionMetadata.set('s1', { runtime: 'ui5' });
+
+    await callTool({});
+
+    expect(mockGetVisible).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ui5: true })
     );
   });
 });

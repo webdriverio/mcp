@@ -473,6 +473,29 @@ describe('generateCode - Electron', () => {
   });
 });
 
+describe('generateCode - UI5', () => {
+  it('returns a notice comment instead of replayable code for ui5 sessions', () => {
+    const history: SessionHistory = {
+      sessionId: 'ui5-123',
+      type: 'browser',
+      runtime: 'ui5',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        { index: 1, tool: 'start_session', params: { platform: 'ui5' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+        { index: 2, tool: 'click_element', params: { selector: 'ui5:{"controlType":"sap.m.Button"}' }, status: 'ok', durationMs: 0, timestamp: '2026-01-01T00:00:00.000Z' },
+      ],
+    };
+
+    const code = generateCode(history);
+
+    expect(code.startsWith('// Code generation is not supported for UI5')).toBe(true);
+    // The notice itself mentions browser.$() — assert no runnable call was emitted.
+    expect(code).not.toContain('await browser.$(');
+    expect(code).not.toContain('remote(');
+  });
+});
+
 describe('generateCode - Electron mocks', () => {
   it.each([
     ['mock', 'await browser.mock("**/api/todos")'],

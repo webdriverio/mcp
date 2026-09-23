@@ -1,5 +1,5 @@
 import type { ResourceDefinition } from '../types/resource';
-import { getBrowser } from '../session/state';
+import { getBrowser, isUi5Session } from '../session/state';
 import { getElements } from '../scripts/get-elements';
 import { encode } from '@toon-format/toon';
 
@@ -10,7 +10,8 @@ export const elementsResource: ResourceDefinition = {
   handler: async () => {
     try {
       const browser = getBrowser();
-      const result = await getElements(browser, {});
+      const ui5 = isUi5Session();
+      const result = await getElements(browser, { ui5 });
       const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
       return { contents: [{ uri: 'wdio://session/current/elements', mimeType: 'text/plain', text }] };
     } catch (e) {

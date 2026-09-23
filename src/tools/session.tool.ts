@@ -4,14 +4,17 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import type { SessionMetadata } from '../session/state';
+import type { SessionHistory } from '../types/recording';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { getElectronService } from '../electron/runtime.js';
+import { authenticateUi5, enableWorkZone, initUi5, injectUi5 } from '../ui5/runtime.js';
+import type { Wdi5Config } from '../ui5/runtime.js';
 
-const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
+const platformEnum = z.enum(['browser', 'electron', 'ui5', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
 const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
@@ -23,8 +26,10 @@ export const startSessionToolDefinition: ToolDefinition = {
   annotations: { title: 'Start Session', destructiveHint: false },
   inputSchema: {
     provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Session provider (default: local). Use "external" to connect to an externally managed W3C WebDriver endpoint. "digitalai" requires DIGITALAI_CLOUD_URL + DIGITALAI_ACCESS_KEY env vars.'),
-    platform: platformEnum.describe('Session platform type'),
+    platform: platformEnum.describe('Session platform type. "ui5" = SAP UI5 control-level automation via wdi5 (chrome/edge, local provider only).'),
     browser: browserEnum.optional().describe('Browser to launch (required for browser platform)'),
+    baseUrl: z.string().min(1).optional().describe('Initial app URL. Required for platform "ui5" — wdi5 opens it and injects the UI5 bridge.'),
+    wdi5: z.record(z.string(), z.unknown()).optional().describe('wdi5 options passthrough (logLevel, waitForUI5Timeout, skipInjectUI5OnStart, btpWorkZoneEnablement).'),
     browserVersion: z.string().optional().describe('Browser version (cloud providers only, default: latest)'),
     electronRootDir: z.string().min(1).optional().describe('Project root used by the Electron standalone service for Electron Builder/Electron Forge discovery. Electron-only.'),
     electronDeeplinkScheme: uriScheme.optional().describe('URI scheme allowed by trigger_electron_deeplink, without ":" (for example, "myapp"). Electron-only and optional unless triggering deeplinks.'),
@@ -111,8 +116,10 @@ export const attachSessionToolDefinition: ToolDefinition = {
 
 type StartSessionArgs = {
   provider?: 'local' | 'browserstack' | 'saucelabs' | 'testmu' | 'testingbot' | 'digitalai' | 'external';
-  platform: 'browser' | 'electron' | 'ios' | 'android';
+  platform: 'browser' | 'electron' | 'ui5' | 'ios' | 'android';
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
+  baseUrl?: string;
+  wdi5?: Record<string, unknown>;
   browserVersion?: string;
   electronRootDir?: string;
   electronDeeplinkScheme?: string;
@@ -228,6 +235,44 @@ async function waitForCDP(host: string, port: number, timeoutMs = 10000): Promis
   throw new Error(`Chrome did not expose CDP on ${host}:${port} within ${timeoutMs}ms`);
 }
 
+async function createLocalBrowserSession(
+  args: StartSessionArgs,
+  buildSession: (sessionId: string, capabilities: Record<string, unknown>) => { metadata: SessionMetadata; history: SessionHistory },
+): Promise<{ wdioBrowser: WebdriverIO.Browser; sessionId: string; capabilities: Record<string, unknown>; sizeNote: string }> {
+  const { browser = 'chrome', headless = true, windowWidth = 1920, windowHeight = 1080 } = args;
+  const userCapabilities = args.capabilities ?? {};
+
+  const provider = getProvider('local', 'browser');
+  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const capabilities = provider.buildCapabilities({
+    ...args as Record<string, unknown>,
+    browser,
+    headless,
+    windowWidth,
+    windowHeight,
+    capabilities: userCapabilities,
+  });
+
+  const wdioBrowser = await remote({ ...connectionConfig, capabilities });
+  const { sessionId } = wdioBrowser;
+
+  const { metadata, history } = buildSession(sessionId, capabilities);
+  registerSession(sessionId, wdioBrowser, metadata, history);
+
+  if (args.trace) {
+    startTrace(sessionId, capabilities, 'browser', { width: windowWidth, height: windowHeight });
+  }
+
+  let sizeNote = '';
+  try {
+    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+  } catch (e) {
+    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+  }
+
+  return { wdioBrowser, sessionId, capabilities, sizeNote };
+}
+
 async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResult> {
   const {
     browser = 'chrome',
@@ -257,52 +302,84 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const tunnelEnabled = effectiveTunnel === true;
   const tunnelName = tunnelEnabled && !args.tunnelName ? `wdio-mcp-${Date.now()}` : args.tunnelName;
 
-  const mergedCapabilities = provider.buildCapabilities({
-    ...args as Record<string, unknown>,
-    browser,
-    headless,
-    windowWidth,
-    windowHeight,
-    capabilities: userCapabilities,
-    tunnelName,
-  });
+  let wdioBrowser: WebdriverIO.Browser;
+  let sessionId: string;
+  let sizeNote: string;
+  let mergedCapabilities: Record<string, unknown>;
 
-  const tunnelHandle = tunnelEnabled
-    ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
-    : undefined;
+  if ((args.provider ?? 'local') === 'local') {
+    const localSession = await createLocalBrowserSession(args, (id, capabilities) => ({
+      metadata: {
+        type: 'browser',
+        capabilities,
+        isAttached: provider.shouldAutoDetach(args as Record<string, unknown>),
+        provider: args.provider ?? 'local',
+        region: args.region,
+        tunnelName,
+        // local-browser provider declares no startTunnel, so the cloud branch's startTunnel?.() call yields undefined here
+        tunnelHandle: undefined,
+        trace: args.trace ?? false,
+      },
+      history: {
+        sessionId: id,
+        type: 'browser',
+        startedAt: new Date().toISOString(),
+        capabilities,
+        steps: [],
+      },
+    }));
+    wdioBrowser = localSession.wdioBrowser;
+    sessionId = localSession.sessionId;
+    sizeNote = localSession.sizeNote;
+    mergedCapabilities = localSession.capabilities;
+  } else {
+    mergedCapabilities = provider.buildCapabilities({
+      ...args as Record<string, unknown>,
+      browser,
+      headless,
+      windowWidth,
+      windowHeight,
+      capabilities: userCapabilities,
+      tunnelName,
+    });
 
-  const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
-  const { sessionId } = wdioBrowser;
-  const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
+    const tunnelHandle = tunnelEnabled
+      ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
+      : undefined;
 
-  const sessionMetadata: SessionMetadata = {
-    type: 'browser',
-    capabilities: mergedCapabilities,
-    isAttached: shouldAutoDetach,
-    provider: args.provider ?? 'local',
-    region: args.region,
-    tunnelName,
-    tunnelHandle,
-    trace: args.trace ?? false,
-  };
+    wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
+    sessionId = wdioBrowser.sessionId;
+    const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
-  registerSession(sessionId, wdioBrowser, sessionMetadata, {
-    sessionId,
-    type: 'browser',
-    startedAt: new Date().toISOString(),
-    capabilities: mergedCapabilities,
-    steps: [],
-  });
+    const sessionMetadata: SessionMetadata = {
+      type: 'browser',
+      capabilities: mergedCapabilities,
+      isAttached: shouldAutoDetach,
+      provider: args.provider ?? 'local',
+      region: args.region,
+      tunnelName,
+      tunnelHandle,
+      trace: args.trace ?? false,
+    };
 
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
-  }
+    registerSession(sessionId, wdioBrowser, sessionMetadata, {
+      sessionId,
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: mergedCapabilities,
+      steps: [],
+    });
 
-  let sizeNote = '';
-  try {
-    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
-  } catch (e) {
-    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+    if (args.trace) {
+      startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
+    }
+
+    sizeNote = '';
+    try {
+      await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+    } catch (e) {
+      sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+    }
   }
 
   if (navigationUrl) {
@@ -397,6 +474,87 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     capabilityOptions.appBinaryPath ? `App binary: ${capabilityOptions.appBinaryPath}` : capabilityOptions.appEntryPoint ? `App entry point: ${capabilityOptions.appEntryPoint}` : `Project root: ${args.electronRootDir}`,
     args.browserVersion ? `Electron version: ${args.browserVersion}` : undefined,
   ].filter(Boolean).join('\n') }] };
+}
+
+async function startUi5Session(args: StartSessionArgs): Promise<CallToolResult> {
+  if ((args.provider ?? 'local') !== 'local') {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: UI5 sessions require provider "local".' }] };
+  }
+  if (args.attach) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: attaching to an existing UI5 session is not supported.' }] };
+  }
+
+  const browser = args.browser ?? 'chrome';
+  if (browser !== 'chrome' && browser !== 'edge') {
+    return { isError: true, content: [{ type: 'text', text: `Error starting session: UI5 sessions support browser "chrome" or "edge" (got "${browser}").` }] };
+  }
+  if (!args.baseUrl) {
+    return { isError: true, content: [{ type: 'text', text: 'Error starting session: baseUrl is required for UI5 sessions.' }] };
+  }
+
+  const { baseUrl, wdi5 } = args;
+  const { windowWidth = 1920, windowHeight = 1080 } = args;
+
+  const { wdioBrowser, sessionId, capabilities: mergedCapabilities, sizeNote } = await createLocalBrowserSession(args, (id, capabilities) => ({
+    metadata: {
+      type: 'browser',
+      runtime: 'ui5',
+      capabilities,
+      isAttached: false,
+      provider: 'local',
+      trace: args.trace ?? false,
+    },
+    history: {
+      sessionId: id,
+      type: 'browser',
+      runtime: 'ui5',
+      startedAt: new Date().toISOString(),
+      capabilities,
+      steps: [],
+    },
+  }));
+
+  const config: Wdi5Config = { baseUrl, wdi5: { ...(wdi5 ?? {}) } };
+  const auth = mergedCapabilities['wdi5:authentication'] as Record<string, unknown> | undefined;
+  const bridgeMode: 'workzone' | 'skipped' | 'injected' =
+    config.wdi5.btpWorkZoneEnablement === true ? 'workzone'
+      : config.wdi5.skipInjectUI5OnStart === true ? 'skipped'
+        : 'injected';
+  try {
+    await initUi5(wdioBrowser, config);
+    if (args.trace) {
+      await recordInitialNavigation(sessionId, baseUrl);
+    }
+    if (auth) {
+      await authenticateUi5(auth);
+    }
+    if (bridgeMode === 'workzone') {
+      await enableWorkZone(wdioBrowser, config);
+    } else if (bridgeMode === 'injected') {
+      await injectUi5(wdioBrowser, config);
+    }
+  } catch (e) {
+    // The session is already registered at this point; a failed init must not leave it current.
+    await closeSession(sessionId, false, false).catch(() => {});
+    throw e;
+  }
+
+  const bridgeText = bridgeMode === 'workzone'
+    ? 'UI5 bridge injected with BTP work zone enabled'
+    : bridgeMode === 'skipped'
+      ? 'UI5 bridge injection skipped (skipInjectUI5OnStart)'
+      : 'UI5 bridge injected';
+  return {
+    content: [{
+      type: 'text',
+      text: [
+        `${browser} UI5 session started with sessionId: ${sessionId} (${windowWidth}x${windowHeight})`,
+        `Base URL: ${baseUrl}`,
+        `${bridgeText}${auth ? ', wdi5 authentication applied' : ''}`,
+        sizeNote.trim(),
+      ].filter(Boolean).join('\n'),
+    }],
+  };
 }
 
 async function startMobileSession(args: StartSessionArgs): Promise<CallToolResult> {
@@ -633,6 +791,7 @@ export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Pr
       };
     }
 
+    if (args.platform === 'ui5') return await startUi5Session(args);
     if (args.platform === 'electron') return await startElectronSession(args);
     if (args.platform === 'browser') {
       if (args.attach) {
@@ -662,8 +821,8 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
     const metadata = state.sessionMetadata.get(sessionId);
 
     const isAttached = !!metadata?.isAttached;
-    if (metadata?.runtime === 'electron' && args.detach) {
-      return { isError: true, content: [{ type: 'text', text: 'Electron sessions are managed by the MCP server and cannot be detached.' }] };
+    if ((metadata?.runtime === 'electron' || metadata?.runtime === 'ui5') && args.detach) {
+      return { isError: true, content: [{ type: 'text', text: 'Electron and UI5 sessions are managed by the MCP server and cannot be detached.' }] };
     }
     const detachByDefault = metadata?.externallyManaged === true || metadata?.provider === 'external';
     const detach = args.detach ?? detachByDefault;

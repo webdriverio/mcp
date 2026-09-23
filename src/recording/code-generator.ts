@@ -372,6 +372,9 @@ function bsStatusUpdateLines(sessionType: 'browser' | 'ios' | 'android'): string
 }
 
 export function generateCode(history: SessionHistory): string {
+  if (history.runtime === 'ui5') {
+    return '// Code generation is not supported for UI5 (wdi5) sessions. Steps are recorded and available via wdio://session/current/steps; ui5 control selectors are not runnable through browser.$().';
+  }
   const bstackOptions = history.capabilities['bstack:options'] as Record<string, unknown> | undefined;
   const sauceOptions = history.capabilities['sauce:options'] as Record<string, unknown> | undefined;
   const ltOptions = history.capabilities['lt:options'] as Record<string, unknown> | undefined;
