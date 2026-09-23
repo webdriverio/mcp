@@ -4,6 +4,8 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { getAsControl, isUi5Selector } from '../ui5/selector';
+import { ensureUi5Injected } from '../ui5/runtime';
 
 const defaultTimeout: number = 3000;
 
@@ -27,6 +29,14 @@ export const setValueAction = async (
 ): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
+    if (isUi5Selector(selector)) {
+      await ensureUi5Injected(browser);
+      const control = await getAsControl(browser, selector, timeout);
+      await control.enterText(value);
+      return {
+        content: [{ type: 'text', text: `Text "${value}" entered into element` }],
+      };
+    }
     await browser.waitUntil(browser.$(selector).isExisting, { timeout });
     if (scrollToView) {
       await browser.$(selector).scrollIntoView({ block: 'center', inline: 'center' });

@@ -344,6 +344,30 @@ describe('closeSession', () => {
     error.mockRestore();
   });
 
+  it('clears the wdi5 ambient globals for a UI5 session instead of running Electron cleanup', async () => {
+    const browser = makeBrowser();
+    const state = getState();
+    state.browsers.set('ui5-session', browser);
+    state.sessionMetadata.set('ui5-session', {
+      type: 'browser', runtime: 'ui5', capabilities: {}, isAttached: false, provider: 'local',
+    });
+    state.sessionHistory.set('ui5-session', {
+      sessionId: 'ui5-session', type: 'browser', runtime: 'ui5', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+    state.currentSession = 'ui5-session';
+
+    const globals = globalThis as unknown as Record<string, unknown>;
+    globals.browser = { sessionId: 'ui5-session' };
+    globals.__wdi5Config = { baseUrl: 'https://x', wdi5: {} };
+
+    await closeSession('ui5-session', false, false);
+
+    expect(globals.browser).toBeUndefined();
+    expect(globals.__wdi5Config).toBeUndefined();
+    expect(browser.deleteSession).toHaveBeenCalled();
+    expect(mockCleanupSessionRuntime).not.toHaveBeenCalled();
+  });
+
   it('does not call onSessionClose when detach=true', async () => {
     const browser = makeBrowser();
     const state = getState();

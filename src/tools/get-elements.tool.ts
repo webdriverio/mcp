@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
-import { getBrowser } from '../session/state';
+import { getBrowser, getState } from '../session/state';
 import { getElements } from '../scripts/get-elements';
 import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
@@ -34,7 +34,9 @@ export const getElementsTool: ToolCallback = async ({
 }) => {
   try {
     const browser = getBrowser();
-    const result = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset });
+    const state = getState();
+    const ui5 = state.sessionMetadata.get(state.currentSession)?.runtime === 'ui5';
+    const result = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset, ui5 });
     const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
     return { content: [{ type: 'text' as const, text }] };
   } catch (e) {

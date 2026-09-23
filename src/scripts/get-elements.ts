@@ -1,5 +1,6 @@
 import { getInteractableBrowserElements } from './get-interactable-browser-elements';
 import { getMobileVisibleElements } from './get-visible-mobile-elements';
+import { getUi5Controls } from './get-ui5-controls';
 
 export type VisibleElementsResult = {
   total: number;
@@ -16,6 +17,7 @@ export async function getElements(
     includeBounds?: boolean;
     limit?: number;
     offset?: number;
+    ui5?: boolean;
   },
 ): Promise<VisibleElementsResult> {
   const {
@@ -24,11 +26,14 @@ export async function getElements(
     includeBounds = false,
     limit = 0,
     offset = 0,
+    ui5 = false,
   } = params;
 
   let elements: { isInViewport?: boolean }[];
 
-  if (browser.isAndroid || browser.isIOS) {
+  if (ui5) {
+    elements = await getUi5Controls(browser, { includeBounds });
+  } else if (browser.isAndroid || browser.isIOS) {
     const platform = browser.isAndroid ? 'android' : 'ios';
     elements = await getMobileVisibleElements(browser, platform, { includeContainers, includeBounds });
   } else {

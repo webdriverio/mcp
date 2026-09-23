@@ -63,6 +63,7 @@
     "saucelabs": "^9.0.2",
     "sharp": "^0.35.3",
     "testingbot-tunnel-launcher": "^1.1.18",
+    "wdio-ui5-service": "3.0.12",
     "webdriverio": "^9.27.0",
     "xpath": "^0.0.34",
     "yazl": "^3.3.1",
