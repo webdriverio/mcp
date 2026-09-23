@@ -35,3 +35,8 @@ export function getBrowser(): WebdriverIO.Browser {
 export function getState() {
   return state;
 }
+
+export function isUi5Session(): boolean {
+  const state = getState();
+  return state.sessionMetadata.get(state.currentSession)?.runtime === 'ui5';
+}

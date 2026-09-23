@@ -32,7 +32,7 @@ export async function getElements(
   let elements: { isInViewport?: boolean }[];
 
   if (ui5) {
-    elements = await getUi5Controls(browser, { includeBounds });
+    elements = await getUi5Controls(browser, { includeBounds, includeContainers, inViewportOnly });
   } else if (browser.isAndroid || browser.isIOS) {
     const platform = browser.isAndroid ? 'android' : 'ios';
     elements = await getMobileVisibleElements(browser, platform, { includeContainers, includeBounds });

@@ -4,8 +4,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
-import { getAsControl, isUi5Selector } from '../ui5/selector';
-import { ensureUi5Injected } from '../ui5/runtime';
+import { isUi5Selector, resolveUi5Control } from '../ui5/selector';
 
 const defaultTimeout: number = 3000;
 
@@ -24,8 +23,7 @@ export const clickAction = async (selector: string, timeout: number, scrollToVie
   try {
     const browser = getBrowser();
     if (isUi5Selector(selector)) {
-      await ensureUi5Injected(browser);
-      const control = await getAsControl(browser, selector, timeout);
+      const control = await resolveUi5Control(browser, selector, timeout);
       await control.press();
       return {
         content: [{ type: 'text', text: `Clicked UI5 control ${selector}` }],

@@ -19,6 +19,7 @@ const { mockState } = vi.hoisted(() => ({
 vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(),
   getState: vi.fn(() => mockState),
+  isUi5Session: () => mockState.sessionMetadata.get(mockState.currentSession)?.runtime === 'ui5',
 }));
 
 type ToolFn = (args: Record<string, unknown>) => Promise<{

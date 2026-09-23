@@ -4,6 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import type { SessionMetadata } from '../session/state';
+import type { SessionHistory } from '../types/recording';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
@@ -234,6 +235,44 @@ async function waitForCDP(host: string, port: number, timeoutMs = 10000): Promis
   throw new Error(`Chrome did not expose CDP on ${host}:${port} within ${timeoutMs}ms`);
 }
 
+async function createLocalBrowserSession(
+  args: StartSessionArgs,
+  buildSession: (sessionId: string, capabilities: Record<string, unknown>) => { metadata: SessionMetadata; history: SessionHistory },
+): Promise<{ wdioBrowser: WebdriverIO.Browser; sessionId: string; capabilities: Record<string, unknown>; sizeNote: string }> {
+  const { browser = 'chrome', headless = true, windowWidth = 1920, windowHeight = 1080 } = args;
+  const userCapabilities = args.capabilities ?? {};
+
+  const provider = getProvider('local', 'browser');
+  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
+  const capabilities = provider.buildCapabilities({
+    ...args as Record<string, unknown>,
+    browser,
+    headless,
+    windowWidth,
+    windowHeight,
+    capabilities: userCapabilities,
+  });
+
+  const wdioBrowser = await remote({ ...connectionConfig, capabilities });
+  const { sessionId } = wdioBrowser;
+
+  const { metadata, history } = buildSession(sessionId, capabilities);
+  registerSession(sessionId, wdioBrowser, metadata, history);
+
+  if (args.trace) {
+    startTrace(sessionId, capabilities, 'browser', { width: windowWidth, height: windowHeight });
+  }
+
+  let sizeNote = '';
+  try {
+    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+  } catch (e) {
+    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+  }
+
+  return { wdioBrowser, sessionId, capabilities, sizeNote };
+}
+
 async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResult> {
   const {
     browser = 'chrome',
@@ -263,52 +302,84 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const tunnelEnabled = effectiveTunnel === true;
   const tunnelName = tunnelEnabled && !args.tunnelName ? `wdio-mcp-${Date.now()}` : args.tunnelName;
 
-  const mergedCapabilities = provider.buildCapabilities({
-    ...args as Record<string, unknown>,
-    browser,
-    headless,
-    windowWidth,
-    windowHeight,
-    capabilities: userCapabilities,
-    tunnelName,
-  });
+  let wdioBrowser: WebdriverIO.Browser;
+  let sessionId: string;
+  let sizeNote: string;
+  let mergedCapabilities: Record<string, unknown>;
 
-  const tunnelHandle = tunnelEnabled
-    ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
-    : undefined;
+  if ((args.provider ?? 'local') === 'local') {
+    const localSession = await createLocalBrowserSession(args, (id, capabilities) => ({
+      metadata: {
+        type: 'browser',
+        capabilities,
+        isAttached: provider.shouldAutoDetach(args as Record<string, unknown>),
+        provider: args.provider ?? 'local',
+        region: args.region,
+        tunnelName,
+        // local-browser provider declares no startTunnel, so the cloud branch's startTunnel?.() call yields undefined here
+        tunnelHandle: undefined,
+        trace: args.trace ?? false,
+      },
+      history: {
+        sessionId: id,
+        type: 'browser',
+        startedAt: new Date().toISOString(),
+        capabilities,
+        steps: [],
+      },
+    }));
+    wdioBrowser = localSession.wdioBrowser;
+    sessionId = localSession.sessionId;
+    sizeNote = localSession.sizeNote;
+    mergedCapabilities = localSession.capabilities;
+  } else {
+    mergedCapabilities = provider.buildCapabilities({
+      ...args as Record<string, unknown>,
+      browser,
+      headless,
+      windowWidth,
+      windowHeight,
+      capabilities: userCapabilities,
+      tunnelName,
+    });
 
-  const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
-  const { sessionId } = wdioBrowser;
-  const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
+    const tunnelHandle = tunnelEnabled
+      ? await provider.startTunnel?.({ ...args as Record<string, unknown>, tunnelName })
+      : undefined;
 
-  const sessionMetadata: SessionMetadata = {
-    type: 'browser',
-    capabilities: mergedCapabilities,
-    isAttached: shouldAutoDetach,
-    provider: args.provider ?? 'local',
-    region: args.region,
-    tunnelName,
-    tunnelHandle,
-    trace: args.trace ?? false,
-  };
+    wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
+    sessionId = wdioBrowser.sessionId;
+    const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
-  registerSession(sessionId, wdioBrowser, sessionMetadata, {
-    sessionId,
-    type: 'browser',
-    startedAt: new Date().toISOString(),
-    capabilities: mergedCapabilities,
-    steps: [],
-  });
+    const sessionMetadata: SessionMetadata = {
+      type: 'browser',
+      capabilities: mergedCapabilities,
+      isAttached: shouldAutoDetach,
+      provider: args.provider ?? 'local',
+      region: args.region,
+      tunnelName,
+      tunnelHandle,
+      trace: args.trace ?? false,
+    };
 
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
-  }
+    registerSession(sessionId, wdioBrowser, sessionMetadata, {
+      sessionId,
+      type: 'browser',
+      startedAt: new Date().toISOString(),
+      capabilities: mergedCapabilities,
+      steps: [],
+    });
 
-  let sizeNote = '';
-  try {
-    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
-  } catch (e) {
-    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+    if (args.trace) {
+      startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
+    }
+
+    sizeNote = '';
+    try {
+      await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+    } catch (e) {
+      sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+    }
   }
 
   if (navigationUrl) {
@@ -421,51 +492,27 @@ async function startUi5Session(args: StartSessionArgs): Promise<CallToolResult> 
     return { isError: true, content: [{ type: 'text', text: 'Error starting session: baseUrl is required for UI5 sessions.' }] };
   }
 
-  const { baseUrl, wdi5, capabilities: userCapabilities = {} } = args;
-  const { headless = true, windowWidth = 1920, windowHeight = 1080 } = args;
+  const { baseUrl, wdi5 } = args;
+  const { windowWidth = 1920, windowHeight = 1080 } = args;
 
-  const provider = getProvider('local', 'browser');
-  const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
-  const mergedCapabilities = provider.buildCapabilities({
-    ...args as Record<string, unknown>,
-    browser,
-    headless,
-    windowWidth,
-    windowHeight,
-    capabilities: userCapabilities,
-  });
-
-  const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
-  const { sessionId } = wdioBrowser;
-
-  const metadata: SessionMetadata = {
-    type: 'browser',
-    runtime: 'ui5',
-    capabilities: mergedCapabilities,
-    isAttached: false,
-    provider: 'local',
-    trace: args.trace ?? false,
-  };
-
-  registerSession(sessionId, wdioBrowser, metadata, {
-    sessionId,
-    type: 'browser',
-    runtime: 'ui5',
-    startedAt: new Date().toISOString(),
-    capabilities: mergedCapabilities,
-    steps: [],
-  });
-
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
-  }
-
-  let sizeNote = '';
-  try {
-    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
-  } catch (e) {
-    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
-  }
+  const { wdioBrowser, sessionId, capabilities: mergedCapabilities, sizeNote } = await createLocalBrowserSession(args, (id, capabilities) => ({
+    metadata: {
+      type: 'browser',
+      runtime: 'ui5',
+      capabilities,
+      isAttached: false,
+      provider: 'local',
+      trace: args.trace ?? false,
+    },
+    history: {
+      sessionId: id,
+      type: 'browser',
+      runtime: 'ui5',
+      startedAt: new Date().toISOString(),
+      capabilities,
+      steps: [],
+    },
+  }));
 
   const config: Wdi5Config = { baseUrl, wdi5: { ...(wdi5 ?? {}) } };
   await initUi5(wdioBrowser, config);
@@ -478,15 +525,20 @@ async function startUi5Session(args: StartSessionArgs): Promise<CallToolResult> 
     await authenticateUi5(auth);
   }
 
-  if (config.wdi5.btpWorkZoneEnablement === true) {
+  const bridgeMode: 'workzone' | 'skipped' | 'injected' =
+    config.wdi5.btpWorkZoneEnablement === true ? 'workzone'
+      : config.wdi5.skipInjectUI5OnStart === true ? 'skipped'
+        : 'injected';
+
+  if (bridgeMode === 'workzone') {
     await enableWorkZone(wdioBrowser, config);
-  } else if (config.wdi5.skipInjectUI5OnStart !== true) {
+  } else if (bridgeMode === 'injected') {
     await injectUi5(wdioBrowser, config);
   }
 
-  const bridgeText = config.wdi5.btpWorkZoneEnablement === true
+  const bridgeText = bridgeMode === 'workzone'
     ? 'UI5 bridge injected with BTP work zone enabled'
-    : config.wdi5.skipInjectUI5OnStart === true
+    : bridgeMode === 'skipped'
       ? 'UI5 bridge injection skipped (skipInjectUI5OnStart)'
       : 'UI5 bridge injected';
   return {
