@@ -96,7 +96,11 @@ export async function ensureUi5Injected(browser: WebdriverIO.Browser): Promise<v
   if (!injected) await injectUi5(browser, config);
 }
 
-export function cleanupUi5Runtime(): void {
-  delete (globalThis as unknown as Record<string, unknown>).browser;
-  delete (globalThis as unknown as Record<string, unknown>).__wdi5Config;
+export function cleanupUi5Runtime(browser: WebdriverIO.Browser): void {
+  const globals = globalThis as unknown as Record<string, unknown>;
+  // Replacement cleanup is async and can land after a new session wrote its own globals —
+  // only wipe what the closing session owns.
+  if (globals.browser !== browser) return;
+  delete globals.browser;
+  delete globals.__wdi5Config;
 }
