@@ -15,16 +15,17 @@ export const getElementsToolDefinition: ToolDefinition = {
   annotations: { title: 'Get Elements With Selectors', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only include elements visible in the current viewport (default: false).'),
+    includeContainers: coerceBoolean.optional().default(false).describe('UI5 sessions only: include non-interactable controls such as containers (default: false).'),
     includeBounds: coerceBoolean.optional().default(false).describe('UI5 sessions only: include bounding box coordinates (default: false).'),
   },
 };
 
-export const getElementsTool: ToolCallback = async ({ inViewportOnly = false, includeBounds = false }: { inViewportOnly?: boolean; includeBounds?: boolean }) => {
+export const getElementsTool: ToolCallback = async ({ inViewportOnly = false, includeContainers = false, includeBounds = false }: { inViewportOnly?: boolean; includeContainers?: boolean; includeBounds?: boolean }) => {
   try {
     const browser = getBrowser();
     if (isUi5Session()) {
       await ensureUi5Injected(browser);
-      const controls = (await getUi5Controls(browser, { includeBounds })).filter((c) => !inViewportOnly || c.isInViewport !== false);
+      const controls = await getUi5Controls(browser, { inViewportOnly, includeContainers, includeBounds });
       return { content: [{ type: 'text' as const, text: encode(controls).replace(/,""/g, ',').replace(/"",/g, ',') }] };
     }
     const { text } = await getSnapshot(browser, { inViewportOnly });

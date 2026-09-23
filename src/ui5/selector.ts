@@ -1,3 +1,5 @@
+import { ensureUi5Injected } from './runtime';
+
 export const UI5_SELECTOR_PREFIX = 'ui5:';
 
 export function isUi5Selector(selector: string): boolean {
@@ -35,4 +37,13 @@ export async function getAsControl(
     throw new Error('wdi5 asControl command is not available on this session — is this a UI5 session?');
   }
   return asControl({ selector: parsed, forceSelect: false, ...(timeout ? { timeout } : {}) });
+}
+
+export async function resolveUi5Control(
+  browser: WebdriverIO.Browser,
+  selector: string,
+  timeout?: number,
+): Promise<Ui5Control> {
+  await ensureUi5Injected(browser);
+  return getAsControl(browser, selector, timeout);
 }

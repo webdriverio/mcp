@@ -98,9 +98,9 @@ describe('get_elements tool on UI5 sessions', () => {
   });
 
   it('injects the UI5 bridge and lists controls instead of the snapshot', async () => {
-    const result = await callTool({ includeBounds: true });
+    const result = await callTool({ inViewportOnly: false, includeContainers: false, includeBounds: true });
     expect(mockEnsureUi5Injected).toHaveBeenCalled();
-    expect(mockGetUi5Controls).toHaveBeenCalledWith(expect.anything(), { includeBounds: true });
+    expect(mockGetUi5Controls).toHaveBeenCalledWith(expect.anything(), { inViewportOnly: false, includeContainers: false, includeBounds: true });
     expect(mockGetSnapshot).not.toHaveBeenCalled();
     expect(result.content[0].text).toContain('sap.m.Button');
   });
