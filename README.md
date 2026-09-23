@@ -714,7 +714,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a browser, local Electron application, or mobile app session; `attach: true` retains the existing Chrome CDP connection mode                                         |
+| `start_session`  | Start a browser, local Electron application, mobile app, or UI5 application session; `attach: true` retains the existing Chrome CDP connection mode                                         |
 | `attach_session` | Attach to an existing remote WebDriver/Appium session by ID without creating a new session                                                                                   |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
 | `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
@@ -955,6 +955,65 @@ start_session({
 })
 trigger_electron_deeplink({ url: 'myapp://open/item' })
 ```
+
+### UI5 applications
+
+UI5 support is local-only (Chrome or Edge) and requires `baseUrl`; it runs on the `wdio-ui5-service` bridge. Service options go in the top-level `wdi5` argument:
+
+```javascript
+start_session({
+  platform: 'ui5',
+  browser: 'chrome',
+  baseUrl: 'https://sdk.openui5.org/test-resources/sap/m/demokit/cart/webapp/index.html',
+  wdi5: { waitForUI5Timeout: 15000 }
+})
+```
+
+Element discovery returns `ui5:` selectors (JSON control selectors); `click_element` and `set_value` consume them like any other selector. A redirect can drop the injected UI5 context — discovery and actions re-inject it automatically. Code generation is not supported for UI5 sessions because `ui5:` selectors are not runnable through `browser.$()`.
+
+**Authentication:**
+
+Pass a `wdi5:authentication` capability to authenticate during session start. Supported providers: `BasicAuth`, `BTP`, `Office365`, `custom`.
+
+```javascript
+start_session({
+  platform: 'ui5',
+  baseUrl: 'https://my-app.example.com',
+  capabilities: {
+    'wdi5:authentication': { provider: 'BasicAuth' }
+  }
+})
+```
+
+Credentials are read by the service from the `wdi5_username` and `wdi5_password` environment variables — lowercase, per the wdi5 convention — and never sent through the MCP server; only the provider name crosses the tool boundary.
+
+<details>
+<summary>UI5 authentication environment variables</summary>
+
+```bash
+export wdi5_username=your_username
+export wdi5_password=your_password
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "wdi5_username": "your_username",
+        "wdi5_password": "your_password"
+      }
+    }
+  }
+}
+```
+
+| `wdi5_username` | UI5 username (required with `wdi5:authentication`) |
+| `wdi5_password` | UI5 password (required with `wdi5:authentication`) |
+
+</details>
 
 **Attach to a running Chrome instance:**
 
