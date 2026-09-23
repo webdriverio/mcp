@@ -38,6 +38,17 @@ async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): P
   }
 }
 
+// ui5 cleanup clears wdi5's ambient globals (globalThis.browser / __wdi5Config),
+// electron cleanup tears down the electron service. Electron runtime stays ui5-agnostic.
+async function cleanupRuntime(metadata: SessionMetadata | undefined, browser: WebdriverIO.Browser): Promise<boolean> {
+  if (metadata?.runtime === 'ui5') {
+    const { cleanupUi5Runtime } = await import('../ui5/runtime');
+    cleanupUi5Runtime();
+    return false;
+  }
+  return cleanupSessionRuntime(metadata?.runtime, browser);
+}
+
 function getSessionResult(history: SessionHistory | undefined): SessionResult {
   const errorStep = history?.steps.find(s => s.status === 'error');
   return errorStep
@@ -113,7 +124,7 @@ export function registerSession(
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           const oldTree = driverTree(oldMetadata?.driverRoots);
-          const ended = await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => false);
+          const ended = await cleanupRuntime(oldMetadata, oldBrowser).catch(() => false);
           if (ended) {
             killPids(oldTree);
           } else {
@@ -186,7 +197,7 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
       capturedTrees.set(sessionId, tree);
       let ended = false;
       try {
-        ended = await cleanupSessionRuntime(metadata?.runtime, browser);
+        ended = await cleanupRuntime(metadata, browser);
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }

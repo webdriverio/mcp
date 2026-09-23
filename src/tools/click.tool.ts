@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
-import { runAction, agentFor, noSession } from '../session/agent';
+import { runAction, agentFor, noSession, errorResult } from '../session/agent';
+import { getBrowser } from '../session/state';
+import { getAsControl, isUi5Selector } from '../ui5/selector';
+import { ensureUi5Injected } from '../ui5/runtime';
+
+const UI5_CONTROL_TIMEOUT_MS = 3000;
 
 export const clickToolDefinition: ToolDefinition = {
   name: 'click_element',
@@ -14,6 +19,17 @@ export const clickToolDefinition: ToolDefinition = {
 };
 
 export const clickTool: ToolCallback = async ({ selector }: { selector: string }): Promise<CallToolResult> => {
+  if (isUi5Selector(selector)) {
+    try {
+      const browser = getBrowser();
+      await ensureUi5Injected(browser);
+      const control = await getAsControl(browser, selector, UI5_CONTROL_TIMEOUT_MS);
+      await control.press();
+      return { content: [{ type: 'text', text: `Clicked UI5 control ${selector}` }] };
+    } catch (e) {
+      return errorResult(e, 'Error clicking UI5 control');
+    }
+  }
   const agent = await agentFor();
   return agent ? runAction(agent, 'click', { target: selector }, 'Clicked.') : noSession();
 };
