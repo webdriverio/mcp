@@ -515,25 +515,28 @@ async function startUi5Session(args: StartSessionArgs): Promise<CallToolResult> 
   }));
 
   const config: Wdi5Config = { baseUrl, wdi5: { ...(wdi5 ?? {}) } };
-  await initUi5(wdioBrowser, config);
-  if (args.trace) {
-    await recordInitialNavigation(sessionId, baseUrl);
-  }
-
   const auth = mergedCapabilities['wdi5:authentication'] as Record<string, unknown> | undefined;
-  if (auth) {
-    await authenticateUi5(auth);
-  }
-
   const bridgeMode: 'workzone' | 'skipped' | 'injected' =
     config.wdi5.btpWorkZoneEnablement === true ? 'workzone'
       : config.wdi5.skipInjectUI5OnStart === true ? 'skipped'
         : 'injected';
-
-  if (bridgeMode === 'workzone') {
-    await enableWorkZone(wdioBrowser, config);
-  } else if (bridgeMode === 'injected') {
-    await injectUi5(wdioBrowser, config);
+  try {
+    await initUi5(wdioBrowser, config);
+    if (args.trace) {
+      await recordInitialNavigation(sessionId, baseUrl);
+    }
+    if (auth) {
+      await authenticateUi5(auth);
+    }
+    if (bridgeMode === 'workzone') {
+      await enableWorkZone(wdioBrowser, config);
+    } else if (bridgeMode === 'injected') {
+      await injectUi5(wdioBrowser, config);
+    }
+  } catch (e) {
+    // The session is already registered at this point; a failed init must not leave it current.
+    await closeSession(sessionId, false, false).catch(() => {});
+    throw e;
   }
 
   const bridgeText = bridgeMode === 'workzone'

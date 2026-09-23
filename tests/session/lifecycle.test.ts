@@ -357,7 +357,8 @@ describe('closeSession', () => {
     state.currentSession = 'ui5-session';
 
     const globals = globalThis as unknown as Record<string, unknown>;
-    globals.browser = { sessionId: 'ui5-session' };
+    // initUi5 writes the registered browser object into the ambient global
+    globals.browser = browser;
     globals.__wdi5Config = { baseUrl: 'https://x', wdi5: {} };
 
     await closeSession('ui5-session', false, false);

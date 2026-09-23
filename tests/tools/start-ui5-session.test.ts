@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   remote: vi.fn(),
   registerSession: vi.fn(),
+  closeSession: vi.fn(async () => {}),
   initUi5: vi.fn(),
   authenticateUi5: vi.fn(),
   injectUi5: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock('../../src/ui5/runtime', () => ({
 
 vi.mock('../../src/session/lifecycle', () => ({
   registerSession: mocks.registerSession,
-  closeSession: vi.fn(),
+  closeSession: mocks.closeSession,
 }));
 
 import { startSessionTool } from '../../src/tools/session.tool';
@@ -118,5 +119,32 @@ describe('start_session UI5', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('baseUrl is required');
     expect(mocks.initUi5).not.toHaveBeenCalled();
+  });
+
+  it('closes the registered session when ui5 initialization fails', async () => {
+    mocks.initUi5.mockRejectedValue(new Error('ui5 init exploded'));
+
+    const result = await callStart({ ...BASE_ARGS });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('ui5 init exploded');
+    expect(mocks.closeSession).toHaveBeenCalledWith('ui5-session', false, false);
+  });
+
+  it('closes the registered session when bridge injection fails', async () => {
+    mocks.injectUi5.mockRejectedValue(new Error('bridge injection exploded'));
+
+    const result = await callStart({ ...BASE_ARGS });
+
+    expect(result.isError).toBe(true);
+    expect(mocks.closeSession).toHaveBeenCalledWith('ui5-session', false, false);
+  });
+
+  it('does not close the session when pre-registration validation fails', async () => {
+    const result = await callStart({ ...BASE_ARGS, browser: 'firefox' });
+
+    expect(result.isError).toBe(true);
+    expect(mocks.registerSession).not.toHaveBeenCalled();
+    expect(mocks.closeSession).not.toHaveBeenCalled();
   });
 });

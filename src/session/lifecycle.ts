@@ -37,7 +37,7 @@ async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): P
 async function cleanupRuntime(metadata: SessionMetadata | undefined, browser: WebdriverIO.Browser): Promise<void> {
   if (metadata?.runtime === 'ui5') {
     const { cleanupUi5Runtime } = await import('../ui5/runtime');
-    cleanupUi5Runtime();
+    cleanupUi5Runtime(browser);
     return;
   }
   await cleanupSessionRuntime(metadata?.runtime, browser);

@@ -1,6 +1,7 @@
 import { getInteractableBrowserElements } from './get-interactable-browser-elements';
 import { getMobileVisibleElements } from './get-visible-mobile-elements';
 import { getUi5Controls } from './get-ui5-controls';
+import { ensureUi5Injected } from '../ui5/runtime';
 
 export type VisibleElementsResult = {
   total: number;
@@ -32,6 +33,8 @@ export async function getElements(
   let elements: { isInViewport?: boolean }[];
 
   if (ui5) {
+    // A redirect since injection drops the bridge; same re-inject contract as ui5 actions.
+    await ensureUi5Injected(browser);
     elements = await getUi5Controls(browser, { includeBounds, includeContainers, inViewportOnly });
   } else if (browser.isAndroid || browser.isIOS) {
     const platform = browser.isAndroid ? 'android' : 'ios';
