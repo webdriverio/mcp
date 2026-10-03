@@ -11,7 +11,7 @@ const defaultTimeout: number = 3000;
 
 export const clickToolDefinition: ToolDefinition = {
   name: 'click_element',
-  description: 'Clicks an element. In browsers the result lists what changed on the page (new elements with refs, or the new page). On iOS use tap_element.',
+  description: 'Clicks an element. In browsers the result lists what changed on the page (new elements with refs, or the new page). On iOS use tap_element. Several steps in a row: perform_actions.',
   annotations: { title: 'Click Element', destructiveHint: false },
   inputSchema: {
     selector: z.string().describe('Ref from snapshot (e12) or selector: CSS, XPath, "button=Exact text", "a*=Partial text"'),

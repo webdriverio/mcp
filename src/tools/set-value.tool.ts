@@ -10,7 +10,7 @@ const defaultTimeout: number = 3000;
 
 export const setValueToolDefinition: ToolDefinition = {
   name: 'set_value',
-  description: 'Replaces the text of an input or textarea. In browsers the result lists what changed on the page.',
+  description: 'Replaces the text of an input or textarea. In browsers the result lists what changed on the page. To fill several fields or fill and then click, use one perform_actions call.',
   annotations: { title: 'Set Input Value', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     selector: z.string().describe('Ref from snapshot (e12) or selector: CSS, XPath, "button=Exact text", "a*=Partial text"'),
