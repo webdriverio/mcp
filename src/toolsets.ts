@@ -14,13 +14,20 @@ const ONLY: Record<string, ToolPlatform[]> = {
   hide_keyboard: ['ios', 'android'],
   get_app_state: ['ios', 'android'],
   execute_electron_script: ['electron'],
+  // browsers use snapshot, select_option and press_key instead
+  get_elements: ['ios', 'android', 'electron'],
+  get_accessibility_tree: ['electron'],
+  snapshot: ['browser'],
+  select_option: ['browser'],
+  press_key: ['browser'],
   trigger_electron_deeplink: ['electron'],
 };
 
 /** whether a tool is listed while a session of `platform` (or none) is active */
 export function toolAppliesTo(name: string, platform: ToolPlatform | undefined): boolean {
   const only = ONLY[name];
-  return !only || (platform !== undefined && only.includes(platform));
+  // before a session starts, list what a browser session gets
+  return !only || only.includes(platform ?? 'browser');
 }
 
 /** `WDIO_MCP_TOOLS=all` lists every tool from the start, for clients that ignore tool list changes */

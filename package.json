@@ -63,10 +63,11 @@
     "saucelabs": "^9.0.2",
     "sharp": "^0.35.3",
     "testingbot-tunnel-launcher": "^1.1.18",
-    "webdriverio": "^9.27.0",
+    "webdriverio": "link:/Users/christian.bromann/Sites/WebdriverIO/webdriverio/.claude/worktrees/stoic-kepler-1354c8/packages/webdriverio",
     "xpath": "^0.0.34",
     "yazl": "^3.3.1",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@wdio/session": "link:/Users/christian.bromann/Sites/WebdriverIO/webdriverio/.claude/worktrees/stoic-kepler-1354c8/packages/wdio-session"
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^10.0.6",

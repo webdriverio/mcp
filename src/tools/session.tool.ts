@@ -10,6 +10,7 @@ import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { getElectronService } from '../electron/runtime.js';
+import { pageReport, webAgent } from '../session/agent';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -305,11 +306,15 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
   }
 
+  // set up before the first page loads, so it records that page too
+  const agent = await webAgent();
+  let page = '';
   if (navigationUrl) {
     await wdioBrowser.url(navigationUrl);
     if (args.trace) {
       await recordInitialNavigation(sessionId, navigationUrl);
     }
+    page = agent ? await pageReport(agent) : '';
   }
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
@@ -328,10 +333,12 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     ].filter(Boolean).join('\n')
     : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${reportNote}`;
 
+  const text = page ? `${startMessage}\n${page}` : startMessage;
+
   return {
     content: [{
       type: 'text',
-      text: startMessage,
+      text,
     }],
   };
 }

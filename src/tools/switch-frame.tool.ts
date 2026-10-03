@@ -3,17 +3,18 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { runAction, webAgent } from '../session/agent';
 
 export const switchFrameToolDefinition: ToolDefinition = {
   name: 'switch_frame',
-  description: 'Switches WebDriver frame context into an iframe by CSS/XPath selector, or back to top-level if selector is omitted. Changes persist — all subsequent click_element, set_value, get_elements calls operate within the switched frame until you switch back. Waits up to 5s for the iframe. Browser-only.',
+  description: 'Switches into an iframe (ref or selector), or back to the top page when selector is omitted. Later tools act inside the frame until you switch back. Returns the frame\'s elements.',
   annotations: { title: 'Switch Frame', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     selector: z
       .string()
       .optional()
       .describe(
-        'CSS/XPath selector for the iframe element. Omit to switch back to the top-level frame.',
+        'Ref or selector of the iframe; omit for the top page',
       ),
   },
 };
@@ -23,6 +24,10 @@ export const switchFrameTool: ToolCallback = async ({
 }: {
   selector?: string;
 }): Promise<CallToolResult> => {
+  const agent = await webAgent();
+  if (agent) {
+    return runAction(agent, 'frame', { target: selector || 'top' }, selector ? `Switched to iframe: ${selector}` : 'Switched back to top-level frame');
+  }
   try {
     const browser = getBrowser();
     if (!selector) {

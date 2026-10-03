@@ -81,6 +81,8 @@ import { switchFrameTool, switchFrameToolDefinition } from './tools/switch-frame
 import { listAppsTool, listAppsToolDefinition, uploadAppTool, uploadAppToolDefinition, } from './tools/cloud-provider.tool';
 import { queryDocsTool, queryDocsToolDefinition } from './tools/query-docs.tool';
 import { screenshotTool, screenshotToolDefinition } from './tools/screenshot.tool';
+import { snapshotTool, snapshotToolDefinition } from './tools/snapshot.tool';
+import { pressKeyTool, pressKeyToolDefinition, selectOptionTool, selectOptionToolDefinition } from './tools/page-input.tool';
 import { accessibilityTool, accessibilityToolDefinition } from './tools/accessibility.tool';
 import { getTabsTool, getTabsToolDefinition } from './tools/get-tabs.tool';
 import { getContextsTool, getContextsToolDefinition } from './tools/get-contexts.tool';
@@ -157,6 +159,9 @@ function createServer(): McpServer {
 
   registerTool(clickToolDefinition, instrument('click_element', clickTool));
   registerTool(setValueToolDefinition, instrument('set_value', setValueTool));
+  registerTool(selectOptionToolDefinition, instrument('select_option', selectOptionTool));
+  registerTool(pressKeyToolDefinition, instrument('press_key', pressKeyTool));
+  registerTool(snapshotToolDefinition, snapshotTool);
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
