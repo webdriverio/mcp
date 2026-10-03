@@ -4,6 +4,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { pageChange, pageInfo } from '../utils/page-info';
 
 const defaultTimeout: number = 3000;
 
@@ -21,13 +22,14 @@ export const clickToolDefinition: ToolDefinition = {
 export const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {
   try {
     const browser = getBrowser();
+    const before = await pageInfo(browser);
     await browser.waitUntil(browser.$(selector).isExisting, { timeout });
     if (scrollToView) {
       await browser.$(selector).scrollIntoView({ block: 'center', inline: 'center' });
     }
     await browser.$(selector).click();
     return {
-      content: [{ type: 'text', text: `Element clicked (selector: ${selector})` }],
+      content: [{ type: 'text', text: `Element clicked (selector: ${selector})${await pageChange(browser, before)}` }],
     };
   } catch (e) {
     return {

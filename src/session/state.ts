@@ -32,6 +32,19 @@ export function getBrowser(): WebdriverIO.Browser {
   return browser;
 }
 
+type SessionListener = (metadata: SessionMetadata) => void;
+const sessionListeners = new Set<SessionListener>();
+
+/** Called whenever a session becomes the active one, e.g. to show the tools for its platform. */
+export function onSessionRegistered(listener: SessionListener): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
+
+export function notifySessionRegistered(metadata: SessionMetadata): void {
+  for (const listener of sessionListeners) listener(metadata);
+}
+
 export function getState() {
   return state;
 }

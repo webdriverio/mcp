@@ -14,4 +14,4 @@ settings.local.json
 .env
 
 .lambdatest
-*.apk
+*.apk.iter

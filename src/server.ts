@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import pkg from '../package.json' with { type: 'json' };
 import http from 'node:http';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -41,6 +41,8 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
+import { onSessionRegistered } from './session/state';
+import { toolAppliesTo, showAllTools } from './toolsets';
 import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
@@ -109,12 +111,16 @@ function createServer(): McpServer {
     },
   });
 
-  const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
-    server.registerTool(definition.name, {
+  const tools = new Map<string, RegisteredTool>();
+  const registerTool = (definition: ToolDefinition, callback: ToolCallback) => {
+    const tool = server.registerTool(definition.name, {
       description: definition.description,
       inputSchema: definition.inputSchema,
       ...(definition.annotations && { annotations: definition.annotations }),
     }, callback);
+    tools.set(definition.name, tool);
+    return tool;
+  };
 
   const registerResource = (definition: ResourceDefinition) => {
     if ('uri' in definition) {
@@ -184,6 +190,23 @@ function createServer(): McpServer {
   registerTool(getContextsToolDefinition, getContextsTool);
   registerTool(appStateToolDefinition, appStateTool);
   registerTool(getCookiesToolDefinition, getCookiesTool);
+
+  /**
+   * Every tool definition is sent with every model request. Tools that only
+   * work on mobile or Electron sessions stay hidden until such a session
+   * starts, so a browser session doesn't pay for them on every turn.
+   */
+  if (!showAllTools()) {
+    const showFor = (platform: Parameters<typeof toolAppliesTo>[1]) => {
+      for (const [name, tool] of tools) {
+        const applies = toolAppliesTo(name, platform);
+        if (applies && !tool.enabled) tool.enable();
+        if (!applies && tool.enabled) tool.disable();
+      }
+    };
+    showFor(undefined);
+    onSessionRegistered((metadata) => showFor(metadata.runtime === 'electron' ? 'electron' : metadata.type));
+  }
 
   registerResource(sessionsIndexResource);
   registerResource(sessionCurrentStepsResource);

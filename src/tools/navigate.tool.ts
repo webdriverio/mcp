@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
+import { pageChange } from '../utils/page-info';
 
 export const navigateToolDefinition: ToolDefinition = {
   name: 'navigate',
@@ -18,7 +19,7 @@ export const navigateAction = async (url: string): Promise<CallToolResult> => {
     const browser = getBrowser();
     await browser.url(url);
     return {
-      content: [{ type: 'text', text: `Navigated to ${url}` }],
+      content: [{ type: 'text', text: `Navigated to ${url}${await pageChange(browser, {})}` }],
     };
   } catch (e) {
     return {

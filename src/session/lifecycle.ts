@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
-import { getState } from './state';
+import { getState, notifySessionRegistered } from './state';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
@@ -72,6 +72,7 @@ export function registerSession(
   state.sessionMetadata.set(sessionId, metadata);
   state.sessionHistory.set(sessionId, historyEntry);
   state.currentSession = sessionId;
+  notifySessionRegistered(metadata);
 
   // If there was a previous session, terminate it to prevent orphaning
   if (oldSessionId && oldSessionId !== sessionId) {
