@@ -20,6 +20,7 @@ const ONLY: Record<string, ToolPlatform[]> = {
   snapshot: ['browser'],
   select_option: ['browser'],
   press_key: ['browser'],
+  perform_actions: ['browser'],
   trigger_electron_deeplink: ['electron'],
 };
 
