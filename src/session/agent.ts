@@ -28,11 +28,12 @@ export function webAgent(): Promise<AgentSession> | undefined {
  * `@wdio/session` hints name its shell commands; here they are tools.
  */
 export function forMcp(text: string): string {
-  return text
-    .replace(/`(?:wdio session )?find <text>`/g, '`snapshot` with `find`')
-    .replace(/`(?:wdio session )?snapshot -i`/g, '`snapshot`')
-    .replace(/`(?:wdio session )?snapshot`/g, '`snapshot` with `full: true`')
-    .replace(/`wdio session ([a-z]+)[^`]*`/g, '`$1`');
+  // one pass, so a replacement is never rewritten again
+  return text.replace(/`(?:wdio session )?([a-z]+)([^`]*)`/g, (match, action: string, rest: string) => {
+    if (action === 'find') return '`snapshot` with `find`';
+    if (action === 'snapshot') return /-i\b|--interactive/.test(rest) ? '`snapshot`' : '`snapshot` with `full: true`';
+    return match.startsWith('`wdio session ') ? `\`${action}\`` : match;
+  });
 }
 
 export async function runAction(agent: AgentSession, action: string, args: Record<string, unknown>, done: string): Promise<CallToolResult> {
