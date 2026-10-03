@@ -42,6 +42,7 @@ import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chr
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import { onSessionRegistered } from './session/state';
+import { closeAllSessions } from './session/lifecycle';
 import { groupOf, GROUPS, toolAppliesTo, showAllTools, type ToolGroup, type ToolPlatform } from './toolsets';
 import { enableToolsToolDefinition } from './tools/enable-tools.tool';
 import { withTrace } from './trace/recorder.js';
@@ -339,7 +340,24 @@ async function main() {
     const transport = new StdioServerTransport();
     await createServer().connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
+    // the client closing stdin is how most of them stop a stdio server
+    process.stdin.once('end', shutdown);
+    process.stdin.once('close', shutdown);
   }
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.once(signal, shutdown);
+  }
+}
+
+/** most time sessions get to close before the process exits anyway */
+const SHUTDOWN_TIMEOUT_MS = 5000;
+let shuttingDown = false;
+
+function shutdown(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS).unref());
+  void Promise.race([closeAllSessions(), timeout]).finally(() => process.exit(0));
 }
 
 main().catch((error) => {

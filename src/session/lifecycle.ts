@@ -183,3 +183,19 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
     }
   }
 }
+
+/**
+ * End every session when the server goes away. Without this, a client that
+ * stops the server leaves each local driver and its browser running. Sessions
+ * `close_session` would detach from stay running.
+ */
+export async function closeAllSessions(): Promise<void> {
+  const state = getState();
+  await Promise.all([...state.browsers.keys()].map(async (sessionId) => {
+    const metadata = state.sessionMetadata.get(sessionId);
+    const detach = metadata?.externallyManaged === true || metadata?.provider === 'external';
+    await closeSession(sessionId, detach, !!metadata?.isAttached).catch((e) => {
+      console.error(`[WARN] Failed to close session ${sessionId} on shutdown:`, e);
+    });
+  }));
+}
