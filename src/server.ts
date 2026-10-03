@@ -42,7 +42,8 @@ import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chr
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import { onSessionRegistered } from './session/state';
-import { toolAppliesTo, showAllTools } from './toolsets';
+import { groupOf, GROUPS, toolAppliesTo, showAllTools, type ToolGroup, type ToolPlatform } from './toolsets';
+import { enableToolsToolDefinition } from './tools/enable-tools.tool';
 import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
@@ -202,15 +203,27 @@ function createServer(): McpServer {
    * starts, so a browser session doesn't pay for them on every turn.
    */
   if (!showAllTools()) {
-    const showFor = (platform: Parameters<typeof toolAppliesTo>[1]) => {
+    let platform: ToolPlatform | undefined;
+    const enabledGroups = new Set<ToolGroup>();
+    const refresh = () => {
       for (const [name, tool] of tools) {
-        const applies = toolAppliesTo(name, platform);
-        if (applies && !tool.enabled) tool.enable();
-        if (!applies && tool.enabled) tool.disable();
+        const group = groupOf(name);
+        const listed = toolAppliesTo(name, platform) && (!group || enabledGroups.has(group));
+        if (listed && !tool.enabled) tool.enable();
+        if (!listed && tool.enabled) tool.disable();
       }
     };
-    showFor(undefined);
-    onSessionRegistered((metadata) => showFor(metadata.runtime === 'electron' ? 'electron' : metadata.type));
+    registerTool(enableToolsToolDefinition, async ({ groups }: { groups: ToolGroup[] }) => {
+      groups.forEach((group) => enabledGroups.add(group));
+      refresh();
+      const added = groups.flatMap((group) => GROUPS[group].tools).filter((name) => tools.get(name)?.enabled);
+      return { content: [{ type: 'text', text: added.length ? `Added: ${added.join(', ')}` : 'None of these tools apply to the current session.' }] };
+    });
+    refresh();
+    onSessionRegistered((metadata) => {
+      platform = metadata.runtime === 'electron' ? 'electron' : metadata.type;
+      refresh();
+    });
   }
 
   registerResource(sessionsIndexResource);

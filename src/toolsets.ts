@@ -30,6 +30,26 @@ export function toolAppliesTo(name: string, platform: ToolPlatform | undefined):
   return !only || only.includes(platform ?? 'browser');
 }
 
+/**
+ * Tools most sessions never call. Their definitions would still be sent with
+ * every model request, so they are listed once an agent asks for their
+ * group through `enable_tools`.
+ */
+export const GROUPS = {
+  mocks: { tools: ['mock', 'get_mock_calls', 'manage_mock'], desc: 'mock network requests or Electron APIs' },
+  cookies: { tools: ['get_cookies', 'set_cookie', 'delete_cookies'], desc: 'read, set and delete cookies' },
+  device: { tools: ['emulate_device', 'set_geolocation'], desc: 'emulate a phone or tablet, fake the location' },
+  extensions: { tools: ['open_web_extension'], desc: 'install and open a browser extension' },
+  attach: { tools: ['launch_chrome', 'attach_session'], desc: 'launch Chrome with remote debugging, attach to a running WebDriver or Appium session' },
+  'cloud-apps': { tools: ['list_apps', 'upload_app'], desc: 'upload and list mobile apps on BrowserStack, Sauce Labs, TestMu, TestingBot, Digital.ai' },
+} as const;
+
+export type ToolGroup = keyof typeof GROUPS;
+
+export function groupOf(name: string): ToolGroup | undefined {
+  return (Object.keys(GROUPS) as ToolGroup[]).find((group) => (GROUPS[group].tools as readonly string[]).includes(name));
+}
+
 /** `WDIO_MCP_TOOLS=all` lists every tool from the start, for clients that ignore tool list changes */
 export function showAllTools(env = process.env): boolean {
   return env.WDIO_MCP_TOOLS === 'all';
