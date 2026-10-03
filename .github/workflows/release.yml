@@ -16,6 +16,10 @@ on:
         description: 'NPM tag (e.g. use "next" to release a test version)'
         required: true
         default: "latest"
+      dev:
+        description: 'Dev build: publish <next version>-dev.<run> under the "dev" tag, without release commit, git tag, changelog or GitHub release'
+        type: boolean
+        default: false
 
 env:
   NPM_CONFIG_PROVENANCE: true
@@ -55,7 +59,23 @@ jobs:
         run: pnpm run bundle
 
       - name: Release
+        if: ${{ !inputs.dev }}
         run: npx release-it ${{github.event.inputs.releaseType}} --ci --no-git.requireCleanWorkingDir --npm.tag=${{github.event.inputs.distTag}}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_REGISTRY: https://registry.npmjs.org/
+
+      # no GitHub release on purpose: it would publish the build to the MCP registry
+      - name: Publish dev build
+        if: ${{ inputs.dev }}
+        run: |
+          VERSION="$(node -e '
+            const [major, minor, patch] = require("./package.json").version.split(/[.-]/).map(Number)
+            const next = { major: [major + 1, 0, 0], minor: [major, minor + 1, 0], patch: [major, minor, patch + 1] }[process.env.RELEASE_TYPE]
+            console.log(`${next.join(".")}-dev.${process.env.GITHUB_RUN_NUMBER}`)
+          ')"
+          npm version "$VERSION" --no-git-tag-version
+          npm publish --tag dev
+          echo "Published @wdio/mcp@$VERSION (npm tag: dev)" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RELEASE_TYPE: ${{ inputs.releaseType }}
