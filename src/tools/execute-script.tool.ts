@@ -6,11 +6,11 @@ import { getBrowser } from '../session/state';
 
 export const executeScriptToolDefinition: ToolDefinition = {
   name: 'execute_script',
-  description: 'Executes arbitrary JavaScript in browser page context or Appium mobile: commands. Can read/modify DOM, trigger events, terminate apps, or run Android shell commands — use only when no dedicated tool covers the action. Browser: pass JS in script, use \'return\' for values, string args matching selectors auto-resolve to elements. Mobile: use \'mobile: <command>\' syntax in script with args array (e.g. "mobile: pressKey", "mobile: activateApp"). Prefer click_element/set_value/get_elements for standard interactions.',
+  description: 'Runs JavaScript in the page (`return` a value; string args that match a selector are passed as elements) or, on Appium, a "mobile: <command>" with args. Prefer the dedicated tools for clicks and typing.',
   annotations: { title: 'Execute Script', destructiveHint: false },
   inputSchema: {
-    script: z.string().describe('JavaScript code (browser) or mobile command string like "mobile: pressKey" (Appium)'),
-    args: z.array(z.any()).optional().describe('Arguments to pass to the script. For browser: element selectors or values. For mobile commands: command-specific parameters as objects.'),
+    script: z.string().describe('JavaScript, or "mobile: <command>" on Appium'),
+    args: z.array(z.any()).optional().describe('Script arguments, or the mobile command\'s parameters'),
   },
 };
 

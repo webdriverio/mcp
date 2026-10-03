@@ -167,10 +167,10 @@ type AttachSessionArgs = {
 
 export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
-  description: 'Closes the current session or detaches without terminating. Detach preserves app state on the Appium server — sessions with noReset: true auto-detach by default. Closing a browser attach session terminates chromedriver but the Chrome process spawned by launch_chrome remains running.',
+  description: 'Closes the session, or with detach: true disconnects and leaves it running. Attached sessions and Appium sessions with noReset are detached unless detach: false.',
   annotations: { title: 'Close Session', destructiveHint: true },
   inputSchema: {
-    detach: coerceBoolean.optional().describe('If true, disconnect without terminating; if false, terminate. When omitted, externally managed and auto-detach sessions are preserved while other sessions are terminated.'),
+    detach: coerceBoolean.optional(),
   },
 };
 
