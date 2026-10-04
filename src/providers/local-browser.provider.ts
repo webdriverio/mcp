@@ -50,6 +50,11 @@ export class LocalBrowserProvider implements SessionProvider {
 
     const capabilities: Record<string, any> = {
       acceptInsecureCerts: true,
+      // With `normal` the driver holds every command until a page and all its
+      // ads and trackers have loaded, which on busy sites takes tens of seconds
+      // or minutes. The page tools give a page a few seconds to finish instead.
+      // User capabilities can set it back.
+      pageLoadStrategy: 'eager',
     };
 
     switch (selectedBrowser) {

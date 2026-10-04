@@ -40,7 +40,11 @@ export const executeScriptTool: ToolCallback = async (args: {
       })
     );
 
-    const result = await browser.execute(script, ...resolvedArgs);
+    // a script body can't use `await` at its top level; as an async function it can
+    const body = !script.startsWith('mobile:') && /\bawait\b/.test(script) && !/^\s*(async\s+)?(function\b|\(|[\w$]+\s*=>)/.test(script)
+      ? `return (async () => {\n${script}\n})()`
+      : script;
+    const result = await browser.execute(body, ...resolvedArgs);
 
     // Format result for display
     let resultText: string;

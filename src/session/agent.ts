@@ -36,13 +36,24 @@ export function forMcp(text: string): string {
   });
 }
 
+/** longest a single page action may take before the agent gets the turn back */
+const ACTION_TIMEOUT_MS = 90_000;
+
 export async function runAction(agent: AgentSession, action: string, args: Record<string, unknown>, done: string): Promise<CallToolResult> {
+  let timer: NodeJS.Timeout | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error(`"${action}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`), {
+      hint: 'The page may still be busy. Take a `snapshot` to see where it is.',
+    })), ACTION_TIMEOUT_MS);
+  });
   try {
-    const result = await agent.run(action, args);
+    const result = await Promise.race([agent.run(action, args), limit]);
     return { content: [{ type: 'text', text: result.text ? forMcp(result.text) : done }] };
   } catch (e) {
     const err = e as Error & { hint?: string };
     return { isError: true, content: [{ type: 'text', text: forMcp([err.message, err.hint].filter(Boolean).join('\n')) }] };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
