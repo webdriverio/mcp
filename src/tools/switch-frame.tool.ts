@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
-import { runAction, webAgent } from '../session/agent';
+import { runAction, agentFor } from '../session/agent';
 
 export const switchFrameToolDefinition: ToolDefinition = {
   name: 'switch_frame',
@@ -24,7 +24,7 @@ export const switchFrameTool: ToolCallback = async ({
 }: {
   selector?: string;
 }): Promise<CallToolResult> => {
-  const agent = await webAgent();
+  const agent = await agentFor();
   if (agent) {
     return runAction(agent, 'frame', { target: selector || 'top' }, selector ? `Switched to iframe: ${selector}` : 'Switched back to top-level frame');
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupOf, showAllTools, toolAppliesTo } from '../src/toolsets';
+import { GROUPS, groupOf, showAllTools, toolAppliesTo } from '../src/toolsets';
 
 describe('toolAppliesTo', () => {
   it('lists general tools everywhere', () => {
@@ -20,7 +20,15 @@ describe('toolAppliesTo', () => {
     expect(toolAppliesTo('snapshot', undefined)).toBe(true);
     expect(toolAppliesTo('perform_actions', undefined)).toBe(true);
     expect(toolAppliesTo('get_elements', undefined)).toBe(false);
-    expect(toolAppliesTo('snapshot', 'android')).toBe(false);
+  });
+
+  it('lists snapshot and perform_actions for apps too', () => {
+    for (const platform of ['ios', 'android'] as const) {
+      expect(toolAppliesTo('snapshot', platform)).toBe(true);
+      expect(toolAppliesTo('perform_actions', platform)).toBe(true);
+    }
+    expect(toolAppliesTo('select_option', 'android')).toBe(false);
+    expect(toolAppliesTo('press_key', 'ios')).toBe(false);
   });
 
   it('lists Electron tools only for Electron sessions', () => {
@@ -35,6 +43,11 @@ describe('groupOf', () => {
     expect(groupOf('set_cookie')).toBe('cookies');
     expect(groupOf('upload_app')).toBe('cloud-apps');
     expect(groupOf('click_element')).toBeUndefined();
+  });
+
+  it('keeps get_elements on demand', () => {
+    expect(groupOf('get_elements')).toBe('elements');
+    expect(GROUPS.elements.tools).toEqual(['get_elements']);
   });
 });
 

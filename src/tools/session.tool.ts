@@ -10,7 +10,7 @@ import { getProvider } from '../providers/registry';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { getElectronService } from '../electron/runtime.js';
-import { pageReport, webAgent } from '../session/agent';
+import { pageReport, agentFor } from '../session/agent';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -307,7 +307,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   }
 
   // set up before the first page loads, so it records that page too
-  const agent = await webAgent();
+  const agent = await agentFor();
   let page = '';
   if (navigationUrl) {
     await wdioBrowser.url(navigationUrl);

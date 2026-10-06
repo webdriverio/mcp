@@ -2,8 +2,10 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
-import { runAction, webAgent } from '../session/agent';
+import type { AgentActionName, AgentSession } from '@wdio/session/agent';
+import { runAction, agentFor } from '../session/agent';
 
+const noSession = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'No active session. Start one with start_session.' }] });
 const browserOnly = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'Only available in browser sessions.' }] });
 
 export const selectOptionToolDefinition: ToolDefinition = {
@@ -17,7 +19,7 @@ export const selectOptionToolDefinition: ToolDefinition = {
 };
 
 export const selectOptionTool: ToolCallback = async ({ selector, value }: { selector: string; value: string }) => {
-  const agent = await webAgent();
+  const agent = await agentFor();
   return agent ? runAction(agent, 'select', { target: selector, value }, `Selected ${JSON.stringify(value)}.`) : browserOnly();
 };
 
@@ -31,25 +33,25 @@ export const pressKeyToolDefinition: ToolDefinition = {
 };
 
 export const pressKeyTool: ToolCallback = async ({ keys }: { keys: string }) => {
-  const agent = await webAgent();
+  const agent = await agentFor();
   return agent ? runAction(agent, 'press', { keys }, `Pressed ${keys}.`) : browserOnly();
 };
 
-type Step = (selector?: string, value?: string) => [string, Record<string, unknown>];
-const STEP_ACTIONS: Record<'click' | 'fill' | 'select' | 'check' | 'uncheck' | 'press', Step> = {
-  click: (selector) => ['click', { target: selector }],
-  fill: (selector, value) => ['fill', { target: selector, text: value ?? '' }],
-  select: (selector, value) => ['select', { target: selector, value }],
-  check: (selector) => ['check', { target: selector }],
-  uncheck: (selector) => ['uncheck', { target: selector }],
-  press: (_selector, value) => ['press', { keys: value }],
-};
+type StepRunner = (agent: AgentSession, selector: string, value: string, done: string) => Promise<CallToolResult>;
+const STEP_ACTIONS = {
+  click: (agent, target, _value, done) => runAction(agent, 'click', { target }, done),
+  fill: (agent, target, text, done) => runAction(agent, 'fill', { target, text }, done),
+  select: (agent, target, value, done) => runAction(agent, 'select', { target, value }, done),
+  check: (agent, target, _value, done) => runAction(agent, 'check', { target }, done),
+  uncheck: (agent, target, _value, done) => runAction(agent, 'uncheck', { target }, done),
+  press: (agent, _target, keys, done) => runAction(agent, 'press', { keys }, done),
+} satisfies Partial<Record<AgentActionName, StepRunner>>;
 
 type StepAction = keyof typeof STEP_ACTIONS;
 
 export const performActionsToolDefinition: ToolDefinition = {
   name: 'perform_actions',
-  description: 'Runs several actions in one call, e.g. fill a form and submit it, and returns what each one changed. Stops at the first failure. value is the text for fill, the option for select and the keys for press.',
+  description: 'Runs several actions in one call, e.g. fill a form and submit it, on the page or app screen (select, check and uncheck are web-only), and returns what each one changed. Stops at the first failure. value is the text for fill, the option for select and the keys for press.',
   annotations: { title: 'Perform Actions', destructiveHint: false },
   inputSchema: {
     actions: z.array(z.object({
@@ -61,12 +63,11 @@ export const performActionsToolDefinition: ToolDefinition = {
 };
 
 export const performActionsTool: ToolCallback = async ({ actions }: { actions: { action: StepAction; selector?: string; value?: string }[] }) => {
-  const agent = await webAgent();
-  if (!agent) return browserOnly();
+  const agent = await agentFor();
+  if (!agent) return noSession();
   const out: string[] = [];
   for (const [i, step] of actions.entries()) {
-    const [action, args] = STEP_ACTIONS[step.action](step.selector, step.value);
-    const result = await runAction(agent, action, args, `${step.action} ${step.selector ?? step.value ?? ''}`.trim());
+    const result = await STEP_ACTIONS[step.action](agent, step.selector ?? '', step.value ?? '', `${step.action} ${step.selector ?? step.value ?? ''}`.trim());
     const text = result.content.map((c) => c.type === 'text' ? c.text : '').join('\n');
     if (result.isError) {
       const skipped = actions.length - i - 1;
