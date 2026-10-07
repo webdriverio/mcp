@@ -126,14 +126,15 @@ describe('browser tools', () => {
     expect(result.content[0].text).toBe('Clicked e2\n2 later actions skipped: the page changed (listbox "Country" [ref=e9]). Continue with the new refs.');
   });
 
-  it('perform_actions stops after a step that opens a dialog, as the change report words it', async () => {
+  it('perform_actions keeps going when a fill opens a dialog', async () => {
     startSession('browser');
     run.mockResolvedValueOnce({ text: 'Filled e9', changes: { kind: 'changed', added: ['Opened dialog "Choose Date" [ref=e40]', '  - button "Next Month" [ref=e42]'], omitted: 0 } });
+    run.mockResolvedValueOnce({ text: 'Filled e10' });
     const result = await call(performActionsTool, {
       actions: [{ action: 'fill', selector: 'e9', value: '21/11/2026' }, { action: 'fill', selector: 'e10', value: '23/11/2026' }],
     });
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(result.content[0].text).toContain('1 later action skipped: the page changed (Opened dialog "Choose Date" [ref=e40])');
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result.content[0].text).not.toContain('skipped');
   });
 
   it('perform_actions completes when only the last step opens a dialog', async () => {

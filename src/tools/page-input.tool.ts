@@ -60,7 +60,7 @@ function openedPopup(changes?: PageChange): string | undefined {
 
 export const performActionsToolDefinition: ToolDefinition = {
   name: 'perform_actions',
-  description: 'Runs several actions in one call, e.g. fill a form and submit it, on the page or app screen (select, check and uncheck are web-only), and returns what each one changed. Stops at the first failure, or when a step opens a dialog, listbox or menu (continue with the new refs). value is the text for fill, the option for select and the keys for press.',
+  description: 'Runs several actions in one call, e.g. fill a form and submit it, on the page or app screen (select, check and uncheck are web-only), and returns what each one changed. Stops at the first failure, or when a step other than fill opens a dialog, listbox or menu (continue with the new refs). value is the text for fill, the option for select and the keys for press.',
   annotations: { title: 'Perform Actions', destructiveHint: false },
   inputSchema: {
     actions: z.array(z.object({
@@ -84,7 +84,7 @@ export const performActionsTool: ToolCallback = async ({ actions }: { actions: {
       return { isError: true, content: [{ type: 'text', text: [...out, `✖ ${step.action} ${step.selector ?? ''}: ${text}`, skipped ? `${skipped} later action${skipped === 1 ? '' : 's'} skipped.` : ''].filter(Boolean).join('\n') }] } as CallToolResult;
     }
     out.push(text);
-    const popup = i < actions.length - 1 ? openedPopup(changes) : undefined;
+    const popup = i < actions.length - 1 && step.action !== 'fill' ? openedPopup(changes) : undefined;
     if (popup) {
       const skipped = actions.length - i - 1;
       out.push(`${skipped} later action${skipped === 1 ? '' : 's'} skipped: the page changed (${popup}). Continue with the new refs.`);

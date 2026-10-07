@@ -755,7 +755,7 @@ The server lists only the tools that fit the current session: browser sessions g
 | `set_value`       | Replace the text of an input or textarea                                                            |
 | `select_option`   | Select an option of a `<select>` by its text; for several steps use `perform_actions`. Browser-only. |
 | `press_key`       | Press a key or combination (`Enter`, `Control+a`) in the focused element, optionally `times` (1-100) to repeat it; for several steps use `perform_actions`. Browser-only. |
-| `perform_actions` | Run several clicks, fills, selects, checks and key presses (`press` accepts `times` to repeat) in one call; stops at the first failure or when a step opens a dialog, listbox or menu. Works for apps too (select, check and uncheck are web-only). |
+| `perform_actions` | Run several clicks, fills, selects, checks and key presses (`press` accepts `times` to repeat) in one call; stops at the first failure or when a step other than fill opens a dialog, listbox or menu. Works for apps too (select, check and uncheck are web-only). |
 
 `click_element`, `set_value`, `tap_element` and `perform_actions` take a ref from `snapshot` (`e12`) as well as a selector, in browsers and apps, and each result lists what the action changed on the page or screen: new or changed elements with their refs, or the page it navigated to. An agent rarely needs a separate screenshot or snapshot to see the effect.
 
