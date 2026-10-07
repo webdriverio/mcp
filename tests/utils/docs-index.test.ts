@@ -268,6 +268,41 @@ describe('chunkCorpus', () => {
     expect(chunks.map((c) => c.path)).toEqual([null, '/docs/usage.md']);
   });
 
+  it('resyncs when the corpus moves a page earlier than its TOC position', () => {
+    const text = [
+      '# Docs',
+      '',
+      '- [A](/docs/a.md)',
+      '- [B](/docs/b.md)',
+      '- [C](/docs/c.md)',
+      '- [D](/docs/d.md)',
+      '',
+      '# Full Documentation Content',
+      '',
+      '# A', '', 'body', '',
+      '# C', '', 'body', '',
+      '# B', '', 'body', '',
+      '# D', '', 'body', '',
+    ].join('\n');
+    expect(chunkCorpus(text).map((c) => c.path)).toEqual(['/docs/a.md', '/docs/c.md', '/docs/b.md', '/docs/d.md']);
+  });
+
+  it('does not desync later pages after a page without a TOC entry', () => {
+    const text = [
+      '# Docs',
+      '',
+      '- [A](/docs/a.md)',
+      '- [B](/docs/b.md)',
+      '',
+      '# Full Documentation Content',
+      '',
+      '# A', '', 'body', '',
+      '# Unlisted', '', 'body', '',
+      '# B', '', 'body', '',
+    ].join('\n');
+    expect(chunkCorpus(text).map((c) => c.path)).toEqual(['/docs/a.md', null, '/docs/b.md']);
+  });
+
   it('assigns every page a distinct page id', () => {
     const pages = chunkCorpus(FIXTURE).map((c) => c.page);
     expect(pages).toEqual([...pages].sort((a, b) => a - b));
@@ -423,6 +458,36 @@ describe('pageBySlug', () => {
   });
 });
 
+describe('title-term boost', () => {
+  const OVERVIEW = [
+    '# Docs',
+    '',
+    '- [MCP (Model Context Protocol)](/docs/mcp.md)',
+    '- [Transport](/docs/mcp/transport.md)',
+    '- [Setup](/docs/setup.md)',
+    '',
+    '# Full Documentation Content',
+    '',
+    '# MCP (Model Context Protocol)',
+    '',
+    'The MCP server speaks several transport options.',
+    '',
+    '# Transport',
+    '',
+    'stdio and http.',
+    '',
+    '# Setup',
+    '',
+    'install the package and run the tests',
+    '',
+  ].join('\n');
+
+  it('ranks the page titled by a query term above an overview that only mentions it', () => {
+    const hits = search(buildIndex(OVERVIEW), 'mcp transport', 5, DEMOTE);
+    expect(hits[0].path).toBe('/docs/mcp/transport.md');
+  });
+});
+
 describe('search demotion', () => {
   const MIXED = [
     '# Docs',
@@ -508,8 +573,9 @@ describe('live corpus (optional)', () => {
   const liveIndex = getIndex(liveText);
 
   it.skipIf(!available)('chunks cleanly and resolves one path per page', () => {
-    expect(liveChunks.length).toBeGreaterThanOrEqual(550);
-    expect(liveChunks.length).toBeLessThanOrEqual(650);
+    const entryCount = tocEntries(liveText).length;
+    expect(liveChunks.length).toBeGreaterThanOrEqual(entryCount);
+    expect(liveChunks.length).toBeLessThanOrEqual(Math.ceil(entryCount * 1.8));
     const titles = new Set(liveChunks.map((c) => c.title));
     for (const phantom of ['Bad - Class that might change', 'Add Tauri to Cargo.toml', 'or', 'By default, Powershell uses TLS 1.0 the site security requires TLS 1.2']) {
       expect(titles.has(phantom)).toBe(false);
@@ -533,7 +599,7 @@ describe('live corpus (optional)', () => {
     for (const paths of byPage.values()) {
       expect(new Set(paths).size).toBe(1);
     }
-    expect(new Set(liveChunks.map((c) => c.path).filter(Boolean)).size).toBe(434);
+    expect(new Set(liveChunks.map((c) => c.path).filter(Boolean)).size).toBe(tocEntries(liveText).length);
   });
 
   it.skipIf(!available)('gives the two waitUntil pages different paths', () => {
