@@ -108,7 +108,14 @@ function createServer(): McpServer {
     description: pkg.description,
     websiteUrl: 'https://github.com/webdriverio/mcp',
   }, {
-    instructions: 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.',
+    instructions: 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.' + [
+      '',
+      'Workflow:',
+      '- snapshot, then act with refs.',
+      '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
+      '- Read text, prices or tables from the snapshot (full: true shows all text), not execute_script.',
+      '- Refs from the latest result stay valid until the page changes.',
+    ].join('\n'),
     capabilities: {
       tools: {},
       resources: {},

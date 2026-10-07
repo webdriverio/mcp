@@ -114,6 +114,38 @@ describe('browser tools', () => {
     expect(result.content[0].text).toBe('Filled e2\n✖ click e99: e99 was never assigned in this session.\n1 later action skipped.');
   });
 
+  it('perform_actions stops after a step that opens a listbox', async () => {
+    startSession('browser');
+    run.mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'changed', added: ['listbox "Country" [ref=e9]', 'option "Austria" [ref=e10]'], omitted: 0 } });
+    const result = await call(performActionsTool, {
+      actions: [{ action: 'click', selector: 'e2' }, { action: 'click', selector: 'e10' }, { action: 'press', value: 'Enter' }],
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toBe('Clicked e2\n2 later actions skipped: the page changed (listbox "Country" [ref=e9]). Continue with the new refs.');
+  });
+
+  it('perform_actions stops after a step that opens a dialog, as the change report words it', async () => {
+    startSession('browser');
+    run.mockResolvedValueOnce({ text: 'Filled e9', changes: { kind: 'changed', added: ['Opened dialog "Choose Date" [ref=e40]', '  - button "Next Month" [ref=e42]'], omitted: 0 } });
+    const result = await call(performActionsTool, {
+      actions: [{ action: 'fill', selector: 'e9', value: '21/11/2026' }, { action: 'fill', selector: 'e10', value: '23/11/2026' }],
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.content[0].text).toContain('1 later action skipped: the page changed (Opened dialog "Choose Date" [ref=e40])');
+  });
+
+  it('perform_actions completes when only the last step opens a dialog', async () => {
+    startSession('browser');
+    run
+      .mockResolvedValueOnce({ text: 'Filled e2' })
+      .mockResolvedValueOnce({ text: 'Clicked e3', changes: { kind: 'changed', added: ['dialog "Confirm" [ref=e8]'], omitted: 0 } });
+    const result = await call(performActionsTool, { actions: [{ action: 'fill', selector: 'e2', value: 'Ada' }, { action: 'click', selector: 'e3' }] });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toBe('Filled e2\nClicked e3');
+  });
+
   it('perform_actions runs on app sessions and surfaces NOT_SUPPORTED from the agent', async () => {
     startSession('android');
     run.mockRejectedValue(new SessionError('NOT_SUPPORTED', '"check" is not supported for Android sessions.'));
