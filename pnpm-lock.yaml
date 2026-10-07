@@ -30,13 +30,13 @@ importers:
         version: 2.3.1
       '@wdio/electron-service':
         specifier: 10.3.0
-        version: 10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)
+        version: 10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)
       '@wdio/protocols':
-        specifier: 10.1.0-alpha.26
-        version: 10.1.0-alpha.26
+        specifier: 10.1.0-alpha.30
+        version: 10.1.0-alpha.30
       '@wdio/session':
-        specifier: 10.1.0-alpha.26
-        version: 10.1.0-alpha.26(@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0))(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(puppeteer-core@24.43.1)(tsx@4.23.13)(yauzl@3.4.0)
+        specifier: 10.1.0-alpha.30
+        version: 10.1.0-alpha.30(@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0))(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(puppeteer-core@24.43.1)(tsx@4.23.13)(yauzl@3.4.0)
       '@xmldom/xmldom':
         specifier: ^0.9.10
         version: 0.9.12
@@ -56,8 +56,8 @@ importers:
         specifier: ^1.1.18
         version: 1.1.20
       webdriverio:
-        specifier: 10.1.0-alpha.26
-        version: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+        specifier: 10.1.0-alpha.30
+        version: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
       xpath:
         specifier: ^0.0.34
         version: 0.0.34
@@ -84,8 +84,8 @@ importers:
         specifier: ^0.1.3
         version: 0.1.3(@typescript-eslint/eslint-plugin@8.57.2(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@wdio/types':
-        specifier: 10.1.0-alpha.26
-        version: 10.1.0-alpha.26
+        specifier: 10.1.0-alpha.30
+        version: 10.1.0-alpha.30
       eslint:
         specifier: ^9.39.4
         version: 9.39.4(jiti@2.7.0)
@@ -1697,12 +1697,12 @@ packages:
   '@vitest/utils@5.0.3':
     resolution: {integrity: sha512-77fDTZv8eu1CzlIfgPU2yrl5MXSUaUAOvgdZEeVm3X3WIxUubIX2SforqS6176lT32HCF6uBVMYVqfHxw7o6eg==}
 
-  '@wdio/config@10.1.0-alpha.26':
-    resolution: {integrity: sha512-zaItt3bOIrejOCrdB6XqMzWoMr+VjyiMdZWokbp8Z5PGVU9mLuwl7GoMw/CuloMPL3n64OaqiPMwfw1xk6xAlg==}
+  '@wdio/config@10.1.0-alpha.30':
+    resolution: {integrity: sha512-BoHzekmIl5wfLHVOJIpO9PSDKkjs2WaV+oUiRTbW7KS0tmfAIjvEGkl+BANY3ranHaehy0I9vyGr7DKuUy0+bQ==}
     engines: {node: '>=22.19.0'}
 
-  '@wdio/display-server@10.1.0-alpha.26':
-    resolution: {integrity: sha512-xxJX3fqW8lcjLNW0t39auTZyugLmxcbnpnDITrlUIzDGkotKgXVax3VPueVqXRXGTEm0Fm+XZqyuImcEINioKA==}
+  '@wdio/display-server@10.1.0-alpha.30':
+    resolution: {integrity: sha512-vQ6Rdyno7vETPigl2QuJqxZpBix9M1JWZhwdSU19uHgpPEY1zM26B4VDPoC+nBDh9xjXdGjotp0PhEq6gQYczg==}
     engines: {node: '>=22.19.0'}
 
   '@wdio/electron-service@10.3.0':
@@ -1725,8 +1725,8 @@ packages:
       expect-webdriverio: ^5.6.5
       webdriverio: ^9.0.0
 
-  '@wdio/logger@10.1.0-alpha.26':
-    resolution: {integrity: sha512-lMdTlIs5N7tP7ngxp+5v0b2ONIl/4AWeqDVEtLHXBGDaW2Q9ULP7PTsKrOGvh747Dsxw+XHQcAfd4JqFL0xLiQ==}
+  '@wdio/logger@10.1.0-alpha.30':
+    resolution: {integrity: sha512-lH855GAMOqVDTtmOsG0gxrHdGQSKcLbSbKb7PIEQI0I1FczA1fq54mRvaIUUCHGGFdb1EOUFqx9Yb2RVZ7YCMg==}
     engines: {node: '>=22.19.0'}
 
   '@wdio/logger@9.29.1':
@@ -1754,16 +1754,16 @@ packages:
       tsx:
         optional: true
 
-  '@wdio/protocols@10.1.0-alpha.26':
-    resolution: {integrity: sha512-x12caVyar5XlqFOq9MyxRb2SVKTP+1WOoo/A7PCOVbEa0xWRvyawnmzUTGXJvIhqcC1NnjF0YMgeO6aG9nlJ2w==}
+  '@wdio/protocols@10.1.0-alpha.30':
+    resolution: {integrity: sha512-lNGSP6utLPYU0cayMGDjESuC0WQX1Ir4VtH9f7upKIOMKkfhDJwk0rrsiQ4Ubk1t383/D4Pt/oFpEHiMt/vatA==}
     engines: {node: '>=22.19.0'}
 
-  '@wdio/repl@10.1.0-alpha.26':
-    resolution: {integrity: sha512-d9TP++KyV2ckdPwoZP7TvDx/5NPUpXni0R46YwKcHEJTlfGkQcGD4SsjIQAy7B7Ey6VCpP4BjJbj3G7GvpbCmw==}
+  '@wdio/repl@10.1.0-alpha.30':
+    resolution: {integrity: sha512-EuD7VLocw2OVHurSK9R2skTCGC5+J1Bl/XZvXABcLBY/KORF8RkfyhpXIuppw7oL5kpDW6PWeS5R+kRdz0DxgQ==}
     engines: {node: '>=22.19.0'}
 
-  '@wdio/session@10.1.0-alpha.26':
-    resolution: {integrity: sha512-KwKul23pcH9xoJmQ747MLzrw/cfXEbaqFH8u20TwnkRHSZ8nf+ESphjpFrpiiyKjDFowtir0NXj8ixvKgCg24g==}
+  '@wdio/session@10.1.0-alpha.30':
+    resolution: {integrity: sha512-mwX09YHEvqq9F/e+cDwvyaC4uRUrfYa3KirZUelnExVPIQpZIR9f47vA+BdWrlrDx/PNHsrLdDkqvWqlf2MfMQ==}
     engines: {node: '>=22.19.0'}
     hasBin: true
     peerDependencies:
@@ -1784,16 +1784,16 @@ packages:
       tsx:
         optional: true
 
-  '@wdio/snapshot@10.1.0-alpha.26':
-    resolution: {integrity: sha512-fP/CNZrlyDV0bhR8Dd6VQSyotpWdPo9en6B0l8gH3D2zYuGfWDRnKZ9i5F44sODcZa7GO4zb0bOPaK03hmeZTw==}
+  '@wdio/snapshot@10.1.0-alpha.30':
+    resolution: {integrity: sha512-XnDdnUbt/rGsPnZPq0a3fmYWZGruPr5lj9l49Y+3izp/PbLVpktWB3S+25GbCHP9QPzp50TjX8ZOmEsPCdRtgA==}
     engines: {node: '>=22.19.0'}
 
-  '@wdio/types@10.1.0-alpha.26':
-    resolution: {integrity: sha512-Caann9r3UFEumr6qsr2yJW1nUTK1zVGc1pdRfkOR9RKzl/ofoCVRZbTpiVsIW3Cv24P8WM1cJJ7+NZmm2HQS0A==}
+  '@wdio/types@10.1.0-alpha.30':
+    resolution: {integrity: sha512-5Ir0beDVa45kzxlUgLf21XQ4xmFVpB8WbNRZBuqUVx/eZ9bGJMZBbCVLov/xRmbmFAlZJ0D1lHD2UYld85IHbw==}
     engines: {node: '>=22.19.0'}
 
-  '@wdio/utils@10.1.0-alpha.26':
-    resolution: {integrity: sha512-WA0+8OBeLHFRosjl4u5fw/TavKTUQwGGs+YDLDi0HVkIToJH7REPZoSTW49wzUa5n4cVCOibRYn+wflIBrDhpg==}
+  '@wdio/utils@10.1.0-alpha.30':
+    resolution: {integrity: sha512-SCjLCEywvuTKcDnkDkV0MQCQZ8jj92ToNQh1CWt93BnCwHl3xFbdV5HenzArIZI2ss2/IgVjgxsSOVNIMZ8Tfg==}
     engines: {node: '>=22.19.0'}
 
   '@xmldom/xmldom@0.9.12':
@@ -4684,12 +4684,12 @@ packages:
   webdriver-bidi-protocol@0.4.3:
     resolution: {integrity: sha512-uuN0goWfxP22B7J/uAgBpOYNPttC+XVseYE+rSY5+rQ+YBeVz/VORw8WbmLVcqW78zNg5A4qnjNXYUWR3il2ig==}
 
-  webdriver@10.1.0-alpha.26:
-    resolution: {integrity: sha512-ruCcgJdVyNjp+oWP9ZZZzCKGvnLUfUcKa3zJmPUFfaCRohbRBi+s6bAmHRGB5uLmdewc3HJKHvorcBi1YupC9A==}
+  webdriver@10.1.0-alpha.30:
+    resolution: {integrity: sha512-7CYSNM2dwSdHs4BS67KgtAQe0TRPUqF60fASywV9sI1FJp7Ef5cl5g98ANdm0M9w7yvc/Sv7n+qZcjO9bW9gyw==}
     engines: {node: '>=22.19.0'}
 
-  webdriverio@10.1.0-alpha.26:
-    resolution: {integrity: sha512-ra3lCIJIRtc5wj2Y4Z3hxIr3uE5QBiT5rVtR5YYbvXRKP/OdL3BkVbUP5ASj2L78RFn58nTBvUQhni4g1aEy1w==}
+  webdriverio@10.1.0-alpha.30:
+    resolution: {integrity: sha512-c4XfB4D+kbaUe0OWFJ0QOXXoyNld1RJ9LZgEXHTAJohg24T9XwWVR+aV6AdvkkWBkM/CNX94Xb8ludldSt+AEA==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
       puppeteer-core: '>=24 <26'
@@ -6159,11 +6159,11 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.1
 
-  '@wdio/config@10.1.0-alpha.26(yauzl@3.4.0)':
+  '@wdio/config@10.1.0-alpha.30(yauzl@3.4.0)':
     dependencies:
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/types': 10.1.0-alpha.26
-      '@wdio/utils': 10.1.0-alpha.26(yauzl@3.4.0)
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/types': 10.1.0-alpha.30
+      '@wdio/utils': 10.1.0-alpha.30(yauzl@3.4.0)
       deepmerge-ts: 8.0.2
       glob: 10.5.0
       import-meta-resolve: 4.2.0
@@ -6173,17 +6173,17 @@ snapshots:
       - supports-color
       - yauzl
 
-  '@wdio/display-server@10.1.0-alpha.26':
+  '@wdio/display-server@10.1.0-alpha.30':
     dependencies:
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/types': 10.1.0-alpha.26
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/types': 10.1.0-alpha.30
 
-  '@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)':
+  '@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)':
     dependencies:
       '@babel/parser': 8.0.4
       '@electron/fuses': 2.1.3
       '@electron/packager': 20.3.0
-      '@wdio/globals': 9.29.1(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))
+      '@wdio/globals': 9.29.1(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))
       '@wdio/logger': 9.29.1
       '@wdio/native-cdp-bridge': 1.2.0(tsx@4.23.13)
       '@wdio/native-core': 1.2.0(tsx@4.23.13)
@@ -6198,7 +6198,7 @@ snapshots:
       get-port: 7.2.0
       puppeteer-core: 25.10.0(yauzl@3.4.0)
       recast: 0.24.0
-      webdriverio: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      webdriverio: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
       yaml: 2.9.0
     transitivePeerDependencies:
       - bufferutil
@@ -6225,12 +6225,12 @@ snapshots:
       - supports-color
       - typescript
 
-  '@wdio/globals@9.29.1(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))':
+  '@wdio/globals@9.29.1(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))':
     dependencies:
-      expect-webdriverio: 8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))
-      webdriverio: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      expect-webdriverio: 8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))
+      webdriverio: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
 
-  '@wdio/logger@10.1.0-alpha.26':
+  '@wdio/logger@10.1.0-alpha.30':
     dependencies:
       chalk: 5.6.2
       loglevel: 1.9.2
@@ -6285,31 +6285,31 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@wdio/protocols@10.1.0-alpha.26': {}
+  '@wdio/protocols@10.1.0-alpha.30': {}
 
-  '@wdio/repl@10.1.0-alpha.26':
+  '@wdio/repl@10.1.0-alpha.30':
     dependencies:
       '@types/node': 22.20.5
 
-  '@wdio/session@10.1.0-alpha.26(@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0))(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(puppeteer-core@24.43.1)(tsx@4.23.13)(yauzl@3.4.0)':
+  '@wdio/session@10.1.0-alpha.30(@wdio/electron-service@10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0))(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(puppeteer-core@24.43.1)(tsx@4.23.13)(yauzl@3.4.0)':
     dependencies:
       '@types/node': 22.20.5
-      '@wdio/config': 10.1.0-alpha.26(yauzl@3.4.0)
-      '@wdio/display-server': 10.1.0-alpha.26
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/snapshot': 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
-      '@wdio/types': 10.1.0-alpha.26
-      '@wdio/utils': 10.1.0-alpha.26(yauzl@3.4.0)
+      '@wdio/config': 10.1.0-alpha.30(yauzl@3.4.0)
+      '@wdio/display-server': 10.1.0-alpha.30
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/snapshot': 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      '@wdio/types': 10.1.0-alpha.30
+      '@wdio/utils': 10.1.0-alpha.30(yauzl@3.4.0)
       acorn: 8.16.0
       get-port: 7.2.0
       image-size: 2.0.4
       picomatch: 4.0.7
       semver: 7.8.5
-      webdriverio: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      webdriverio: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
       yargs: 18.2.0
     optionalDependencies:
-      '@wdio/electron-service': 10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)
-      expect-webdriverio: 8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0))
+      '@wdio/electron-service': 10.3.0(expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)))(tsx@4.23.13)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))(yauzl@3.4.0)
+      expect-webdriverio: 8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0))
       tsx: 4.23.13
     transitivePeerDependencies:
       - bare-abort-controller
@@ -6322,10 +6322,10 @@ snapshots:
       - utf-8-validate
       - yauzl
 
-  '@wdio/snapshot@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)':
+  '@wdio/snapshot@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)':
     dependencies:
-      '@wdio/utils': 10.1.0-alpha.26(yauzl@3.4.0)
-      webdriverio: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      '@wdio/utils': 10.1.0-alpha.30(yauzl@3.4.0)
+      webdriverio: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -6337,16 +6337,16 @@ snapshots:
       - utf-8-validate
       - yauzl
 
-  '@wdio/types@10.1.0-alpha.26':
+  '@wdio/types@10.1.0-alpha.30':
     dependencies:
       '@types/node': 22.20.5
 
-  '@wdio/utils@10.1.0-alpha.26(yauzl@3.4.0)':
+  '@wdio/utils@10.1.0-alpha.30(yauzl@3.4.0)':
     dependencies:
       '@puppeteer/browsers': 3.2.2(yauzl@3.4.0)
       '@types/split2': 4.2.3
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/types': 10.1.0-alpha.26
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/types': 10.1.0-alpha.30
       aria-query: 5.3.2
       decamelize: 6.0.1
       deepmerge-ts: 8.0.2
@@ -7417,14 +7417,14 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.26)(webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)):
+  expect-webdriverio@8.0.0-alpha.3(@wdio/types@10.1.0-alpha.30)(webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)):
     dependencies:
       '@vitest/snapshot': 5.0.3
-      '@wdio/types': 10.1.0-alpha.26
+      '@wdio/types': 10.1.0-alpha.30
       deep-eql: 5.0.2
       expect: 30.5.2
       jest-matcher-utils: 30.5.2
-      webdriverio: 10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0)
+      webdriverio: 10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0)
 
   expect@30.5.2:
     dependencies:
@@ -9465,15 +9465,15 @@ snapshots:
 
   webdriver-bidi-protocol@0.4.3: {}
 
-  webdriver@10.1.0-alpha.26(yauzl@3.4.0):
+  webdriver@10.1.0-alpha.30(yauzl@3.4.0):
     dependencies:
       '@types/node': 22.20.5
       '@types/ws': 8.18.1
-      '@wdio/config': 10.1.0-alpha.26(yauzl@3.4.0)
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/protocols': 10.1.0-alpha.26
-      '@wdio/types': 10.1.0-alpha.26
-      '@wdio/utils': 10.1.0-alpha.26(yauzl@3.4.0)
+      '@wdio/config': 10.1.0-alpha.30(yauzl@3.4.0)
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/protocols': 10.1.0-alpha.30
+      '@wdio/types': 10.1.0-alpha.30
+      '@wdio/utils': 10.1.0-alpha.30(yauzl@3.4.0)
       deepmerge-ts: 8.0.2
       https-proxy-agent: 7.0.6
       undici: 8.11.2
@@ -9485,16 +9485,16 @@ snapshots:
       - utf-8-validate
       - yauzl
 
-  webdriverio@10.1.0-alpha.26(puppeteer-core@24.43.1)(yauzl@3.4.0):
+  webdriverio@10.1.0-alpha.30(puppeteer-core@24.43.1)(yauzl@3.4.0):
     dependencies:
       '@types/node': 22.20.5
       '@types/sinonjs__fake-timers': 8.1.5
-      '@wdio/config': 10.1.0-alpha.26(yauzl@3.4.0)
-      '@wdio/logger': 10.1.0-alpha.26
-      '@wdio/protocols': 10.1.0-alpha.26
-      '@wdio/repl': 10.1.0-alpha.26
-      '@wdio/types': 10.1.0-alpha.26
-      '@wdio/utils': 10.1.0-alpha.26(yauzl@3.4.0)
+      '@wdio/config': 10.1.0-alpha.30(yauzl@3.4.0)
+      '@wdio/logger': 10.1.0-alpha.30
+      '@wdio/protocols': 10.1.0-alpha.30
+      '@wdio/repl': 10.1.0-alpha.30
+      '@wdio/types': 10.1.0-alpha.30
+      '@wdio/utils': 10.1.0-alpha.30(yauzl@3.4.0)
       archiver: 8.0.0
       aria-query: 5.3.2
       cheerio: 1.2.0
@@ -9509,7 +9509,7 @@ snapshots:
       rgb2hex: 0.2.5
       serialize-error: 12.0.0
       urlpattern-polyfill: 10.1.0
-      webdriver: 10.1.0-alpha.26(yauzl@3.4.0)
+      webdriver: 10.1.0-alpha.30(yauzl@3.4.0)
     optionalDependencies:
       puppeteer-core: 24.43.1
     transitivePeerDependencies:
