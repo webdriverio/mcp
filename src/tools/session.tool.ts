@@ -7,6 +7,7 @@ import type { SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { getProvider } from '../providers/registry';
+import { matchHeadedUserAgent } from '../providers/local-browser.provider';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { getElectronService } from '../electron/runtime.js';
@@ -273,6 +274,9 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     : undefined;
 
   const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
+  if (effectiveHeadless && (args.provider ?? 'local') === 'local' && (browser === 'chrome' || browser === 'edge')) {
+    await matchHeadedUserAgent(wdioBrowser).catch(() => undefined);
+  }
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 

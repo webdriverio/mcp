@@ -29,22 +29,23 @@ export const pressKeyToolDefinition: ToolDefinition = {
   annotations: { title: 'Press Key', destructiveHint: false },
   inputSchema: {
     keys: z.string().describe('Key or combination'),
+    times: z.number().int().min(1).max(100).optional().describe('Press it this many times, e.g. to move a slider'),
   },
 };
 
-export const pressKeyTool: ToolCallback = async ({ keys }: { keys: string }) => {
+export const pressKeyTool: ToolCallback = async ({ keys, times }: { keys: string; times?: number }) => {
   const agent = await agentFor();
-  return agent ? runAction(agent, 'press', { keys }, `Pressed ${keys}.`) : browserOnly();
+  return agent ? runAction(agent, 'press', { keys, times }, `Pressed ${keys}${times && times > 1 ? ` ${times} times` : ''}.`) : browserOnly();
 };
 
-type StepRunner = (agent: AgentSession, selector: string, value: string, done: string) => ReturnType<typeof runActionWithChanges>;
+type StepRunner = (agent: AgentSession, selector: string, value: string, done: string, times?: number) => ReturnType<typeof runActionWithChanges>;
 const STEP_ACTIONS = {
   click: (agent, target, _value, done) => runActionWithChanges(agent, 'click', { target }, done),
   fill: (agent, target, text, done) => runActionWithChanges(agent, 'fill', { target, text }, done),
   select: (agent, target, value, done) => runActionWithChanges(agent, 'select', { target, value }, done),
   check: (agent, target, _value, done) => runActionWithChanges(agent, 'check', { target }, done),
   uncheck: (agent, target, _value, done) => runActionWithChanges(agent, 'uncheck', { target }, done),
-  press: (agent, _target, keys, done) => runActionWithChanges(agent, 'press', { keys }, done),
+  press: (agent, _target, keys, done, times) => runActionWithChanges(agent, 'press', { keys, times }, done),
 } satisfies Partial<Record<AgentActionName, StepRunner>>;
 
 type StepAction = keyof typeof STEP_ACTIONS;
@@ -67,16 +68,17 @@ export const performActionsToolDefinition: ToolDefinition = {
       action: z.enum(Object.keys(STEP_ACTIONS) as [StepAction, ...StepAction[]]),
       selector: z.string().optional().describe('Ref (e12) or selector'),
       value: z.string().optional(),
+      times: z.number().int().min(1).max(100).optional().describe('press only: repeat count'),
     })).min(1),
   },
 };
 
-export const performActionsTool: ToolCallback = async ({ actions }: { actions: { action: StepAction; selector?: string; value?: string }[] }) => {
+export const performActionsTool: ToolCallback = async ({ actions }: { actions: { action: StepAction; selector?: string; value?: string; times?: number }[] }) => {
   const agent = await agentFor();
   if (!agent) return noSession();
   const out: string[] = [];
   for (const [i, step] of actions.entries()) {
-    const { result, changes } = await STEP_ACTIONS[step.action](agent, step.selector ?? '', step.value ?? '', `${step.action} ${step.selector ?? step.value ?? ''}`.trim());
+    const { result, changes } = await STEP_ACTIONS[step.action](agent, step.selector ?? '', step.value ?? '', `${step.action} ${step.selector ?? step.value ?? ''}`.trim(), step.times);
     const text = result.content.map((c) => c.type === 'text' ? c.text : '').join('\n');
     if (result.isError) {
       const skipped = actions.length - i - 1;

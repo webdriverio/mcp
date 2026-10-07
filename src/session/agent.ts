@@ -26,7 +26,7 @@ export function agentFor(): Promise<AgentSession> | undefined {
 }
 
 /** longest a single page action may take before the agent gets the turn back */
-const ACTION_TIMEOUT_MS = 90_000;
+const ACTION_TIMEOUT_MS = 30_000;
 
 export function errorResult(e: unknown): CallToolResult {
   const message = e instanceof Error ? e.message : String(e);
