@@ -274,8 +274,15 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     : undefined;
 
   const wdioBrowser = await remote({ ...connectionConfig, capabilities: mergedCapabilities });
+  let userAgentNote = '';
   if (effectiveHeadless && (args.provider ?? 'local') === 'local' && (browser === 'chrome' || browser === 'edge')) {
-    await matchHeadedUserAgent(wdioBrowser).catch(() => undefined);
+    try {
+      await matchHeadedUserAgent(wdioBrowser);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      console.error(`[WARN] Headless user agent not overridden: ${reason}`);
+      userAgentNote = `\nNote: Headless user agent not overridden: ${reason}`;
+    }
   }
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
@@ -335,7 +342,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
       sizeNote.trim(),
       reportNote.trim(),
     ].filter(Boolean).join('\n')
-    : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${reportNote}`;
+    : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${userAgentNote}${reportNote}`;
 
   const text = page ? `${startMessage}\n${page}` : startMessage;
 

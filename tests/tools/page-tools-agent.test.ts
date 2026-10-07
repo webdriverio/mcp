@@ -33,6 +33,13 @@ describe('set_geolocation', () => {
     expect(result.isError).toBeUndefined();
   });
 
+  it('calls setGeoLocation directly on web when an altitude is given', async () => {
+    const result = await call(setGeolocationTool, { latitude: 52.52, longitude: 13.405, altitude: 34 });
+    expect(browser.setGeoLocation).toHaveBeenCalledWith({ latitude: 52.52, longitude: 13.405, altitude: 34 });
+    expect(run).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('Altitude: 34m');
+  });
+
   it('keeps setGeoLocation on mobile', async () => {
     browser.isMobile = true;
     await call(setGeolocationTool, { latitude: 1, longitude: 2, altitude: 3 });
@@ -48,6 +55,41 @@ describe('execute_script', () => {
     expect(scope.execute).toHaveBeenCalledWith('return document.title');
     expect(browser.execute).not.toHaveBeenCalled();
     expect(result.content[0].text).toBe('Result: inside');
+  });
+
+  describe('await wrapping', () => {
+    const wrapped = (script: string) => `return (async () => {\n${script}\n})()`;
+    const ranAs = async (script: string) => {
+      scope.execute.mockResolvedValue(1);
+      await call(executeScriptTool, { script });
+      return scope.execute.mock.calls[0][0];
+    };
+
+    it('wraps a statement script that has a parenthesized await expression', async () => {
+      const script = '(window.r = await Promise.resolve(1)); return window.r;';
+      expect(await ranAs(script)).toBe(wrapped(script));
+    });
+
+    it('wraps statements after a function declaration', async () => {
+      const script = 'function f(){}; await f(); return 1';
+      expect(await ranAs(script)).toBe(wrapped(script));
+    });
+
+    it('wraps a plain top-level await', async () => {
+      expect(await ranAs('return await fetch("/a")')).toBe(wrapped('return await fetch("/a")'));
+    });
+
+    it.each([
+      'async () => { await fetch("/a"); return 1; }',
+      'async function f() { return await x(); }',
+      'async x => await x',
+    ])('passes %s through unchanged', async (script) => {
+      expect(await ranAs(script)).toBe(script);
+    });
+
+    it('leaves scripts without await alone', async () => {
+      expect(await ranAs('return 1')).toBe('return 1');
+    });
   });
 
   it('falls back to the browser without an agent', async () => {

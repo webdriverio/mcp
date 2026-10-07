@@ -3,9 +3,8 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import type { AgentActionName, AgentSession, PageChange } from '@wdio/session/agent';
-import { runAction, runActionWithChanges, agentFor } from '../session/agent';
+import { runAction, runActionWithChanges, agentFor, noSession } from '../session/agent';
 
-const noSession = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'No active session. Start one with start_session.' }] });
 const browserOnly = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'Only available in browser sessions.' }] });
 
 export const selectOptionToolDefinition: ToolDefinition = {

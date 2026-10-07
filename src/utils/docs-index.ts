@@ -171,25 +171,44 @@ export function pathOf(slug: string): string {
 }
 
 // Corpus pages follow the TOC's order, but some pages have no TOC entry and the live
-// corpus moves a few pages relative to the TOC, so a title→paths map hands both `waitUntil`
-// pages both paths and strict lockstep strands every later entry after one move. Matching
-// in order within a bounded look-ahead resyncs; duplicate titles still take entries in order.
+// corpus moves a few pages relative to the TOC. A page takes the entry at the pointer when
+// the titles match. Otherwise it is either unlisted or the pointer entry has moved, and
+// it looks ahead for its own entry only when the pointer entry's title no longer shows up
+// among the next RESYNC_WINDOW corpus pages, or when no later page repeats its own title
+// (a page that moved earlier). A repeated title never lets an unlisted page take the
+// path of the listed page that follows it.
 function resolvePagePaths(chunks: DocChunk[], entries: TocEntry[]): { matched: number; leftover: number } {
+  const pages: { page: number; title: string }[] = [];
   const seen = new Set<number>();
+  for (const chunk of chunks) {
+    if (seen.has(chunk.page)) { continue; }
+    seen.add(chunk.page);
+    pages.push({ page: chunk.page, title: chunk.title });
+  }
   const used = new Array<boolean>(entries.length).fill(false);
   const pagePaths = new Map<number, string>();
   let ptr = 0;
   let matched = 0;
-  for (const chunk of chunks) {
-    if (seen.has(chunk.page)) { continue; }
-    seen.add(chunk.page);
-    const end = Math.min(ptr + RESYNC_WINDOW, entries.length);
-    for (let i = ptr; i < end; i++) {
-      if (!used[i] && entries[i].title === chunk.title) {
-        pagePaths.set(chunk.page, entries[i].path);
-        used[i] = true;
-        matched += 1;
-        break;
+  const claim = (page: number, i: number): void => {
+    pagePaths.set(page, entries[i].path);
+    used[i] = true;
+    matched += 1;
+  };
+  for (const [k, { page, title }] of pages.entries()) {
+    if (ptr < entries.length && entries[ptr].title === title) {
+      claim(page, ptr);
+    } else if (ptr < entries.length) {
+      const pointerTitle = entries[ptr].title;
+      const upcoming = pages.slice(k + 1, k + 1 + RESYNC_WINDOW);
+      const pointerMoved = !upcoming.some((next) => next.title === pointerTitle);
+      if (pointerMoved || !upcoming.some((next) => next.title === title)) {
+        const end = Math.min(ptr + RESYNC_WINDOW, entries.length);
+        for (let i = ptr + 1; i < end; i++) {
+          if (!used[i] && entries[i].title === title) {
+            claim(page, i);
+            break;
+          }
+        }
       }
     }
     while (ptr < entries.length && used[ptr]) { ptr += 1; }

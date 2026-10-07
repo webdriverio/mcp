@@ -5,6 +5,18 @@ import { z } from 'zod';
 import { getBrowser } from '../session/state';
 import { agentFor } from '../session/agent';
 
+const FUNCTION_SYNTAX = /^\s*(async\b|function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/;
+
+/** a lone function or arrow expression is passed through as it is; anything else is a script body */
+function isFunctionExpression(script: string): boolean {
+  try {
+    new Function(`return (${script})`);
+  } catch {
+    return false;
+  }
+  return FUNCTION_SYNTAX.test(script);
+}
+
 export const executeScriptToolDefinition: ToolDefinition = {
   name: 'execute_script',
   description: 'Runs JavaScript in the page (`return` a value; string args that match a selector are passed as elements) or, on Appium, a "mobile: <command>" with args. Prefer the dedicated tools for clicks and typing.',
@@ -43,7 +55,7 @@ export const executeScriptTool: ToolCallback = async (args: {
     );
 
     // a script body can't use `await` at its top level; as an async function it can
-    const body = !script.startsWith('mobile:') && /\bawait\b/.test(script) && !/^\s*(async\s+)?(function\b|\(|[\w$]+\s*=>)/.test(script)
+    const body = !script.startsWith('mobile:') && /\bawait\b/.test(script) && !isFunctionExpression(script)
       ? `return (async () => {\n${script}\n})()`
       : script;
     const result = await browser.execute(body, ...resolvedArgs);

@@ -303,6 +303,23 @@ describe('chunkCorpus', () => {
     expect(chunkCorpus(text).map((c) => c.path)).toEqual(['/docs/a.md', null, '/docs/b.md']);
   });
 
+  it('gives an unlisted page no path when a listed page with the same title follows', () => {
+    const text = [
+      '# Docs',
+      '',
+      '- [A](/docs/a.md)',
+      '- [B](/docs/b.md)',
+      '',
+      '# Full Documentation Content',
+      '',
+      '# B', '', 'unlisted', '',
+      '# A', '', 'body', '',
+      '# B', '', 'listed', '',
+    ].join('\n');
+    const paths = chunkCorpus(text).map((c) => [c.text.split('\n')[2], c.path]);
+    expect(paths).toEqual([['unlisted', null], ['body', '/docs/a.md'], ['listed', '/docs/b.md']]);
+  });
+
   it('assigns every page a distinct page id', () => {
     const pages = chunkCorpus(FIXTURE).map((c) => c.page);
     expect(pages).toEqual([...pages].sort((a, b) => a - b));

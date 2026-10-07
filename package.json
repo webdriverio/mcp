@@ -31,6 +31,9 @@
     "wdio-show-trace": "lib/show-trace.js"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "publishConfig": {
     "access": "public"
   },

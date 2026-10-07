@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../src/session/state';
 
 const run = vi.fn();
@@ -33,6 +33,7 @@ beforeEach(() => {
   state.sessionMetadata.clear();
   state.currentSession = null;
   run.mockReset();
+  snapshot.mockReset();
   createAgentSession.mockClear();
 });
 
@@ -200,5 +201,36 @@ describe('app tools', () => {
     run.mockResolvedValue({ text: 'match' });
     await call(snapshotTool, { find: 'Login' });
     expect(run).toHaveBeenCalledWith('find', { text: 'Login' });
+  });
+
+  it('snapshot rejects find together with viewport', async () => {
+    startSession('browser');
+    const result = await call(snapshotTool, { find: 'Login', viewport: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('find does not support viewport');
+    expect(run).not.toHaveBeenCalled();
+    expect(snapshot).not.toHaveBeenCalled();
+  });
+});
+
+describe('action timeout for snapshots', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('snapshot returns the TIMEOUT error and hint when the page never answers', async () => {
+    startSession('browser');
+    snapshot.mockReturnValue(new Promise(() => {}));
+    const pending = call(snapshotTool, {});
+    await vi.advanceTimersByTimeAsync(30_000);
+    const result = await pending;
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('"snapshot" did not finish within 30s.\nThe page may still be busy. `snapshot()` shows where it is.');
+  });
+
+  it('pageReport reports the timeout instead of hanging', async () => {
+    snapshot.mockReturnValue(new Promise(() => {}));
+    const pending = pageReport({ snapshot } as never);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toContain('"snapshot" did not finish within 30s.');
   });
 });

@@ -667,3 +667,55 @@ describe('generateCode - Browser mocks', () => {
     expect(code.match(/const browserMocks = new Map\(\);/g)).toHaveLength(1);
   });
 });
+
+describe('generateCode - recorded agent code', () => {
+  it('replays a ref click as the selector code the agent ran', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'click_element',
+      params: { selector: 'e4' },
+      code: ["await $('role/button[name=\"Save\"]').click()"],
+    }]));
+    expect(code).toContain("await $('role/button[name=\"Save\"]').click()");
+    expect(code).toContain('const $ = (...args) => browser.$(...args);');
+    expect(code).not.toContain("browser.$('e4')");
+  });
+
+  it('emits the code of select_option and press_key', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'select_option', params: { selector: 'e2', value: 'Red' }, code: ["await $('#color').selectByVisibleText('Red')"] },
+      { tool: 'press_key', params: { keys: 'Enter' }, code: ["await browser.keys('Enter')"] },
+    ]));
+    expect(code).toContain("await $('#color').selectByVisibleText('Red')");
+    expect(code).toContain("await browser.keys('Enter')");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('keeps the code of completed sub-steps before a failure, then the error', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'perform_actions',
+      params: { actions: [] },
+      status: 'error',
+      error: 'boom',
+      code: ["await $('#a').setValue('x')", "await $('#b').click()"],
+    }]));
+    expect(code).toContain("await $('#a').setValue('x')");
+    expect(code).toContain("await $('#b').click()");
+    expect(code).toContain('// [error] perform_actions:');
+  });
+
+  it('does not emit a snapshot ref as a selector when no code was recorded', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'click_element', params: { selector: 'e4' } },
+      { tool: 'set_value', params: { selector: 'e5', value: 'v' } },
+    ]));
+    expect(code).not.toContain("$('e4')");
+    expect(code).not.toContain("$('e5')");
+    expect(code).toContain('[not replayable: snapshot ref] click_element');
+  });
+
+  it('still generates selector code for CSS selectors without recorded code', () => {
+    const code = generateCode(makeHistory([{ tool: 'click_element', params: { selector: '#btn' } }]));
+    expect(code).toContain("await browser.$('#btn').click();");
+    expect(code).not.toContain('const $ =');
+  });
+});

@@ -41,10 +41,8 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
-import { onSessionRegistered } from './session/state';
 import { closeAllSessions } from './session/lifecycle';
-import { groupOf, GROUPS, toolAppliesTo, showAllTools, type ToolGroup, type ToolPlatform } from './toolsets';
-import { enableToolsToolDefinition } from './tools/enable-tools.tool';
+import { setupToolVisibility } from './tool-visibility';
 import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
@@ -206,34 +204,8 @@ function createServer(): McpServer {
   registerTool(appStateToolDefinition, appStateTool);
   registerTool(getCookiesToolDefinition, getCookiesTool);
 
-  /**
-   * Every tool definition is sent with every model request. Tools that only
-   * work on mobile or Electron sessions stay hidden until such a session
-   * starts, so a browser session doesn't pay for them on every turn.
-   */
-  if (!showAllTools()) {
-    let platform: ToolPlatform | undefined;
-    const enabledGroups = new Set<ToolGroup>();
-    const refresh = () => {
-      for (const [name, tool] of tools) {
-        const group = groupOf(name);
-        const listed = toolAppliesTo(name, platform) && (!group || enabledGroups.has(group));
-        if (listed && !tool.enabled) tool.enable();
-        if (!listed && tool.enabled) tool.disable();
-      }
-    };
-    registerTool(enableToolsToolDefinition, async ({ groups }: { groups: ToolGroup[] }) => {
-      groups.forEach((group) => enabledGroups.add(group));
-      refresh();
-      const added = groups.flatMap((group) => GROUPS[group].tools).filter((name) => tools.get(name)?.enabled);
-      return { content: [{ type: 'text', text: added.length ? `Added: ${added.join(', ')}` : 'None of these tools apply to the current session.' }] };
-    });
-    refresh();
-    onSessionRegistered((metadata) => {
-      platform = metadata.runtime === 'electron' ? 'electron' : metadata.type;
-      refresh();
-    });
-  }
+  const disposeToolVisibility = setupToolVisibility(tools, registerTool);
+  server.server.onclose = disposeToolVisibility;
 
   registerResource(sessionsIndexResource);
   registerResource(sessionCurrentStepsResource);
@@ -327,7 +299,9 @@ async function main() {
             return;
           }
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-          await createServer().connect(transport);
+          const server = createServer();
+          res.on('close', () => void server.close());
+          await server.connect(transport);
           await transport.handleRequest(req, res, body);
         } catch (e) {
           const code = (e as NodeJS.ErrnoException).code;

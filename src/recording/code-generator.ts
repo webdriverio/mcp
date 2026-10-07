@@ -119,10 +119,30 @@ function generateAttachSessionStep(params: Record<string, unknown>, history: Ses
   ].join('\n');
 }
 
+const SNAPSHOT_REF = /^e\d+$/;
+
+function isSnapshotRef(selector: unknown): boolean {
+  return typeof selector === 'string' && SNAPSHOT_REF.test(selector);
+}
+
+/** refs only exist in the live page model, so they cannot be replayed as selectors */
+function unreplayableRef(step: RecordedStep): string {
+  return `// [not replayable: snapshot ref] ${step.tool}: ${formatParams(step.params)}`;
+}
+
+/** the agent's code calls the bare `$` and `$$` globals */
+const BARE_SELECTOR_GLOBAL = /(?<![.\w$])\$\$?\(/;
+
 function generateStep(step: RecordedStep, history: SessionHistory): string {
   if (step.tool === '__session_transition__') {
     const newId = (step.params.newSessionId as string) ?? 'unknown';
     return `// --- new session: ${newId} started at ${step.timestamp} ---`;
+  }
+
+  if (step.code?.length) {
+    const lines = [...step.code];
+    if (step.status === 'error') lines.push(`// [error] ${step.tool}: ${formatParams(step.params)} — ${step.error ?? 'unknown error'}`);
+    return lines.join('\n');
   }
 
   if (step.status === 'error') {
@@ -269,8 +289,10 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
     case 'navigate':
       return `await browser.url('${escapeStr(p.url)}');`;
     case 'click_element':
+      if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').click();`;
     case 'set_value':
+      if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
     case 'scroll': {
       const scrollAmount = (p.direction as string) === 'down' ? (p.pixels as number) : -(p.pixels as number);
@@ -388,6 +410,9 @@ export function generateCode(history: SessionHistory): string {
         : (tbOptions?.tunnel === true);
 
   const stepLines = history.steps.map(step => generateStep(step, history));
+  if (history.steps.some(step => step.code?.some(line => BARE_SELECTOR_GLOBAL.test(line)))) {
+    stepLines.unshift('const $ = (...args) => browser.$(...args);', 'const $$ = (...args) => browser.$$(...args);');
+  }
   // Failed mock steps emit only an error comment, so they must not pull in the declaration either.
   if (history.steps.some(step => MOCK_TOOLS.has(step.tool) && step.params.mockType !== 'electron' && step.status !== 'error')) {
     stepLines.unshift('const browserMocks = new Map();');

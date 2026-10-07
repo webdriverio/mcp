@@ -942,7 +942,7 @@ Browser mocks require a BiDi-enabled session — start it with `capabilities: { 
 
 ### Electron applications
 
-Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.12 or newer. Put service options such as `appBinaryPath`, `appEntryPoint`, and `appArgs` in `capabilities['wdio:electronServiceOptions']`; use top-level `electronRootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
+Electron support is local-only and uses the official `@wdio/electron-service` standalone lifecycle. It requires Node.js 22.19 or newer. Put service options such as `appBinaryPath`, `appEntryPoint`, and `appArgs` in `capabilities['wdio:electronServiceOptions']`; use top-level `electronRootDir` for the service's Electron Builder/Electron Forge discovery. When testing a binary outside the project, set `browserVersion` to the Electron version so the service can select a compatible Chromedriver.
 
 ```javascript
 start_session({
