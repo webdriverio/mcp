@@ -10,7 +10,7 @@ const electronTargetSchema = {
 };
 const mockTypeSchema = z.enum(['electron', 'browser']);
 const targetSchema = {
-  mockType: mockTypeSchema.optional().describe('Mock type: electron or browser. Defaults to browser in WebDriver sessions; required in Electron sessions. Browser mocks intercept network requests by url glob and require a BiDi-enabled session (start_session with capabilities: { webSocketUrl: true }); in Electron sessions they additionally require the session to have negotiated BiDi. Electron mocks require apiName and funcName. Appium sessions are unsupported.'),
+  mockType: mockTypeSchema.optional().describe('Defaults to browser; required in Electron sessions.'),
   apiName: electronTargetSchema.apiName.optional().describe('Required for mockType electron: API module, such as dialog, app, or clipboard.'),
   funcName: electronTargetSchema.funcName.optional().describe('Required for mockType electron: API function, such as showOpenDialog or getName.'),
   url: z.string().min(1).optional().describe('Required for mockType browser: URL glob to intercept, such as **/api/todos.'),

@@ -710,6 +710,12 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 ## Available Tools
 
+The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. Set `WDIO_MCP_TOOLS=all` to list everything up front.
+
+| Tool           | Description                                                                                                       |
+|----------------|-------------------------------------------------------------------------------------------------------------------|
+| `enable_tools` | Add a group of tools: `mocks`, `cookies`, `device`, `extensions`, `attach`, `cloud-apps`                          |
+
 ### Session Management
 
 | Tool             | Description                                                                                                                                                            |
@@ -725,9 +731,10 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 | Tool                     | Description                                                                                                                                                                                            |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `navigate`               | Navigate to a URL                                                                                                                                                                                      |
-| `get_elements`           | Get visible, interactable elements on the page. Supports `inViewportOnly` (default: true) to filter viewport elements, and `includeContainers` (default: false) to include layout containers on mobile |
-| `get_accessibility_tree` | Get the page accessibility tree with roles, names, and selectors. Supports filtering by role and pagination. Browser-only.                                                                             |
+| `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
+| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default; `find` returns only the parts containing a text (link targets included), `full: true` adds all text. Browser-only. |
+| `get_elements`           | Get visible, interactable elements. Supports `inViewportOnly` (default: true) and `includeContainers` (default: false). Mobile and Electron                                                            |
+| `get_accessibility_tree` | Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
@@ -742,12 +749,17 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 ### Element Interaction (Web & Mobile)
 
-| Tool            | Description                 |
-|-----------------|-----------------------------|
-| `click_element` | Click an element            |
-| `set_value`     | Type text into input fields |
+| Tool              | Description                                                                                         |
+|-------------------|-----------------------------------------------------------------------------------------------------|
+| `click_element`   | Click an element                                                                                    |
+| `set_value`       | Replace the text of an input or textarea                                                            |
+| `select_option`   | Select an option of a `<select>` by its text. Browser-only.                                         |
+| `press_key`       | Press a key or combination (`Enter`, `Control+a`) in the focused element. Browser-only.             |
+| `perform_actions` | Run several clicks, fills, selects, checks and key presses in one call; stops at the first failure. Browser-only. |
 
-### Cookie Management (Web)
+In browser sessions these tools take a ref from `snapshot` (`e12`) as well as a selector, and each result lists what the action changed on the page: new or changed elements with their refs, or the page it navigated to. An agent rarely needs a separate screenshot or snapshot to see the effect.
+
+### Cookie Management (Web, after `enable_tools`)
 
 | Tool             | Description                                                         |
 |------------------|---------------------------------------------------------------------|
@@ -885,7 +897,7 @@ start_session({
 
 ### Mocking
 
-Mocking is available through `mock`, `get_mock_calls`, and `manage_mock`, for both Electron main-process API functions and browser network requests.
+Mocking is available through `mock`, `get_mock_calls`, and `manage_mock` (listed after `enable_tools({ groups: ['mocks'] })`), for both Electron main-process API functions and browser network requests.
 
 `mockType` accepts `'electron'` or `'browser'`. Browser mocks are the default in WebDriver sessions when `mockType` is omitted. Electron sessions require an explicit selection because they can target both kinds of mocks. iOS/Android Appium sessions do not support mocking.
 

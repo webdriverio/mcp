@@ -18,8 +18,8 @@ export class LocalBrowserProvider implements SessionProvider {
   buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
     const selectedBrowser = (options.browser as string | undefined) ?? 'chrome';
     const headless = (options.headless as boolean | undefined) ?? true;
-    const windowWidth = (options.windowWidth as number | undefined) ?? 1920;
-    const windowHeight = (options.windowHeight as number | undefined) ?? 1080;
+    const windowWidth = (options.windowWidth as number | undefined) ?? 1280;
+    const windowHeight = (options.windowHeight as number | undefined) ?? 800;
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
 
     const headlessSupported = selectedBrowser !== 'safari';
@@ -50,6 +50,11 @@ export class LocalBrowserProvider implements SessionProvider {
 
     const capabilities: Record<string, any> = {
       acceptInsecureCerts: true,
+      // With `normal` the driver holds every command until a page and all its
+      // ads and trackers have loaded, which on busy sites takes tens of seconds
+      // or minutes. The page tools give a page a few seconds to finish instead.
+      // User capabilities can set it back.
+      pageLoadStrategy: 'eager',
     };
 
     switch (selectedBrowser) {

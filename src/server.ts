@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import pkg from '../package.json' with { type: 'json' };
 import http from 'node:http';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -41,6 +41,10 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
+import { onSessionRegistered } from './session/state';
+import { closeAllSessions } from './session/lifecycle';
+import { groupOf, GROUPS, toolAppliesTo, showAllTools, type ToolGroup, type ToolPlatform } from './toolsets';
+import { enableToolsToolDefinition } from './tools/enable-tools.tool';
 import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
@@ -79,6 +83,8 @@ import { switchFrameTool, switchFrameToolDefinition } from './tools/switch-frame
 import { listAppsTool, listAppsToolDefinition, uploadAppTool, uploadAppToolDefinition, } from './tools/cloud-provider.tool';
 import { queryDocsTool, queryDocsToolDefinition } from './tools/query-docs.tool';
 import { screenshotTool, screenshotToolDefinition } from './tools/screenshot.tool';
+import { snapshotTool, snapshotToolDefinition } from './tools/snapshot.tool';
+import { performActionsTool, performActionsToolDefinition, pressKeyTool, pressKeyToolDefinition, selectOptionTool, selectOptionToolDefinition } from './tools/page-input.tool';
 import { accessibilityTool, accessibilityToolDefinition } from './tools/accessibility.tool';
 import { getTabsTool, getTabsToolDefinition } from './tools/get-tabs.tool';
 import { getContextsTool, getContextsToolDefinition } from './tools/get-contexts.tool';
@@ -109,12 +115,16 @@ function createServer(): McpServer {
     },
   });
 
-  const registerTool = (definition: ToolDefinition, callback: ToolCallback) =>
-    server.registerTool(definition.name, {
+  const tools = new Map<string, RegisteredTool>();
+  const registerTool = (definition: ToolDefinition, callback: ToolCallback) => {
+    const tool = server.registerTool(definition.name, {
       description: definition.description,
       inputSchema: definition.inputSchema,
       ...(definition.annotations && { annotations: definition.annotations }),
     }, callback);
+    tools.set(definition.name, tool);
+    return tool;
+  };
 
   const registerResource = (definition: ResourceDefinition) => {
     if ('uri' in definition) {
@@ -151,6 +161,10 @@ function createServer(): McpServer {
 
   registerTool(clickToolDefinition, instrument('click_element', clickTool));
   registerTool(setValueToolDefinition, instrument('set_value', setValueTool));
+  registerTool(selectOptionToolDefinition, instrument('select_option', selectOptionTool));
+  registerTool(pressKeyToolDefinition, instrument('press_key', pressKeyTool));
+  registerTool(performActionsToolDefinition, instrument('perform_actions', performActionsTool));
+  registerTool(snapshotToolDefinition, snapshotTool);
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
@@ -184,6 +198,35 @@ function createServer(): McpServer {
   registerTool(getContextsToolDefinition, getContextsTool);
   registerTool(appStateToolDefinition, appStateTool);
   registerTool(getCookiesToolDefinition, getCookiesTool);
+
+  /**
+   * Every tool definition is sent with every model request. Tools that only
+   * work on mobile or Electron sessions stay hidden until such a session
+   * starts, so a browser session doesn't pay for them on every turn.
+   */
+  if (!showAllTools()) {
+    let platform: ToolPlatform | undefined;
+    const enabledGroups = new Set<ToolGroup>();
+    const refresh = () => {
+      for (const [name, tool] of tools) {
+        const group = groupOf(name);
+        const listed = toolAppliesTo(name, platform) && (!group || enabledGroups.has(group));
+        if (listed && !tool.enabled) tool.enable();
+        if (!listed && tool.enabled) tool.disable();
+      }
+    };
+    registerTool(enableToolsToolDefinition, async ({ groups }: { groups: ToolGroup[] }) => {
+      groups.forEach((group) => enabledGroups.add(group));
+      refresh();
+      const added = groups.flatMap((group) => GROUPS[group].tools).filter((name) => tools.get(name)?.enabled);
+      return { content: [{ type: 'text', text: added.length ? `Added: ${added.join(', ')}` : 'None of these tools apply to the current session.' }] };
+    });
+    refresh();
+    onSessionRegistered((metadata) => {
+      platform = metadata.runtime === 'electron' ? 'electron' : metadata.type;
+      refresh();
+    });
+  }
 
   registerResource(sessionsIndexResource);
   registerResource(sessionCurrentStepsResource);
@@ -297,7 +340,24 @@ async function main() {
     const transport = new StdioServerTransport();
     await createServer().connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
+    // the client closing stdin is how most of them stop a stdio server
+    process.stdin.once('end', shutdown);
+    process.stdin.once('close', shutdown);
   }
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.once(signal, shutdown);
+  }
+}
+
+/** most time sessions get to close before the process exits anyway */
+const SHUTDOWN_TIMEOUT_MS = 5000;
+let shuttingDown = false;
+
+function shutdown(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS).unref());
+  void Promise.race([closeAllSessions(), timeout]).finally(() => process.exit(0));
 }
 
 main().catch((error) => {

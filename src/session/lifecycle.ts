@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
-import { getState } from './state';
+import { getState, notifySessionRegistered } from './state';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
@@ -72,6 +72,7 @@ export function registerSession(
   state.sessionMetadata.set(sessionId, metadata);
   state.sessionHistory.set(sessionId, historyEntry);
   state.currentSession = sessionId;
+  notifySessionRegistered(metadata);
 
   // If there was a previous session, terminate it to prevent orphaning
   if (oldSessionId && oldSessionId !== sessionId) {
@@ -181,4 +182,20 @@ export async function closeSession(sessionId: string, detach: boolean, isAttache
       state.currentSession = null;
     }
   }
+}
+
+/**
+ * End every session when the server goes away. Without this, a client that
+ * stops the server leaves each local driver and its browser running. Sessions
+ * `close_session` would detach from stay running.
+ */
+export async function closeAllSessions(): Promise<void> {
+  const state = getState();
+  await Promise.all([...state.browsers.keys()].map(async (sessionId) => {
+    const metadata = state.sessionMetadata.get(sessionId);
+    const detach = metadata?.externallyManaged === true || metadata?.provider === 'external';
+    await closeSession(sessionId, detach, !!metadata?.isAttached).catch((e) => {
+      console.error(`[WARN] Failed to close session ${sessionId} on shutdown:`, e);
+    });
+  }));
 }

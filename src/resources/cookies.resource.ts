@@ -6,7 +6,7 @@ export async function readCookies(name?: string): Promise<{ mimeType: string; te
     const browser = getBrowser();
 
     if (name) {
-      const cookie = await browser.getCookies([name]);
+      const cookie = await browser.getCookies({ name });
       if (cookie.length === 0) {
         return { mimeType: 'application/json', text: JSON.stringify(null) };
       }

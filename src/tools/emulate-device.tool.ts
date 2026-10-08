@@ -1,9 +1,8 @@
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
-// DeviceName is not in webdriverio's public exports but is required to satisfy browser.emulate('device', ...) overloads.
-// This is a type-only import — it is stripped at build time by tsup and has no runtime impact.
-import type { DeviceName } from 'webdriverio/build/deviceDescriptorsSource.js';
+// the device names browser.emulate('device', …) accepts; not exported by webdriverio
+type DeviceName = Extract<Parameters<WebdriverIO.Browser['emulate']>, ['device', unknown]>[1];
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 
