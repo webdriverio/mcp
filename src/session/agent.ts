@@ -1,60 +1,58 @@
-import { createAgentSession, type AgentSession } from '@wdio/session/agent';
+import { createAgentSession, SessionError, type ActionArgsOf, type AgentActionName, type AgentSession, type PageChange } from '@wdio/session/agent';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getBrowser, getState } from './state';
+import { mcpHint } from './hints';
 
 /**
- * Browser sessions run their page actions through `@wdio/session`: one page
- * model (snapshots with refs like `e12`) shared with `wdio session`, and every
- * action reports what it changed on the page, so an agent rarely needs a
- * separate screenshot or element listing to see the result.
+ * Page and app actions run through `@wdio/session`: one page model (snapshots
+ * with refs like `e12`) shared with the session CLI, and every action reports
+ * what it changed, so an agent rarely needs a separate screenshot or element
+ * listing to see the result.
  */
 const agents = new WeakMap<WebdriverIO.Browser, Promise<AgentSession>>();
 
-/** the agent session of the active browser session, undefined for apps */
-export function webAgent(): Promise<AgentSession> | undefined {
+/** the agent session of the active session, undefined before one starts */
+export function agentFor(): Promise<AgentSession> | undefined {
   const state = getState();
   const metadata = state.currentSession ? state.sessionMetadata.get(state.currentSession) : undefined;
-  if (metadata?.type !== 'browser') return undefined;
+  if (!metadata) return undefined;
   const browser = getBrowser();
   let agent = agents.get(browser);
   if (!agent) {
-    agent = createAgentSession(browser, { name: 'mcp', recordPage: true });
+    agent = createAgentSession(browser, { name: 'mcp', hint: mcpHint, recordPage: metadata.type === 'browser' });
     agents.set(browser, agent);
   }
   return agent;
 }
 
-/**
- * `@wdio/session` hints name its shell commands; here they are tools.
- */
-export function forMcp(text: string): string {
-  // one pass, so a replacement is never rewritten again
-  return text.replace(/`(?:wdio session )?([a-z]+)([^`]*)`/g, (match, action: string, rest: string) => {
-    if (action === 'find') return '`snapshot` with `find`';
-    if (action === 'snapshot') return /-i\b|--interactive/.test(rest) ? '`snapshot`' : '`snapshot` with `full: true`';
-    return match.startsWith('`wdio session ') ? `\`${action}\`` : match;
-  });
-}
-
 /** longest a single page action may take before the agent gets the turn back */
 const ACTION_TIMEOUT_MS = 90_000;
 
-export async function runAction(agent: AgentSession, action: string, args: Record<string, unknown>, done: string): Promise<CallToolResult> {
+export function errorResult(e: unknown): CallToolResult {
+  const message = e instanceof Error ? e.message : String(e);
+  const hint = e instanceof SessionError ? e.hint : undefined;
+  return { isError: true, content: [{ type: 'text', text: [message, hint].filter(Boolean).join('\n') }] };
+}
+
+export async function runActionWithChanges<A extends AgentActionName>(agent: AgentSession, action: A, args: ActionArgsOf<A>, done: string): Promise<{ result: CallToolResult; changes?: PageChange }> {
   let timer: NodeJS.Timeout | undefined;
   const limit = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(Object.assign(new Error(`"${action}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`), {
-      hint: 'The page may still be busy. Take a `snapshot` to see where it is.',
+    timer = setTimeout(() => reject(new SessionError('TIMEOUT', `"${action}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`, {
+      hint: `The page may still be busy. \`${mcpHint('snapshot', { interactive: true })}\` shows where it is.`,
     })), ACTION_TIMEOUT_MS);
   });
   try {
     const result = await Promise.race([agent.run(action, args), limit]);
-    return { content: [{ type: 'text', text: result.text ? forMcp(result.text) : done }] };
+    return { result: { content: [{ type: 'text', text: result.text || done }] }, changes: result.changes };
   } catch (e) {
-    const err = e as Error & { hint?: string };
-    return { isError: true, content: [{ type: 'text', text: forMcp([err.message, err.hint].filter(Boolean).join('\n')) }] };
+    return { result: errorResult(e) };
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function runAction<A extends AgentActionName>(agent: AgentSession, action: A, args: ActionArgsOf<A>, done: string): Promise<CallToolResult> {
+  return (await runActionWithChanges(agent, action, args, done)).result;
 }
 
 /** most characters of a page snapshot returned after opening a page */
@@ -65,14 +63,13 @@ const MAX_PAGE_CHARS = 1500;
  */
 export async function pageReport(agent: AgentSession): Promise<string> {
   try {
-    const result = await agent.run('snapshot', { interactive: true, maxChars: MAX_PAGE_CHARS });
-    const data = result.data as { chars?: number; refs?: number } | undefined;
-    const url = await agent.browser.getUrl().catch(() => '');
-    if (data?.chars !== undefined && data.chars > MAX_PAGE_CHARS) {
-      const title = await agent.browser.getTitle().catch(() => '');
-      return `Page: ${url}${title ? ` · ${JSON.stringify(title)}` : ''} · ${data.refs ?? 0} interactive elements. \`snapshot\` with \`find\` gets the ones you need with their refs.`;
+    const snapshot = await agent.snapshot({ interactive: true, maxChars: MAX_PAGE_CHARS });
+    const url = snapshot.page?.url ?? '';
+    if (snapshot.tooBig) {
+      const title = snapshot.page?.title;
+      return `Page: ${url}${title ? ` · ${JSON.stringify(title)}` : ''} · ${snapshot.refs} interactive elements. \`${mcpHint('find', { text: '<text>' })}\` gets the ones you need with their refs.`;
     }
-    return `Page: ${url}\n${result.text ?? ''}`;
+    return `Page: ${url}\n${snapshot.text}`;
   } catch {
     return '';
   }

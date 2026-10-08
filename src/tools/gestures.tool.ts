@@ -3,17 +3,18 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { agentFor, runAction } from '../session/agent';
 
 // Tap Tool
 export const tapElementToolDefinition: ToolDefinition = {
   name: 'tap_element',
-  description: 'Taps a matched element via element.tap() or at absolute screen coordinates (x, y). No scroll-into-view or wait — element must already be visible on screen. Use instead of click_element on iOS where element.click() is ignored. Provide selector OR both x and y. Mobile-only.',
+  description: 'Taps an element (ref from snapshot, or selector) or taps at absolute screen coordinates (x, y). A tap on an element lists what changed on the screen. No scroll-into-view or wait — element must already be visible on screen. Use instead of click_element on iOS where element.click() is ignored. Provide selector OR both x and y. Mobile-only.',
   annotations: { title: 'Tap Element', destructiveHint: false },
   inputSchema: {
     selector: z
       .string()
       .optional()
-      .describe('Element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
+      .describe('Ref from snapshot (e12) or element selector (CSS, XPath, accessibility ID, or UiAutomator)'),
     x: z.number().optional().describe('X coordinate for screen tap (if no selector provided)'),
     y: z.number().optional().describe('Y coordinate for screen tap (if no selector provided)'),
   },
@@ -29,6 +30,8 @@ export const tapAction = async (args: {
     const { selector, x, y } = args;
 
     if (selector) {
+      const agent = await agentFor();
+      if (agent) return await runAction(agent, 'tap', { target: selector }, `Tapped ${selector}.`);
       const element = await browser.$(selector);
       await element.tap();
       return {

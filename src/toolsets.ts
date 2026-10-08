@@ -14,13 +14,10 @@ const ONLY: Record<string, ToolPlatform[]> = {
   hide_keyboard: ['ios', 'android'],
   get_app_state: ['ios', 'android'],
   execute_electron_script: ['electron'],
-  // browsers use snapshot, select_option and press_key instead
   get_elements: ['ios', 'android', 'electron'],
   get_accessibility_tree: ['electron'],
-  snapshot: ['browser'],
   select_option: ['browser'],
   press_key: ['browser'],
-  perform_actions: ['browser'],
   trigger_electron_deeplink: ['electron'],
 };
 
@@ -42,6 +39,7 @@ export const GROUPS = {
   device: { tools: ['emulate_device', 'set_geolocation'], desc: 'emulate a phone or tablet, fake the location' },
   extensions: { tools: ['open_web_extension'], desc: 'install and open a browser extension' },
   attach: { tools: ['launch_chrome', 'attach_session'], desc: 'launch Chrome with remote debugging, attach to a running WebDriver or Appium session' },
+  elements: { tools: ['get_elements'], desc: 'raw element list with bounds' },
   'cloud-apps': { tools: ['list_apps', 'upload_app'], desc: 'upload and list mobile apps on BrowserStack, Sauce Labs, TestMu, TestingBot, Digital.ai' },
 } as const;
 

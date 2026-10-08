@@ -5,13 +5,13 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { pageChange, pageInfo } from '../utils/page-info';
-import { runAction, webAgent } from '../session/agent';
+import { runAction, agentFor } from '../session/agent';
 
 const defaultTimeout: number = 3000;
 
 export const clickToolDefinition: ToolDefinition = {
   name: 'click_element',
-  description: 'Clicks an element. In browsers the result lists what changed on the page (new elements with refs, or the new page). On iOS use tap_element. Several steps in a row: perform_actions.',
+  description: 'Clicks an element. The result lists what changed on the page or screen (new elements with refs, or the new page). Several steps in a row: perform_actions.',
   annotations: { title: 'Click Element', destructiveHint: false },
   inputSchema: {
     selector: z.string().describe('Ref from snapshot (e12) or selector: CSS, XPath, "button=Exact text", "a*=Partial text"'),
@@ -45,6 +45,6 @@ export const clickTool: ToolCallback = async ({ selector, scrollToView, timeout 
   scrollToView?: boolean;
   timeout?: number
 }): Promise<CallToolResult> => {
-  const agent = await webAgent();
+  const agent = await agentFor();
   return agent ? runAction(agent, 'click', { target: selector }, 'Clicked.') : clickAction(selector, timeout, scrollToView);
 };
