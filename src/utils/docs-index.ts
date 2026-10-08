@@ -23,6 +23,7 @@ export interface LoadCorpusOptions {
 export const CACHE_FILE = 'llms-full.txt';
 export const META_FILE = 'llms-full.meta.json';
 export const FULL_DOCS_MARKER = '# Full Documentation Content';
+const RESYNC_WINDOW = 16;
 const TOC_ENTRY = /^- \[([^\]]+)\]\(([^)]+\.md)\)/;
 const FENCE_OPEN = /^\s*(`{3,})\s*([A-Za-z0-9_+.-]*)\s*$/;
 const FENCE_CLOSE = /^\s*(`{3,})\s*\|?\s*$/;
@@ -39,6 +40,7 @@ export const BM25_K1 = 1.2;
 export const BM25_B = 0.75;
 const SUB_SEGMENT_MIN_LEN = 3;
 const TITLE_FIELD = 2;
+const TITLE_TERM_BOOST = 1.5;
 // Closed-class English function words. Derived grammatically, not from corpus frequency:
 // `i` has df 59 (0.1·n) and idf 2.299, so on both frequency signals it looks like a
 // content word — only grammar separates it from `appium`. A df threshold cannot find it.
@@ -168,21 +170,48 @@ export function pathOf(slug: string): string {
   return `/${slug.replace(/~/g, '/')}`;
 }
 
-// Corpus pages appear in the TOC's order, but 21 of 438 have no TOC entry, so a
-// title→paths map cannot address a specific page: it hands both `waitUntil` pages
-// both paths. Walking both sequences in step gives each page exactly one path.
-// A desync stalls the pointer and strands every later entry, so it fails loudly.
+// Corpus pages follow the TOC's order, but some pages have no TOC entry and the live
+// corpus moves a few pages relative to the TOC. A page takes the entry at the pointer when
+// the titles match. Otherwise it is either unlisted or the pointer entry has moved, and
+// it looks ahead for its own entry only when the pointer entry's title no longer shows up
+// among the next RESYNC_WINDOW corpus pages, or when no later page repeats its own title
+// (a page that moved earlier). A repeated title never lets an unlisted page take the
+// path of the listed page that follows it.
 function resolvePagePaths(chunks: DocChunk[], entries: TocEntry[]): { matched: number; leftover: number } {
+  const pages: { page: number; title: string }[] = [];
   const seen = new Set<number>();
-  const pagePaths = new Map<number, string>();
-  let ptr = 0;
   for (const chunk of chunks) {
     if (seen.has(chunk.page)) { continue; }
     seen.add(chunk.page);
-    if (ptr < entries.length && entries[ptr].title === chunk.title) {
-      pagePaths.set(chunk.page, entries[ptr].path);
-      ptr += 1;
+    pages.push({ page: chunk.page, title: chunk.title });
+  }
+  const used = new Array<boolean>(entries.length).fill(false);
+  const pagePaths = new Map<number, string>();
+  let ptr = 0;
+  let matched = 0;
+  const claim = (page: number, i: number): void => {
+    pagePaths.set(page, entries[i].path);
+    used[i] = true;
+    matched += 1;
+  };
+  for (const [k, { page, title }] of pages.entries()) {
+    if (ptr < entries.length && entries[ptr].title === title) {
+      claim(page, ptr);
+    } else if (ptr < entries.length) {
+      const pointerTitle = entries[ptr].title;
+      const upcoming = pages.slice(k + 1, k + 1 + RESYNC_WINDOW);
+      const pointerMoved = !upcoming.some((next) => next.title === pointerTitle);
+      if (pointerMoved || !upcoming.some((next) => next.title === title)) {
+        const end = Math.min(ptr + RESYNC_WINDOW, entries.length);
+        for (let i = ptr + 1; i < end; i++) {
+          if (!used[i] && entries[i].title === title) {
+            claim(page, i);
+            break;
+          }
+        }
+      }
     }
+    while (ptr < entries.length && used[ptr]) { ptr += 1; }
   }
   // Every chunk of a page carries its path, not just the first: a split page's later
   // chunks are separately searchable, and a hit without a path loses both its citation
@@ -190,7 +219,7 @@ function resolvePagePaths(chunks: DocChunk[], entries: TocEntry[]): { matched: n
   for (const chunk of chunks) {
     chunk.path = pagePaths.get(chunk.page) ?? null;
   }
-  return { matched: ptr, leftover: entries.length - ptr };
+  return { matched, leftover: entries.length - matched };
 }
 
 export function chunkCorpus(text: string, entries: TocEntry[] = tocEntries(text)): DocChunk[] {
@@ -399,11 +428,20 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
   const { demotePathPrefix, demoteFactor } = opts;
   const demote = Boolean(demotePathPrefix && demoteFactor) && !tokens.some((t) => t.toLowerCase() === 'mcp');
   const terms = tokens.flatMap(termsOf);
+  const queryNames = [...new Set(tokens.map((t) => t.toLowerCase()))];
+  // A page whose title or path names the query terms is the page the query is about; BM25
+  // alone lets an overview that merely repeats a term outscore it by a hair.
+  const nameTerms = (i: number): Set<string> => {
+    const { title, path } = index.chunks[i];
+    return new Set([...tokenize(title), ...tokenize(path ?? '')].map((t) => t.toLowerCase()));
+  };
   return [...scores]
     .filter(([, score]) => score > 0)
     .map(([i, score]) => {
       const path = index.chunks[i].path;
-      const adjusted = demote && path && path.startsWith(demotePathPrefix as string) ? score * (demoteFactor as number) : score;
+      const own = nameTerms(i);
+      const boosted = score * TITLE_TERM_BOOST ** queryNames.filter((t) => own.has(t)).length;
+      const adjusted = demote && path && path.startsWith(demotePathPrefix as string) ? boosted * (demoteFactor as number) : boosted;
       return [i, adjusted] as const;
     })
     .sort((a, b2) => b2[1] - a[1])

@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { agentFor, runAction } from '../session/agent';
 
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
@@ -77,13 +78,20 @@ export const setGeolocationTool: ToolCallback = async (args: {
     const browser = getBrowser();
     const { latitude, longitude, altitude } = args;
 
+    // the agent's geolocation action has no altitude
+    if (!browser.isMobile && altitude === undefined) {
+      const agent = await agentFor();
+      if (!agent) throw new Error('No active session. Start one with start_session.');
+      return runAction(agent, 'geolocation', { lat: String(latitude), lon: String(longitude) }, `Geolocation set to:\n  Latitude: ${latitude}\n  Longitude: ${longitude}`);
+    }
+
     await browser.setGeoLocation({ latitude, longitude, altitude });
 
     return {
       content: [
         {
           type: 'text',
-          text: `Geolocation set to:\n  Latitude: ${latitude}\n  Longitude: ${longitude}${altitude ? `\n  Altitude: ${altitude}m` : ''}`,
+          text: `Geolocation set to:\n  Latitude: ${latitude}\n  Longitude: ${longitude}${altitude !== undefined ? `\n  Altitude: ${altitude}m` : ''}`,
         },
       ],
     };

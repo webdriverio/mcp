@@ -4,6 +4,7 @@ export interface RecordedStep {
   params: Record<string, unknown>;
   status: 'ok' | 'error';
   error?: string;                     // only present when status === 'error'
+  code?: string[];                    // WebdriverIO code the session agent ran for each completed action
   durationMs: number;
   timestamp: string;                  // ISO 8601
 }

@@ -1,50 +1,19 @@
-import { getBrowser } from '../session/state';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
-import { coerceBoolean } from '../utils/zod-helpers';
-import { pageChange, pageInfo } from '../utils/page-info';
-import { runAction, agentFor } from '../session/agent';
-
-const defaultTimeout: number = 3000;
+import { runAction, agentFor, noSession } from '../session/agent';
 
 export const clickToolDefinition: ToolDefinition = {
   name: 'click_element',
-  description: 'Clicks an element. The result lists what changed on the page or screen (new elements with refs, or the new page). Several steps in a row: perform_actions.',
+  description: 'Clicks an element. On web pages the result lists what changed (new elements with refs, or the new page). In apps it does not: take a snapshot to see the new screen. Several steps in a row: perform_actions.',
   annotations: { title: 'Click Element', destructiveHint: false },
   inputSchema: {
     selector: z.string().describe('Ref from snapshot (e12) or selector: CSS, XPath, "button=Exact text", "a*=Partial text"'),
-    scrollToView: coerceBoolean.optional().describe('Whether to scroll the element into view before clicking').default(true),
-    timeout: z.number().optional().describe('Maximum time to wait for element in milliseconds'),
   },
 };
 
-export const clickAction = async (selector: string, timeout: number, scrollToView = true): Promise<CallToolResult> => {
-  try {
-    const browser = getBrowser();
-    const before = await pageInfo(browser);
-    await browser.waitUntil(browser.$(selector).isExisting, { timeout });
-    if (scrollToView) {
-      await browser.$(selector).scrollIntoView({ block: 'center', inline: 'center' });
-    }
-    await browser.$(selector).click();
-    return {
-      content: [{ type: 'text', text: `Element clicked (selector: ${selector})${await pageChange(browser, before)}` }],
-    };
-  } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error clicking element: ${e}` }],
-    };
-  }
-};
-
-export const clickTool: ToolCallback = async ({ selector, scrollToView, timeout = defaultTimeout }: {
-  selector: string;
-  scrollToView?: boolean;
-  timeout?: number
-}): Promise<CallToolResult> => {
+export const clickTool: ToolCallback = async ({ selector }: { selector: string }): Promise<CallToolResult> => {
   const agent = await agentFor();
-  return agent ? runAction(agent, 'click', { target: selector }, 'Clicked.') : clickAction(selector, timeout, scrollToView);
+  return agent ? runAction(agent, 'click', { target: selector }, 'Clicked.') : noSession();
 };

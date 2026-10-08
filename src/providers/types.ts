@@ -8,6 +8,7 @@ export interface ConnectionConfig {
   user?: string;
   key?: string;
   services?: unknown[];
+  bidiResponseTimeout?: number;
 }
 
 export interface SessionResult {

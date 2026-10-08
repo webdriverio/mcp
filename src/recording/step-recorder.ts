@@ -1,7 +1,15 @@
 // src/recording/step-recorder.ts
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RecordedStep, SessionHistory } from '../types/recording';
 import { getState } from '../session/state';
+
+const recordedCode = new AsyncLocalStorage<string[]>();
+
+/** Attaches code the agent ran to the step of the tool call in progress. */
+export function recordCode(code: string | undefined): void {
+  if (code) recordedCode.getStore()?.push(code);
+}
 
 export function appendStep(
   toolName: string,
@@ -9,6 +17,7 @@ export function appendStep(
   status: 'ok' | 'error',
   durationMs: number,
   error?: string,
+  code?: string[],
 ): void {
   const state = getState();
   const sessionId = state.currentSession;
@@ -25,6 +34,7 @@ export function appendStep(
     durationMs,
     timestamp: new Date().toISOString(),
     ...(error !== undefined && { error }),
+    ...(code?.length ? { code } : {}),
   };
   history.steps.push(step);
 }
@@ -41,7 +51,8 @@ function extractErrorText(result: Awaited<ReturnType<ToolCallback>>): string {
 export function withRecording(toolName: string, callback: ToolCallback): ToolCallback {
   return async (params, extra) => {
     const start = Date.now();
-    const result = await callback(params, extra);
+    const code: string[] = [];
+    const result = await recordedCode.run(code, () => callback(params, extra));
     const isError = (result as any).isError === true;
     appendStep(
       toolName,
@@ -49,6 +60,7 @@ export function withRecording(toolName: string, callback: ToolCallback): ToolCal
       isError ? 'error' : 'ok',
       Date.now() - start,
       isError ? extractErrorText(result) : undefined,
+      code,
     );
     return result;
   };

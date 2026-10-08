@@ -1,5 +1,8 @@
 import type { SessionProvider, ConnectionConfig } from './types';
 
+const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
+const HEADLESS_TOKEN = 'HeadlessChrome/';
+
 export type LocalBrowserOptions = {
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   headless?: boolean;
@@ -12,7 +15,7 @@ export class LocalBrowserProvider implements SessionProvider {
   name = 'local-browser';
 
   getConnectionConfig(_options: Record<string, unknown>): ConnectionConfig {
-    return {}; // local — use WebdriverIO defaults
+    return { bidiResponseTimeout: BIDI_RESPONSE_TIMEOUT_MS };
   }
 
   buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
@@ -30,6 +33,7 @@ export class LocalBrowserProvider implements SessionProvider {
       '--no-sandbox',
       '--disable-search-engine-choice-screen',
       '--disable-infobars',
+      '--disable-blink-features=AutomationControlled',
       '--log-level=3',
       '--use-fake-device-for-media-stream',
       '--use-fake-ui-for-media-stream',
@@ -118,6 +122,14 @@ export class LocalBrowserProvider implements SessionProvider {
     }
     return merged;
   }
+}
+
+/** Headless Chrome/Edge announce `HeadlessChrome/`, which many sites block outright */
+export async function matchHeadedUserAgent(browser: WebdriverIO.Browser): Promise<void> {
+  if (!browser.isBidi) return;
+  const current = await browser.execute(() => navigator.userAgent);
+  if (typeof current !== 'string' || !current.includes(HEADLESS_TOKEN)) return;
+  await browser.emulationSetUserAgentOverride({ userAgent: current.replace(HEADLESS_TOKEN, 'Chrome/') });
 }
 
 export const localBrowserProvider = new LocalBrowserProvider();
