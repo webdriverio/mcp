@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.0](https://github.com/webdriverio/mcp/compare/v3.14.0...v4.0.0) (2026-10-08)
+
+### Features
+
+* drive browsers and apps through the typed session agent ([#157](https://github.com/webdriverio/mcp/issues/157)) ([b0ee38d](https://github.com/webdriverio/mcp/commit/b0ee38dd0c72c8e865b3d7b04d1ab7d87021bb29)), closes [webdriverio/webdriverio#15943](https://github.com/webdriverio/webdriverio/issues/15943)
+
+### Bug Fixes
+
+* fail fast and fix web-only gaps found in benchmark runs ([#159](https://github.com/webdriverio/mcp/issues/159)) ([7da0954](https://github.com/webdriverio/mcp/commit/7da0954a9b2a2d812e9013e420b530a96df7300c))
+
+### Performance
+
+* browser page model from @wdio/session, smaller tool list, close sessions on shutdown ([#155](https://github.com/webdriverio/mcp/issues/155)) ([6204d4f](https://github.com/webdriverio/mcp/commit/6204d4f17e4ec4cb7dc0ff712df5cb38e246b8cc))
+
 ## [3.14.0](https://github.com/webdriverio/mcp/compare/v3.13.0...v3.14.0) (2026-09-23)
 
 ### Features
