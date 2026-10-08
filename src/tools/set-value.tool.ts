@@ -5,7 +5,7 @@ import { runAction, agentFor, noSession } from '../session/agent';
 
 export const setValueToolDefinition: ToolDefinition = {
   name: 'set_value',
-  description: 'Replaces the text of an input or textarea. The result lists what changed on the page or screen. To fill several fields or fill and then click, use one perform_actions call.',
+  description: 'Replaces the text of an input or textarea. On web pages the result lists what changed (new elements with refs, or the new page). In apps it does not: take a snapshot to see the new screen. To fill several fields or fill and then click, use one perform_actions call.',
   annotations: { title: 'Set Input Value', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     selector: z.string().describe('Ref from snapshot (e12) or selector: CSS, XPath, "button=Exact text", "a*=Partial text"'),

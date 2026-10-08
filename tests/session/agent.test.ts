@@ -3,16 +3,19 @@ import { getState } from '../../src/session/state';
 
 const run = vi.fn();
 const snapshot = vi.fn();
-const createAgentSession = vi.fn(async (browser: unknown) => ({ browser, run, snapshot }));
+const session = { isWeb: true };
+let actions: { name: string }[] = [];
+const ALL_STEPS = ['click', 'fill', 'select', 'check', 'uncheck', 'press'].map((name) => ({ name }));
+const createAgentSession = vi.fn(async (browser: unknown) => ({ browser, run, snapshot, session, get actions() { return actions; } }));
 vi.mock('@wdio/session/agent', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   createAgentSession: (...args: unknown[]) => createAgentSession(...(args as [unknown])),
 }));
 
 const { SessionError } = await import('@wdio/session/agent');
-const { agentFor, pageReport, runAction } = await import('../../src/session/agent');
+const { agentFor, pageReport, runAction, APP_CHANGES_HINT } = await import('../../src/session/agent');
 const { mcpHint } = await import('../../src/session/hints');
-const { performActionsTool } = await import('../../src/tools/page-input.tool');
+const { performActionsTool, pressKeyTool, selectOptionTool } = await import('../../src/tools/page-input.tool');
 const { clickTool } = await import('../../src/tools/click.tool');
 const { snapshotTool } = await import('../../src/tools/snapshot.tool');
 const { tapElementTool } = await import('../../src/tools/gestures.tool');
@@ -24,6 +27,7 @@ function startSession(type: 'browser' | 'android') {
   const state = getState();
   state.browsers.set('s1', { getUrl: vi.fn() } as unknown as WebdriverIO.Browser);
   state.currentSession = 's1';
+  session.isWeb = type === 'browser';
   state.sessionMetadata.set('s1', { type, capabilities: {}, isAttached: false });
 }
 
@@ -35,6 +39,8 @@ beforeEach(() => {
   run.mockReset();
   snapshot.mockReset();
   createAgentSession.mockClear();
+  actions = ALL_STEPS;
+  session.isWeb = true;
 });
 
 describe('agentFor', () => {
@@ -74,13 +80,13 @@ describe('pageReport', () => {
 describe('runAction', () => {
   it('returns the change report', async () => {
     run.mockResolvedValue({ text: 'Clicked e3\nChanges:\n+ status "Saved"' });
-    const result = await runAction({ run } as never, 'click', { target: 'e3' }, 'Clicked.');
+    const result = await runAction({ run, session } as never, 'click', { target: 'e3' }, 'Clicked.');
     expect(result.content[0]).toEqual({ type: 'text', text: 'Clicked e3\nChanges:\n+ status "Saved"' });
   });
 
   it('turns errors into tool errors with the hint, unchanged', async () => {
     run.mockRejectedValue(new SessionError('REF_STALE', 'e9 no longer exists on the page.', { hint: 'Run `snapshot()` to get fresh refs.' }));
-    const result = await runAction({ run } as never, 'click', { target: 'e9' }, 'Clicked.');
+    const result = await runAction({ run, session } as never, 'click', { target: 'e9' }, 'Clicked.');
     expect(result.isError).toBe(true);
     expect(result.content[0]).toEqual({ type: 'text', text: 'e9 no longer exists on the page.\nRun `snapshot()` to get fresh refs.' });
   });
@@ -198,6 +204,58 @@ describe('browser tools', () => {
     expect(run).toHaveBeenCalledWith('check', { target: 'e2' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('is not supported for Android sessions.');
+  });
+});
+
+describe('perform_actions validation and hints', () => {
+  it('rejects a batch with unsupported steps before running any', async () => {
+    startSession('android');
+    actions = [{ name: 'click' }, { name: 'fill' }];
+    const result = await call(performActionsTool, { actions: [{ action: 'click', selector: 'e34' }, { action: 'press', value: 'Enter' }] });
+    expect(run).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('"press" not supported in this session, so no step ran. Steps available here: click, fill.');
+  });
+
+  it('runs a fully supported batch unchanged', async () => {
+    startSession('android');
+    actions = [{ name: 'click' }, { name: 'fill' }];
+    run.mockResolvedValue({ text: 'ok' });
+    const result = await call(performActionsTool, { actions: [{ action: 'click', selector: 'e1' }, { action: 'fill', selector: 'e2', value: 'x' }] });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('labels a failing press with its keys and never prints fill text', async () => {
+    startSession('browser');
+    run.mockRejectedValueOnce(new Error('boom'));
+    const press = await call(performActionsTool, { actions: [{ action: 'press', value: 'Enter' }] });
+    expect(press.content[0].text).toBe('✖ press Enter: boom');
+    run.mockRejectedValueOnce(new Error('boom'));
+    const fill = await call(performActionsTool, { actions: [{ action: 'fill', selector: 'e2', value: 'secret' }] });
+    expect(fill.content[0].text).toBe('✖ fill e2: boom');
+  });
+
+  it.each([['press_key', pressKeyTool, { keys: 'Enter' }], ['select_option', selectOptionTool, { selector: 'e1', value: 'x' }]])('%s answers the no-session error without a session', async (_n, tool, args) => {
+    const result = await call(tool, args);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('No active session. Start one with start_session.');
+  });
+
+  it('adds the app hint to a native click and none on web', async () => {
+    run.mockResolvedValue({ text: 'Clicked e4' });
+    startSession('android');
+    expect((await call(clickTool, { selector: 'e4' })).content[0].text).toBe(`Clicked e4\n${APP_CHANGES_HINT}`);
+    getState().sessionMetadata.clear();
+    startSession('browser');
+    expect((await call(clickTool, { selector: 'e4' })).content[0].text).toBe('Clicked e4');
+  });
+
+  it('adds the app hint once per perform_actions batch', async () => {
+    startSession('android');
+    run.mockResolvedValue({ text: 'step' });
+    const result = await call(performActionsTool, { actions: [{ action: 'click', selector: 'e1' }, { action: 'click', selector: 'e2' }] });
+    expect(result.content[0].text).toBe(`step\nstep\n${APP_CHANGES_HINT}`);
   });
 });
 

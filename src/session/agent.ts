@@ -52,11 +52,14 @@ export async function withActionTimeout<T>(work: Promise<T>, label: string): Pro
   }
 }
 
-export async function runActionWithChanges<A extends AgentActionName>(agent: AgentSession, action: A, args: ActionArgsOf<A>, done: string): Promise<{ result: CallToolResult; changes?: PageChange }> {
+export const APP_CHANGES_HINT = "App screens don't report changes: snapshot to see the result, and snapshot again if it is still loading.";
+
+export async function runActionWithChanges<A extends AgentActionName>(agent: AgentSession, action: A, args: ActionArgsOf<A>, done: string, appHint = true): Promise<{ result: CallToolResult; changes?: PageChange }> {
   try {
     const result = await withActionTimeout(agent.run(action, args), action);
     recordCode(result.code);
-    return { result: { content: [{ type: 'text', text: result.text || done }] }, changes: result.changes };
+    const text = appHint && !agent.session.isWeb ? `${result.text || done}\n${APP_CHANGES_HINT}` : result.text || done;
+    return { result: { content: [{ type: 'text', text }] }, changes: result.changes };
   } catch (e) {
     return { result: errorResult(e) };
   }

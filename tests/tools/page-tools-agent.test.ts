@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const run = vi.fn();
 const scope = { execute: vi.fn(), $: vi.fn() };
 const browser = { isMobile: false, execute: vi.fn(), setGeoLocation: vi.fn(), $: vi.fn() };
-const agent = { run, scope };
+const agent = { run, scope, session: { isWeb: true }, actions: ['click', 'fill', 'select', 'check', 'uncheck', 'press'].map((name) => ({ name })) };
 
 vi.mock('../../src/session/agent', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

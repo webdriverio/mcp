@@ -6,7 +6,7 @@ import type { SessionHistory } from '../../src/types/recording';
 const run = vi.fn();
 vi.mock('@wdio/session/agent', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  createAgentSession: vi.fn(async () => ({ run })),
+  createAgentSession: vi.fn(async () => ({ run, session: { isWeb: true }, actions: ['click', 'fill', 'select', 'check', 'uncheck', 'press'].map((name) => ({ name })) })),
 }));
 
 const { withRecording } = await import('../../src/recording/step-recorder');
