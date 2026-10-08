@@ -115,26 +115,69 @@ describe('browser tools', () => {
     expect(result.content[0].text).toBe('Filled e2\n✖ click e99: e99 was never assigned in this session.\n1 later action skipped.');
   });
 
-  it('perform_actions stops after a step that opens a listbox', async () => {
+  it('perform_actions keeps going when a step opens a listbox or dialog', async () => {
     startSession('browser');
-    run.mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'changed', added: ['listbox "Country" [ref=e9]', 'option "Austria" [ref=e10]'], omitted: 0 } });
+    run
+      .mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'changed', added: ['listbox "Country" [ref=e9]', 'option "Austria" [ref=e10]'], omitted: 0 } })
+      .mockResolvedValueOnce({ text: 'Clicked e10', changes: { kind: 'changed', added: ['Opened dialog "Choose Date" [ref=e40]'], omitted: 0 } })
+      .mockResolvedValueOnce({ text: 'Clicked e41' });
+    const result = await call(performActionsTool, {
+      actions: [{ action: 'click', selector: 'e2' }, { action: 'click', selector: 'e10' }, { action: 'click', selector: 'e41' }],
+    });
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(result.content[0].text).not.toContain('skipped');
+  });
+
+  it('perform_actions stops before a key press when a click changed the page', async () => {
+    startSession('browser');
+    run.mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'changed', added: ['dialog "Confirm" [ref=e8]'], omitted: 0 } });
+    const result = await call(performActionsTool, { actions: [{ action: 'click', selector: 'e2' }, { action: 'press', value: 'Enter' }] });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toBe('Clicked e2\n1 later action skipped: the page changed before a key press, so focus may not be where you expected. Check it (or click the element), then continue.');
+  });
+
+  it('perform_actions stops before a key press when a click removed elements', async () => {
+    startSession('browser');
+    run.mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'removed', removed: 3 } });
+    const result = await call(performActionsTool, { actions: [{ action: 'click', selector: 'e2' }, { action: 'press', value: 'Enter' }] });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.content[0].text).toContain('1 later action skipped: the page changed before a key press');
+  });
+
+  it.each([
+    ['fill', { action: 'fill', selector: 'e2', value: 'Ada' }, { kind: 'changed', added: ['listbox "Suggestions" [ref=e9]'], omitted: 0 }],
+    ['press', { action: 'press', value: 'ArrowDown' }, { kind: 'changed', added: ['option "Ada" [ref=e10]'], omitted: 0 }],
+    ['click without changes', { action: 'click', selector: 'e2' }, undefined],
+  ])('perform_actions presses after a %s', async (_name, first, changes) => {
+    startSession('browser');
+    run
+      .mockResolvedValueOnce({ text: 'Step 1', changes })
+      .mockResolvedValueOnce({ text: 'Pressed Enter' });
+    const result = await call(performActionsTool, { actions: [first, { action: 'press', value: 'Enter' }] });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result.content[0].text).toBe('Step 1\nPressed Enter');
+  });
+
+  it('perform_actions stops after a step that loads a new page', async () => {
+    startSession('browser');
+    run.mockResolvedValueOnce({ text: 'Clicked e2', changes: { kind: 'page', frame: false, url: 'https://x.test/next', refs: 3 } });
     const result = await call(performActionsTool, {
       actions: [{ action: 'click', selector: 'e2' }, { action: 'click', selector: 'e10' }, { action: 'press', value: 'Enter' }],
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toBe('Clicked e2\n2 later actions skipped: the page changed (listbox "Country" [ref=e9]). Continue with the new refs.');
+    expect(result.content[0].text).toBe('Clicked e2\n2 later actions skipped: a new page loaded (https://x.test/next). Continue with the new refs.');
   });
 
-  it('perform_actions keeps going when a fill opens a dialog', async () => {
+  it('perform_actions stops after a fill that loads a new page, without a url', async () => {
     startSession('browser');
-    run.mockResolvedValueOnce({ text: 'Filled e9', changes: { kind: 'changed', added: ['Opened dialog "Choose Date" [ref=e40]', '  - button "Next Month" [ref=e42]'], omitted: 0 } });
-    run.mockResolvedValueOnce({ text: 'Filled e10' });
+    run.mockResolvedValueOnce({ text: 'Filled e9', changes: { kind: 'page', frame: true, refs: 2 } });
     const result = await call(performActionsTool, {
-      actions: [{ action: 'fill', selector: 'e9', value: '21/11/2026' }, { action: 'fill', selector: 'e10', value: '23/11/2026' }],
+      actions: [{ action: 'fill', selector: 'e9', value: 'x' }, { action: 'click', selector: 'e10' }],
     });
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(result.content[0].text).not.toContain('skipped');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.content[0].text).toBe('Filled e9\n1 later action skipped: a new page loaded. Continue with the new refs.');
   });
 
   it('perform_actions completes when only the last step opens a dialog', async () => {

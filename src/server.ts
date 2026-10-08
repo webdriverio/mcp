@@ -111,7 +111,6 @@ function createServer(): McpServer {
       'Workflow:',
       '- snapshot, then act with refs.',
       '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
-      '- Read text, prices or tables from the snapshot (full: true shows all text), not execute_script.',
       '- Refs from the latest result stay valid until the page changes.',
     ].join('\n'),
     capabilities: {
