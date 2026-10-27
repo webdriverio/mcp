@@ -1,4 +1,5 @@
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -18,7 +19,7 @@ export const scrollAction = async (direction: 'up' | 'down', pixels = 500): Prom
   try {
     const browser = getBrowser();
     const state = getState();
-    const metadata = state.sessionMetadata.get(state.currentSession);
+    const metadata = state.sessionMetadata.get(activeSessionId());
     const sessionType = metadata?.type;
 
     if (sessionType !== 'browser') {

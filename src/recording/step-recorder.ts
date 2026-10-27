@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RecordedStep, SessionHistory } from '../types/recording';
 import { getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 
 const recordedCode = new AsyncLocalStorage<string[]>();
 
@@ -20,7 +21,7 @@ export function appendStep(
   code?: string[],
 ): void {
   const state = getState();
-  const sessionId = state.currentSession;
+  const sessionId = activeSessionId();
   if (!sessionId) return;
 
   const history = state.sessionHistory.get(sessionId);

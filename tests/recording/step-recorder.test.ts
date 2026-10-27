@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
 import { getState } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
+import { sessionContext } from '../../src/session/context';
 import { appendStep, withRecording, getSessionHistory } from '../../src/recording/step-recorder';
 
 const extra = {} as Parameters<ToolCallback>[1];
@@ -54,6 +55,15 @@ describe('appendStep', () => {
       status: 'error',
       error: 'Element not found',
     });
+  });
+
+  it('records into the session of the call context, not the default', () => {
+    setupSession('a');
+    setupSession('b');
+    getState().currentSession = 'a';
+    sessionContext.run({ sessionId: 'b' }, () => appendStep('navigate', {}, 'ok', 1));
+    expect(getSessionHistory().get('b')?.steps).toHaveLength(1);
+    expect(getSessionHistory().get('a')?.steps).toHaveLength(0);
   });
 
   it('does nothing when there is no active session', () => {

@@ -2,6 +2,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 import type { ToolDefinition } from '../types/tool';
 
 type WebExtensionData =
@@ -42,7 +43,7 @@ const extensionDataSchema = z.discriminatedUnion('type', [
 
 function getBrowserSession(): BrowserSession | CallToolResult {
   const state = getState();
-  const sessionId = state.currentSession;
+  const sessionId = activeSessionId();
   if (!sessionId) {
     return {
       isError: true,

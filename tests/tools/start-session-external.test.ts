@@ -101,6 +101,7 @@ describe('start_session with provider: external', () => {
         isAttached: true,
       }),
       expect.any(Object),
+      { keep: false, name: undefined },
     );
   });
 

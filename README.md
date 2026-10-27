@@ -710,7 +710,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 ## Available Tools
 
-The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, the raw element list, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. Set `WDIO_MCP_TOOLS=all` to list everything up front.
+The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, the raw element list, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. With several live sessions, tools are listed for the union of their platforms. Set `WDIO_MCP_TOOLS=all` to list everything up front.
 
 | Tool           | Description                                                                                                       |
 |----------------|-------------------------------------------------------------------------------------------------------------------|
@@ -720,12 +720,24 @@ The server lists only the tools that fit the current session: browser sessions g
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a browser, local Electron application, or mobile app session; `attach: true` retains the existing Chrome CDP connection mode                                         |
-| `attach_session` | Attach to an existing remote WebDriver/Appium session by ID without creating a new session                                                                                   |
+| `start_session`  | Start a browser, local Electron application, or mobile app session; `attach: true` retains the existing Chrome CDP connection mode. Optional `name` and `onExisting: "close" \| "keep"` (`keep` runs it alongside existing sessions; the new session is not made the default) |
+| `attach_session` | Attach to an existing remote WebDriver/Appium session by `sessionId` without creating a new session; optional `name` and `onExisting`. With only a `name`, looks up a live session |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
-| `close_session`  | Close or detach from the current session (supports `detach: true` to disconnect without terminating)                                                                   |
+| `close_session`  | Close or detach from the default session, or the one named by the optional `session` target (supports `detach: true` to disconnect without terminating) |
 | `emulate_device` | Emulate a mobile/tablet device preset (viewport, DPR, UA, touch); requires BiDi session                                                                                |
 | `open_web_extension` | Install a web extension through WebDriver BiDi and open one of its extension pages so normal page tools can drive its UI                                           |
+
+#### Multiple sessions
+
+By default the server keeps one session: starting a new one closes the previous one. To run sessions side by side, pass `onExisting: "keep"` and a `name` to `start_session`. The new session is not made the default, so the original keeps answering calls that omit a target.
+
+Every session-bound tool accepts an optional `session` argument, either a name or a sessionId (sessionId is matched first). Omitting it uses the default session, and targeting a session never changes the default. When a call is targeted, or more than one session is live, the result starts with `[session: name (id8)]`. Calls to the same session queue and run in order; calls to different sessions run concurrently. An unknown target, or no default session while others are live, returns an error that lists the live sessions. Names are scoped to one server process. The `wdio://session/current/*` resources always refer to the default session.
+
+```
+start_session({ platform: "browser", browser: "chrome", name: "alice" })
+start_session({ platform: "browser", browser: "chrome", name: "bob", onExisting: "keep" })
+navigate({ url: "https://example.com", session: "bob" })
+```
 
 ### Navigation & Page Interaction (Web & Mobile)
 
@@ -808,8 +820,8 @@ Recommended workflow (also sent to clients as server instructions):
 | Resource                                      | Description                                              |
 |-----------------------------------------------|----------------------------------------------------------|
 | `wdio://sessions`                             | Index of all recorded sessions                           |
-| `wdio://session/current/steps`                | Step log for the active session                          |
-| `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the active session |
+| `wdio://session/current/steps`                | Step log for the default session                          |
+| `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the default session |
 | `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
 | `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
 | `wdio://session/current/elements`             | Interactable elements (viewport-only by default)         |
@@ -821,8 +833,8 @@ Recommended workflow (also sent to clients as server instructions):
 | `wdio://session/current/context`              | Currently active context (mobile)                        |
 | `wdio://session/current/app-state/{bundleId}` | Mobile app lifecycle state for a given bundle ID         |
 | `wdio://session/current/geolocation`          | Device geolocation                                       |
-| `wdio://session/current/capabilities`         | Resolved WebDriver capabilities for the active session   |
-| `wdio://session/current/logs`                 | Crash/console logs for the current session. Auto-detects session type — browser: console logs + JS exceptions; Android: logcat; iOS: crashlog + syslog |
+| `wdio://session/current/capabilities`         | Resolved WebDriver capabilities for the default session   |
+| `wdio://session/current/logs`                 | Crash/console logs for the default session. Auto-detects session type — browser: console logs + JS exceptions; Android: logcat; iOS: crashlog + syslog |
 | `wdio://browserstack/local-binary`            | BrowserStack Local binary download URL and start command |
 | `wdio://saucelabs/local-binary`               | Sauce Connect binary download URL and start command      |
 | `wdio://testmu/local-binary`                  | TestMu Tunnel binary download URL and start command       |
@@ -1297,7 +1309,7 @@ This eliminates the need to manually handle permission popups during automated t
 - **Browser Support:** Chrome, Firefox, Edge (headed/headless, automated driver management), Safari (headed only; macOS)
 - **Mobile Support:** iOS (XCUITest) and Android (UiAutomator2/Espresso)
 - **Protocol:** Model Context Protocol (MCP) for Claude Desktop integration
-- **Session Model:** Single active session (browser or mobile app)
+- **Session Model:** One default session, with optional named sessions running alongside (browser or mobile app)
 - **Data Format:** TOON (Token-Oriented Object Notation) for efficient LLM communication
 - **Element Detection:** XML-based page source parsing with intelligent filtering and multi-strategy locator generation
 
@@ -1307,8 +1319,8 @@ Every tool call is automatically recorded to a session history. You can inspect 
 MCP resources — no extra tool calls needed:
 
 - `wdio://sessions` — lists all recorded sessions with type, timestamps, and step count
-- `wdio://session/current/steps` — step log for the active session
-- `wdio://session/current/code` — generated runnable WebdriverIO JS for the active session
+- `wdio://session/current/steps` — step log for the default session
+- `wdio://session/current/code` — generated runnable WebdriverIO JS for the default session
 - `wdio://session/{sessionId}/steps` — step log for any past session by ID
 - `wdio://session/{sessionId}/code` — generated JS for any past session by ID
 

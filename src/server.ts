@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { z } from 'zod';
 import pkg from '../package.json' with { type: 'json' };
 import http from 'node:http';
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -69,7 +70,7 @@ import {
   tabsResource,
 } from './resources';
 import {
-  attachSessionTool,
+  attachSessionRecorded,
   attachSessionToolDefinition,
   closeSessionTool,
   closeSessionToolDefinition,
@@ -92,11 +93,14 @@ import { openWebExtensionTool, openWebExtensionToolDefinition } from './tools/we
 import { executeElectronScriptTool, executeElectronScriptToolDefinition } from './tools/electron-execute.tool';
 import { mockTool, mockToolDefinition, getMockCallsTool, getMockCallsToolDefinition, manageMockTool, manageMockToolDefinition } from './tools/mock.tool';
 import { triggerElectronDeeplinkTool, triggerElectronDeeplinkToolDefinition } from './tools/electron-deeplink.tool';
+import { withSessionTarget, withSessionlessContext } from './session/routing';
 
 console.log = (...args) => console.error('[LOG]', ...args);
 console.info = (...args) => console.error('[INFO]', ...args);
 console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
+
+const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
 function createServer(): McpServer {
   const server = new McpServer({
@@ -121,11 +125,12 @@ function createServer(): McpServer {
 
   const tools = new Map<string, RegisteredTool>();
   const registerTool = (definition: ToolDefinition, callback: ToolCallback) => {
+    const routed = !definition.sessionless;
     const tool = server.registerTool(definition.name, {
       description: definition.description,
-      inputSchema: definition.inputSchema,
+      inputSchema: routed ? { ...definition.inputSchema, session: SESSION_TARGET_SCHEMA } : definition.inputSchema,
       ...(definition.annotations && { annotations: definition.annotations }),
-    }, callback);
+    }, routed ? withSessionTarget(definition.name, callback) : withSessionlessContext(callback));
     tools.set(definition.name, tool);
     return tool;
   };
@@ -152,7 +157,7 @@ function createServer(): McpServer {
     withTrace(name, withRecording(name, cb));
 
   registerTool(startSessionToolDefinition, withRecording('start_session', startSessionTool));
-  registerTool(attachSessionToolDefinition, withRecording('attach_session', attachSessionTool));
+  registerTool(attachSessionToolDefinition, attachSessionRecorded);
   registerTool(closeSessionToolDefinition, closeSessionTool);
   registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
   registerTool(emulateDeviceToolDefinition, emulateDeviceTool);

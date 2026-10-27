@@ -5,6 +5,7 @@ import type { ToolDefinition } from '../types/tool';
 type DeviceName = Extract<Parameters<WebdriverIO.Browser['emulate']>, ['device', unknown]>[1];
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 
 // Stores restore functions returned by browser.emulate(), keyed by sessionId
 const restoreFunctions = new Map<string, () => Promise<void>>();
@@ -28,7 +29,7 @@ export const emulateDeviceTool: ToolCallback = async ({
   try {
     const browser = getBrowser();
     const state = getState();
-    const sessionId = state.currentSession;
+    const sessionId = activeSessionId();
     const metadata = state.sessionMetadata.get(sessionId);
 
     // Guard: mobile sessions

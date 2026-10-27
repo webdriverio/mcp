@@ -31,7 +31,7 @@ describe('start_session Electron', () => {
     }, {});
     expect(result.isError).toBeUndefined();
     expect(mocks.startWdioSession).toHaveBeenCalledWith([expect.objectContaining({ browserName: 'electron', browserVersion: '33.2.1', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/My App', appArgs: ['--test'] } })], undefined);
-    expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ type: 'browser', runtime: 'electron', provider: 'local' }), expect.objectContaining({ runtime: 'electron' }));
+    expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ type: 'browser', runtime: 'electron', provider: 'local' }), expect.objectContaining({ runtime: 'electron' }), { keep: false, name: undefined });
   });
 
   it('records immutable Electron capabilities when the standalone service mutates launch capabilities', async () => {
@@ -75,7 +75,7 @@ describe('start_session Electron', () => {
     expect(mocks.startWdioSession).toHaveBeenCalledWith([expect.objectContaining({ browserName: 'electron' })], { rootDir: '/project' });
     expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({
       electronDeeplinkScheme: 'myapp',
-    }), expect.any(Object));
+    }), expect.any(Object), { keep: false, name: undefined });
   });
 
   it('validates electronDeeplinkScheme as a URI scheme without a colon', () => {

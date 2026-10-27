@@ -58,9 +58,11 @@ src/
 
 ### Session State
 
-Single active session model in `src/session/state.ts` — private state, read through `getBrowser()` or
-`getState()`. The `SessionMetadata` interface (type, capabilities, `isAttached`, `provider`, plus the
-provider-specific `region` / `tunnelName` / `tunnelHandle`) lives there; read it there rather than here.
+Multiple live sessions: `state.ts` holds the session maps plus the default (`currentSession`); read `SessionMetadata` there.
+`src/session/routing.ts` — `registerTool` wraps every tool in `withSessionTarget` (adds the optional `session` arg) unless
+`sessionless`; it resolves the target via `resolveSession()`, queues calls per session and prefixes results with `[session: name (id8)]` only when a target is passed or more than one session is live.
+`src/session/context.ts` — AsyncLocalStorage; `activeSessionId()` is what `getBrowser()` reads. Never read `currentSession` directly in tools.
+`registerSession()` takes `{ keep, name }`: `keep` leaves the existing default in place.
 
 Session lifecycle managed via `src/session/lifecycle.ts`:
 - `registerSession()` — registers browser + metadata + history, handles transition sentinel; calls `provider.onSessionClose()` on orphaned sessions
@@ -260,7 +262,6 @@ catch (e) {
 
 Unimplemented proposals only; shipped work is not listed here. See `docs/architecture/`:
 
-- `multi-session-proposal.md` — parallel sessions for sub-agent coordination
 - `interaction-sequencing-proposal.md` — sequencing model for tool interactions
 - `trace-extraction-proposal.md` — extracting trace data to a standalone package
 

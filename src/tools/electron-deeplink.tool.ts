@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 
 export const triggerElectronDeeplinkToolDefinition: ToolDefinition = {
   name: 'trigger_electron_deeplink',
@@ -16,7 +17,7 @@ export const triggerElectronDeeplinkToolDefinition: ToolDefinition = {
 export const triggerElectronDeeplinkTool: ToolCallback = async (args: { url: string }): Promise<CallToolResult> => {
   try {
     const state = getState();
-    const metadata = state.currentSession ? state.sessionMetadata.get(state.currentSession) : undefined;
+    const metadata = activeSessionId() ? state.sessionMetadata.get(activeSessionId()) : undefined;
     if (metadata?.runtime !== 'electron') {
       return { isError: true, content: [{ type: 'text', text: 'Error triggering Electron deeplink: no active Electron session.' }] };
     }

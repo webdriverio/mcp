@@ -2,6 +2,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
 
 const electronTargetSchema = {
@@ -107,8 +108,8 @@ const browserAdapter: MockAdapter = {
 function context(target: Target) {
   const selector = mockTypeSchema.optional().parse(target.mockType);
   const state = getState();
-  if (!state.currentSession) throw new Error('No active session.');
-  const metadata = state.sessionMetadata.get(state.currentSession);
+  if (!activeSessionId()) throw new Error('No active session.');
+  const metadata = state.sessionMetadata.get(activeSessionId());
   if (!metadata) throw new Error('Active session metadata is unavailable.');
   const browser = getBrowser();
   if (metadata.type !== 'browser') throw new Error('Mocking is unsupported for iOS/Android Appium sessions.');

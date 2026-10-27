@@ -67,6 +67,16 @@ describe('tool visibility across servers', () => {
     expect(getToolSettings().platform).toBe('electron');
   });
 
+  it('lists the tools of every live session platform', () => {
+    const server = createServer();
+    const state = getState();
+    state.sessionMetadata.set('b1', { type: 'browser', capabilities: {}, isAttached: false });
+    state.sessionMetadata.set('a1', { type: 'android', capabilities: {}, isAttached: false });
+    notifySessionRegistered(state.sessionMetadata.get('a1')!);
+    expect(server.listed()).toContain('select_option');
+    expect(server.listed()).toContain('tap_element');
+  });
+
   it('keeps one session listener however many servers are created', () => {
     const servers = Array.from({ length: 5 }, createServer);
     expect(registered).toHaveBeenCalledTimes(1);

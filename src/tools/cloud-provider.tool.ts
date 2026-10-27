@@ -205,6 +205,7 @@ export const listAppsToolDefinition: ToolDefinition = {
   name: 'list_apps',
   description: 'List apps uploaded to a cloud provider (BrowserStack App Automate, Sauce Labs App Storage, TestMu Real Device Cloud, TestingBot Storage, or Digital.ai Applications). Reads provider-specific credentials from environment.',
   annotations: { title: 'List Cloud Provider Apps', readOnlyHint: true, idempotentHint: true },
+  sessionless: true,
   inputSchema: {
     provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).describe('Cloud provider'),
     sortBy: z.enum(['app_name', 'uploaded_at']).optional().default('uploaded_at').describe('Sort order for results'),
@@ -288,6 +289,7 @@ export const uploadAppToolDefinition: ToolDefinition = {
   name: 'upload_app',
   description: 'Upload a local .apk or .ipa to a cloud provider (BrowserStack, Sauce Labs, TestMu, TestingBot, or Digital.ai). Returns the app URL for use in start_session.',
   annotations: { title: 'Upload App to Cloud Provider', destructiveHint: false },
+  sessionless: true,
   inputSchema: {
     provider: z.enum(['browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai']).describe('Cloud provider'),
     path: z.string().describe('Absolute path to the .apk or .ipa file'),

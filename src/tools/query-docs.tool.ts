@@ -26,6 +26,7 @@ export const queryDocsToolDefinition: ToolDefinition = {
     fullPage: coerceBoolean.optional().default(false).describe('Return the full matched pages instead of excerpts'),
   },
   annotations: { title: 'Query WebdriverIO Docs', readOnlyHint: true, idempotentHint: true },
+  sessionless: true,
 };
 
 type QueryDocsArgs = {

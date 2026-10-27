@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getBrowser, getState } from '../session/state.js';
+import { activeSessionId } from '../session/context.js';
 import { createTraceSession, getMonotonicMs, getTraceSession } from './state.js';
 import { formatActionTitle, mapToolToTraceAction } from './tool-mapping.js';
 import type { TraceSession } from './types.js';
@@ -65,7 +66,7 @@ export async function recordInitialNavigation(sessionId: string, url: string): P
 export function withTrace(toolName: string, callback: ToolCallback): ToolCallback {
   return async (params, extra) => {
     const state = getState();
-    const sessionId = state.currentSession;
+    const sessionId = activeSessionId();
 
     if (!sessionId) return callback(params, extra);
 

@@ -1,5 +1,6 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 
 interface LogEntry {
   level: string;
@@ -104,7 +105,7 @@ async function fetchLogsForSession(sessionType: string): Promise<{ logTypes: str
 export async function readSessionLogs(): Promise<{ mimeType: string; text: string }> {
   try {
     const state = getState();
-    const metadata = state.sessionMetadata.get(state.currentSession ?? '');
+    const metadata = state.sessionMetadata.get(activeSessionId() ?? '');
     const sessionType = metadata?.type ?? 'browser';
 
     const { logTypes, entries } = await fetchLogsForSession(sessionType);

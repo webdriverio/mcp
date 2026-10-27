@@ -1,6 +1,7 @@
 import { createAgentSession, SessionError, type ActionArgsOf, type AgentActionName, type AgentSession, type PageChange } from '@wdio/session/agent';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getBrowser, getState } from './state';
+import { activeSessionId } from './context';
 import { mcpHint } from './hints';
 import { recordCode } from '../recording/step-recorder';
 
@@ -15,7 +16,7 @@ const agents = new WeakMap<WebdriverIO.Browser, Promise<AgentSession>>();
 /** the agent session of the active session, undefined before one starts */
 export function agentFor(): Promise<AgentSession> | undefined {
   const state = getState();
-  const metadata = state.currentSession ? state.sessionMetadata.get(state.currentSession) : undefined;
+  const metadata = activeSessionId() ? state.sessionMetadata.get(activeSessionId()) : undefined;
   if (!metadata) return undefined;
   const browser = getBrowser();
   let agent = agents.get(browser);

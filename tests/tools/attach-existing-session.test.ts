@@ -175,6 +175,7 @@ describe('attach_session', () => {
         sessionId: 'existing-session-id',
         type: 'ios',
       }),
+      { keep: false, name: undefined },
     );
   });
 

@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 
 export const executeElectronScriptToolDefinition: ToolDefinition = {
   name: 'execute_electron_script',
@@ -17,7 +18,7 @@ export const executeElectronScriptToolDefinition: ToolDefinition = {
 export const executeElectronScriptTool: ToolCallback = async (args: { script: string; args?: unknown[] }): Promise<CallToolResult> => {
   try {
     const state = getState();
-    const metadata = state.currentSession ? state.sessionMetadata.get(state.currentSession) : undefined;
+    const metadata = activeSessionId() ? state.sessionMetadata.get(activeSessionId()) : undefined;
     if (metadata?.runtime !== 'electron') {
       return { isError: true, content: [{ type: 'text', text: 'Error executing Electron script: no active Electron session.' }] };
     }

@@ -79,21 +79,14 @@ BiDi mode subscribes to browser events asynchronously — screenshots, network a
 
 ### Multi-Session Support
 
-**Goal:** Enable parallel automation sessions for sub-agent coordination and cross-platform testing.
+Phase 1 shipped: session targeting (optional `session` on session-bound tools), named sessions (`name`, `onExisting: "keep"`) and a per-session call queue. Remaining work:
 
-The server currently enforces a single active session. Multi-session adds an optional `sessionId` parameter to all
-tools, allowing named sessions to run in parallel.
-
-| What                                                              | Why it matters                                                       |
-|-------------------------------------------------------------------|----------------------------------------------------------------------|
-| Session targeting (`sessionId` on all tools)                      | Sub-agents can each control their own session without conflicts      |
-| Session management tools (`list_sessions`, `set_current_session`) | Visibility and control over multiple concurrent sessions             |
-| Cross-platform testing                                            | Run web + iOS + Android sessions simultaneously, compare behavior    |
-| Multi-user scenarios                                              | "User A sends message, verify User B receives it" — impossible today |
-
-**Dependency:** Benefits from Interaction Sequencing (`execute_sequence` + `sessionId` compose naturally).
-
-See: [`docs/architecture/multi-session-proposal.md`](docs/architecture/multi-session-proposal.md)
+| What                                                          | Why it matters                                                       |
+|---------------------------------------------------------------|----------------------------------------------------------------------|
+| `list_sessions` tool/resource                                 | Visibility into live sessions and their names                        |
+| Idle timeout and max live sessions cap, failing loudly        | Prevent leaked or runaway sessions                                   |
+| Shutdown/cleanup policy for cloud sessions                    | Avoid billed cloud sessions left running                             |
+| Cross-process session registry                                | Names are currently scoped to one server process                     |
 
 ---
 

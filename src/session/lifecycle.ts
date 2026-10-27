@@ -4,6 +4,7 @@ import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState, notifySessionRegistered } from './state';
+import { assertNameAvailable, runInSessionQueue, setContextSession } from './routing';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
@@ -62,16 +63,21 @@ export function registerSession(
   browser: WebdriverIO.Browser,
   metadata: SessionMetadata,
   historyEntry: SessionHistory,
+  options: { keep?: boolean; name?: string } = {},
 ): void {
   const state = getState();
-  const oldSessionId = state.currentSession;
+  const { keep, name } = options;
+  const oldSessionId = keep ? null : state.currentSession;
+  assertNameAvailable(name, oldSessionId);
+  metadata.name = name ?? metadata.name;
   if (oldSessionId && oldSessionId !== sessionId) {
     handleSessionTransition(sessionId);
   }
   state.browsers.set(sessionId, browser);
   state.sessionMetadata.set(sessionId, metadata);
   state.sessionHistory.set(sessionId, historyEntry);
-  state.currentSession = sessionId;
+  if (!keep || !state.currentSession) state.currentSession = sessionId;
+  setContextSession(sessionId);
   notifySessionRegistered(metadata);
 
   // If there was a previous session, terminate it to prevent orphaning
@@ -113,7 +119,9 @@ export function registerSession(
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }
       };
-      void closeOld();
+      void runInSessionQueue(oldSessionId, closeOld).catch((e) => {
+        console.error('[WARN] Failed to close replaced session:', e);
+      });
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
     }

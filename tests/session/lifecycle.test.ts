@@ -59,6 +59,34 @@ beforeEach(() => {
 });
 
 describe('registerSession', () => {
+  const hist = (id: string): SessionHistory => ({ sessionId: id, type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+  const meta = (): SessionMetadata => ({ type: 'browser', capabilities: {}, isAttached: false });
+
+  it('keep leaves the old session alive and the default unchanged', () => {
+    const b1 = makeBrowser();
+    const b2 = makeBrowser();
+    registerSession('s1', b1, meta(), hist('s1'));
+    registerSession('s2', b2, meta(), hist('s2'), { keep: true, name: 'b' });
+    const state = getState();
+    expect(state.currentSession).toBe('s1');
+    expect(state.browsers.get('s1')).toBe(b1);
+    expect(state.browsers.get('s2')).toBe(b2);
+    expect(state.sessionMetadata.get('s2')?.name).toBe('b');
+    expect(b1.deleteSession).not.toHaveBeenCalled();
+    expect(state.sessionHistory.get('s1')?.steps).toHaveLength(0);
+  });
+
+  it('keep becomes the default when none exists', () => {
+    registerSession('s1', makeBrowser(), meta(), hist('s1'), { keep: true });
+    expect(getState().currentSession).toBe('s1');
+  });
+
+  it('throws on a duplicate live session name', () => {
+    registerSession('s1', makeBrowser(), meta(), hist('s1'), { name: 'a' });
+    expect(() => registerSession('s2', makeBrowser(), meta(), hist('s2'), { keep: true, name: 'a' }))
+      .toThrow('Session name "a" is already in use');
+  });
+
   it('sets currentSession', () => {
     const browser = makeBrowser();
     const meta: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false };
