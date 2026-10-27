@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { SessionMetadata } from '../../src/session/state';
 import { getState } from '../../src/session/state';
 import { closeSession, registerSession } from '../../src/session/lifecycle';
+import { runInSessionQueue } from '../../src/session/routing';
 import type { SessionHistory } from '../../src/types/recording';
 import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
@@ -138,6 +139,22 @@ describe('registerSession', () => {
 
     await vi.waitFor(() => expect(mockStopTunnel).toHaveBeenCalledWith(tunnel));
     expect(getState().currentSession).toBe('s2');
+  });
+
+  it('tears down a replaced session promptly even when a queued command on it is hung', async () => {
+    const state = getState();
+    const oldBrowser = makeBrowser();
+    state.browsers.set('s1', oldBrowser);
+    state.sessionMetadata.set('s1', { type: 'browser', capabilities: {}, isAttached: false });
+    state.sessionHistory.set('s1', { sessionId: 's1', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 's1';
+    void runInSessionQueue('s1', () => new Promise<never>(() => {}));
+
+    registerSession('s2', makeBrowser(), { type: 'browser', capabilities: {}, isAttached: false }, {
+      sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+
+    await vi.waitFor(() => expect(oldBrowser.deleteSession).toHaveBeenCalledOnce());
   });
 
   it('does not delete an auto-detached previous session during session transition', async () => {
@@ -470,5 +487,19 @@ describe('registerSession orphaned trace cleanup', () => {
     const files = readdirSync(join(tempDir, '.trace'));
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/\.zip$/);
+  });
+});
+
+describe('closeSession overlap', () => {
+  it('shares one teardown between overlapping closes', async () => {
+    const { closeSession } = await import('../../src/session/lifecycle');
+    const { getState } = await import('../../src/session/state');
+    const deleteSession = vi.fn(() => new Promise<void>((r) => setTimeout(r, 10)));
+    const state = getState();
+    state.browsers.set('overlap1', { deleteSession } as unknown as WebdriverIO.Browser);
+    state.sessionMetadata.set('overlap1', { type: 'browser', capabilities: {}, isAttached: false });
+    await Promise.all([closeSession('overlap1', false, false), closeSession('overlap1', false, false)]);
+    expect(deleteSession).toHaveBeenCalledTimes(1);
+    expect(state.browsers.has('overlap1')).toBe(false);
   });
 });

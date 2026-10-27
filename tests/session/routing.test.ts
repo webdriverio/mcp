@@ -117,6 +117,15 @@ describe('withSessionTarget', () => {
     expect(log).toEqual(['start1', 'end1', 'start2', 'end2']);
   });
 
+  it('does not queue unqueued tools behind a hung call on the same session', async () => {
+    addSession('hung1');
+    const hung = (async () => new Promise(() => {})) as unknown as ToolCallback;
+    void (withSessionTarget('navigate', hung) as unknown as Fn)({ session: 'hung1' }, extra);
+    await tick();
+    const result = await (withSessionTarget('close_session', echo(), true) as unknown as Fn)({ session: 'hung1' }, extra);
+    expect(result.content.at(-1)?.text).toBe('hung1');
+  });
+
   it('runs calls to different sessions concurrently', async () => {
     addSession('s1');
     addSession('s2');

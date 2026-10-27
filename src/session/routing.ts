@@ -68,7 +68,7 @@ export function withSessionlessContext(cb: ToolCallback): ToolCallback {
     sessionContext.run({}, () => (cb as (...x: unknown[]) => Promise<ToolResult>)(args, extra))) as unknown as ToolCallback;
 }
 
-export function withSessionTarget(toolName: string, cb: ToolCallback): ToolCallback {
+export function withSessionTarget(toolName: string, cb: ToolCallback, unqueued = false): ToolCallback {
   return (async (args: Record<string, unknown> | undefined, extra: never) => {
     const { session: target, ...rest } = (args ?? {}) as Record<string, unknown> & { session?: string };
     const call = (...a: unknown[]) => (cb as (...x: unknown[]) => Promise<ToolResult>)(...a);
@@ -97,7 +97,8 @@ export function withSessionTarget(toolName: string, cb: ToolCallback): ToolCallb
       return errorResult(`Tool "${toolName}" does not apply to ${platformOf(metadata)} session ${sessionLabel(id)}`);
     }
 
-    const result = await runInSessionQueue(id, () => sessionContext.run({ sessionId: id }, () => call(rest, extra)));
+    const run = () => sessionContext.run({ sessionId: id }, () => call(rest, extra));
+    const result = await (unqueued ? run() : runInSessionQueue(id, run));
     if (!prefixNeeded) return result;
     return {
       ...result,

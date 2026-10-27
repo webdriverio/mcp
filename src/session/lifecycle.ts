@@ -4,7 +4,7 @@ import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
 import { getState, notifySessionRegistered } from './state';
-import { assertNameAvailable, runInSessionQueue, setContextSession } from './routing';
+import { assertNameAvailable, setContextSession } from './routing';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
 import { deleteTraceSession, getTraceSession } from '../trace/state.js';
@@ -119,7 +119,7 @@ export function registerSession(
           await provider.stopTunnel?.(oldMetadata.tunnelHandle).catch(() => {});
         }
       };
-      void runInSessionQueue(oldSessionId, closeOld).catch((e) => {
+      void closeOld().catch((e) => {
         console.error('[WARN] Failed to close replaced session:', e);
       });
       state.browsers.delete(oldSessionId);
@@ -128,7 +128,18 @@ export function registerSession(
   }
 }
 
-export async function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
+const closing = new Map<string, Promise<void>>();
+
+// close_session bypasses the per-session queue, so overlapping closes must share one teardown.
+export function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
+  const inFlight = closing.get(sessionId);
+  if (inFlight) return inFlight;
+  const teardown = closeSessionOnce(sessionId, detach, isAttached, force).finally(() => closing.delete(sessionId));
+  closing.set(sessionId, teardown);
+  return teardown;
+}
+
+async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
   const state = getState();
   const browser = state.browsers.get(sessionId);
   if (!browser) return;

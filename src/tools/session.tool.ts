@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
-import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
+import { activeSessionId, assertNameAvailable, resolveSession, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
 import { matchHeadedUserAgent } from '../providers/local-browser.provider';
@@ -182,6 +182,7 @@ export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
   description: 'Closes the session, or with detach: true disconnects and leaves it running. Attached sessions and Appium sessions with noReset are detached unless detach: false.',
   annotations: { title: 'Close Session', destructiveHint: true },
+  unqueued: true,
   inputSchema: {
     detach: coerceBoolean.optional(),
   },
@@ -412,7 +413,7 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     const oldMetadata = state.sessionMetadata.get(state.currentSession);
     if (oldMetadata?.runtime === 'electron') {
       const oldId = state.currentSession;
-      await runInSessionQueue(oldId, () => closeSession(oldId, false, Boolean(oldMetadata.isAttached), true));
+      await closeSession(oldId, false, Boolean(oldMetadata.isAttached), true);
     }
   }
 

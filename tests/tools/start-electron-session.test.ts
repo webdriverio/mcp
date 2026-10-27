@@ -3,15 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   startWdioSession: vi.fn(),
   registerSession: vi.fn(),
+  closeSession: vi.fn(),
 }));
 
 vi.mock('../../src/electron/runtime', () => ({
   getElectronService: vi.fn(async () => ({ startWdioSession: mocks.startWdioSession })),
 }));
-vi.mock('../../src/session/lifecycle', () => ({ closeSession: vi.fn(), registerSession: mocks.registerSession }));
+vi.mock('../../src/session/lifecycle', () => ({ closeSession: mocks.closeSession, registerSession: mocks.registerSession }));
 
 import { startSessionTool, startSessionToolDefinition } from '../../src/tools/session.tool';
 import { getState } from '../../src/session/state';
+import { runInSessionQueue } from '../../src/session/routing';
 import { generateCode } from '../../src/recording/code-generator';
 
 const callStart = startSessionTool as unknown as (args: Record<string, unknown>, extra: unknown) => ReturnType<typeof startSessionTool>;
@@ -32,6 +34,23 @@ describe('start_session Electron', () => {
     expect(result.isError).toBeUndefined();
     expect(mocks.startWdioSession).toHaveBeenCalledWith([expect.objectContaining({ browserName: 'electron', browserVersion: '33.2.1', 'wdio:electronServiceOptions': { appBinaryPath: '/Applications/My App', appArgs: ['--test'] } })], undefined);
     expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ type: 'browser', runtime: 'electron', provider: 'local' }), expect.objectContaining({ runtime: 'electron' }), { keep: false, name: undefined });
+  });
+
+  it('replaces an Electron session without waiting on a hung command of the old session', async () => {
+    const state = getState();
+    state.browsers.set('old', {} as WebdriverIO.Browser);
+    state.sessionMetadata.set('old', { type: 'browser', capabilities: {}, isAttached: false, runtime: 'electron' });
+    state.currentSession = 'old';
+    void runInSessionQueue('old', () => new Promise<never>(() => {}));
+
+    const result = await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/app' } },
+    }, {});
+
+    expect(result.isError).toBeUndefined();
+    expect(mocks.closeSession).toHaveBeenCalledWith('old', false, false, true);
+    expect(mocks.startWdioSession).toHaveBeenCalled();
   });
 
   it('records immutable Electron capabilities when the standalone service mutates launch capabilities', async () => {

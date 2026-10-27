@@ -130,7 +130,7 @@ function createServer(): McpServer {
       description: definition.description,
       inputSchema: routed ? { ...definition.inputSchema, session: SESSION_TARGET_SCHEMA } : definition.inputSchema,
       ...(definition.annotations && { annotations: definition.annotations }),
-    }, routed ? withSessionTarget(definition.name, callback) : withSessionlessContext(callback));
+    }, routed ? withSessionTarget(definition.name, callback, definition.unqueued) : withSessionlessContext(callback));
     tools.set(definition.name, tool);
     return tool;
   };
