@@ -43,7 +43,7 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
-import { closeAllSessions } from './session/lifecycle';
+import { closeAllSessions, killAllDriverGroups } from './session/lifecycle';
 import { setupToolVisibility } from './tool-visibility';
 import { withTrace } from './trace/recorder.js';
 import {
@@ -244,6 +244,7 @@ function createServer(): McpServer {
 
 async function main() {
   installCrashHandlers(process, console.error);
+  process.on('exit', killAllDriverGroups);
   let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
   try {
     args = parseArgs(process.argv.slice(2));
@@ -343,11 +344,14 @@ async function main() {
 
 /** most time sessions get to close before the process exits anyway */
 const SHUTDOWN_TIMEOUT_MS = 5000;
+// MCP clients escalate stdin-close → SIGTERM → SIGKILL in about 4s; local drivers still closing by then must be killed before it.
+const DRIVER_KILL_AFTER_MS = 3500;
 let shuttingDown = false;
 
 function shutdown(): void {
   if (shuttingDown) return;
   shuttingDown = true;
+  setTimeout(killAllDriverGroups, DRIVER_KILL_AFTER_MS).unref();
   const timeout = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS).unref());
   void Promise.race([closeAllSessions(), timeout]).finally(() => process.exit(0));
 }

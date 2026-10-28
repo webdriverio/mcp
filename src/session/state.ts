@@ -16,6 +16,7 @@ export interface SessionMetadata {
   region?: string;
   tunnelName?: string;
   tunnelHandle?: unknown;
+  driverPid?: number;
   trace?: boolean;
   networkLogs?: NetworkLogsMode;
   /** The remote session lifecycle is owned outside this MCP process. */

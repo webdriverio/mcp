@@ -99,6 +99,9 @@ export class LocalBrowserProvider implements SessionProvider {
     const mergedCapabilities: Record<string, unknown> = {
       ...capabilities,
       ...userCapabilities,
+      ...(selectedBrowser === 'chrome' && process.platform !== 'win32' && {
+        'wdio:chromedriverOptions': this.withDetachedDriver(userCapabilities['wdio:chromedriverOptions']),
+      }),
       'goog:chromeOptions': this.mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),
       'goog:loggingPrefs': this.mergeCapabilityOptions(capabilities['goog:loggingPrefs'], userCapabilities['goog:loggingPrefs']),
       'ms:edgeOptions': this.mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
@@ -121,6 +124,11 @@ export class LocalBrowserProvider implements SessionProvider {
 
   shouldAutoDetach(_options: Record<string, unknown>): boolean {
     return false;
+  }
+
+  private withDetachedDriver(customOptions: unknown): Record<string, unknown> {
+    const custom = (customOptions ?? {}) as Record<string, unknown>;
+    return { ...custom, spawnOpts: { detached: true, ...(custom.spawnOpts as Record<string, unknown> | undefined) } };
   }
 
   private mergeCapabilityOptions(defaultOptions: unknown, customOptions: unknown): unknown {

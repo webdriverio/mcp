@@ -14,7 +14,7 @@ import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
 import { SessionError } from '@wdio/session/agent';
-import { pageReport, agentFor, withActionTimeout } from '../session/agent';
+import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -344,6 +344,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
+  const isLocalChrome = (args.provider ?? 'local') === 'local' && browser === 'chrome';
   const sessionMetadata: SessionMetadata = {
     type: 'browser',
     capabilities: mergedCapabilities,
@@ -352,6 +353,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
     region: args.region,
     tunnelName,
     tunnelHandle,
+    driverPid: isLocalChrome ? (wdioBrowser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined : undefined,
     trace: args.trace ?? false,
     networkLogs,
   };
@@ -754,7 +756,7 @@ export function createStartSessionTool(defaultNetworkLogs: NetworkLogsMode = 'no
       }
       return await startMobileSession(args);
     } catch (e) {
-      return { isError: true, content: [{ type: 'text', text: `Error starting session: ${e}` }] };
+      return errorResult(e, 'Error starting session');
     }
   };
 }
@@ -773,7 +775,7 @@ export const attachSessionTool: ToolCallback = async (args: AttachSessionArgs): 
     assertNameAvailable(name, replacedSessionId(args));
     return await attachExistingSession({ ...args, sessionId, platform });
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error attaching to session: ${e}` }] };
+    return errorResult(e, 'Error attaching to session');
   }
 };
 
@@ -806,7 +808,7 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
       content: [{ type: 'text', text: `Session ${sessionId} ${action}${note}` }],
     };
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error closing session: ${e}` }] };
+    return errorResult(e, 'Error closing session');
   }
 };
 
