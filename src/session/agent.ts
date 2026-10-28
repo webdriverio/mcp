@@ -33,10 +33,20 @@ export const ACTION_TIMEOUT_MS = 30_000;
 
 export const noSession = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'No active session. Start one with start_session.' }] });
 
+const SESSION_ENDED_ERROR_NAME = 'session ended';
+
+const hasEndedName = (e: unknown) => e instanceof Error && e.name === SESSION_ENDED_ERROR_NAME;
+
+function sessionEnded(e: unknown): boolean {
+  if (e instanceof SessionError && e.code === 'SESSION_DIED') return true;
+  return hasEndedName(e) || (e instanceof Error && hasEndedName(e.cause));
+}
+
 export function errorResult(e: unknown): CallToolResult {
   const message = e instanceof Error ? e.message : String(e);
   const hint = e instanceof SessionError ? e.hint : undefined;
-  return { isError: true, content: [{ type: 'text', text: [message, hint].filter(Boolean).join('\n') }] };
+  const ended = sessionEnded(e) ? `This browser session has ended. If you did not close it, start a new one with \`${mcpHint('open')}\`.` : undefined;
+  return { isError: true, content: [{ type: 'text', text: [message, hint, ended].filter(Boolean).join('\n') }] };
 }
 
 /** Rejects with a TIMEOUT error when `work` takes longer than the action limit. */
