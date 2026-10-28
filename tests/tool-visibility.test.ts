@@ -2,18 +2,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../src/types/tool';
-import type { onSessionRegistered } from '../src/session/state';
+import type { SessionHistory } from '../src/types/recording';
+import type { SessionMetadata, onSessionsChanged } from '../src/session/state';
 
 const registered = vi.fn();
 vi.mock('../src/session/state', async (importOriginal) => {
-  const actual = await importOriginal<{ onSessionRegistered: typeof onSessionRegistered }>();
-  return { ...actual, onSessionRegistered: (listener: Parameters<typeof onSessionRegistered>[0]) => { registered(); return actual.onSessionRegistered(listener); } };
+  const actual = await importOriginal<{ onSessionsChanged: typeof onSessionsChanged }>();
+  return { ...actual, onSessionsChanged: (listener: Parameters<typeof onSessionsChanged>[0]) => { registered(); return actual.onSessionsChanged(listener); } };
 });
 
 const { setupToolVisibility } = await import('../src/tool-visibility');
-const { getState, getToolSettings, notifySessionRegistered } = await import('../src/session/state');
+const { getState, getToolSettings, notifySessionsChanged } = await import('../src/session/state');
+const { closeSession, registerSession } = await import('../src/session/lifecycle');
 
 const noop: ToolCallback = async () => ({ content: [] });
+
+const sessionOf = (type: SessionMetadata['type']): SessionMetadata => ({ type, capabilities: {}, isAttached: false });
+const browserMock = () => ({ deleteSession: vi.fn().mockResolvedValue(undefined) }) as unknown as WebdriverIO.Browser;
+const historyOf = (sessionId: string): SessionHistory => ({ sessionId, type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
 
 /** what createServer() does per HTTP request */
 function createServer() {
@@ -38,14 +44,16 @@ beforeEach(() => {
   settings.enabledGroups.clear();
   const state = getState();
   state.currentSession = null;
+  state.browsers.clear();
   state.sessionMetadata.clear();
+  state.sessionHistory.clear();
 });
 
 describe('tool visibility across servers', () => {
   it('a later server lists the tools of the platform an earlier one started', () => {
     const first = createServer();
     expect(first.listed()).toContain('select_option');
-    notifySessionRegistered({ type: 'android', capabilities: {}, isAttached: false });
+    notifySessionsChanged({ type: 'android', capabilities: {}, isAttached: false });
     expect(first.listed()).toContain('tap_element');
 
     const second = createServer();
@@ -72,9 +80,41 @@ describe('tool visibility across servers', () => {
     const state = getState();
     state.sessionMetadata.set('b1', { type: 'browser', capabilities: {}, isAttached: false });
     state.sessionMetadata.set('a1', { type: 'android', capabilities: {}, isAttached: false });
-    notifySessionRegistered(state.sessionMetadata.get('a1')!);
+    notifySessionsChanged(state.sessionMetadata.get('a1')!);
     expect(server.listed()).toContain('select_option');
     expect(server.listed()).toContain('tap_element');
+  });
+
+  it('drops the platform of a browser session that an android session replaced', () => {
+    const server = createServer();
+    registerSession('b1', browserMock(), sessionOf('browser'), historyOf('b1'));
+    expect(server.listed()).toContain('select_option');
+
+    registerSession('a1', browserMock(), sessionOf('android'), historyOf('a1'));
+    expect(server.listed()).not.toContain('select_option');
+    expect(server.listed()).toContain('tap_element');
+  });
+
+  it('drops the platform of an android session once it is closed', async () => {
+    const server = createServer();
+    registerSession('b1', browserMock(), sessionOf('browser'), historyOf('b1'), { keep: true });
+    registerSession('a1', browserMock(), sessionOf('android'), historyOf('a1'), { keep: true });
+    expect(server.listed()).toContain('tap_element');
+
+    await closeSession('a1', false, false);
+    expect(server.listed()).not.toContain('tap_element');
+    expect(server.listed()).toContain('select_option');
+  });
+
+  it('lists the fresh-server tools once the last session closes', async () => {
+    const server = createServer();
+    registerSession('a1', browserMock(), sessionOf('android'), historyOf('a1'));
+    expect(server.listed()).toContain('tap_element');
+
+    await closeSession('a1', false, false);
+    expect(server.listed()).not.toContain('tap_element');
+    expect(server.listed()).toContain('select_option');
+    expect(server.listed()).toEqual(createServer().listed());
   });
 
   it('keeps one session listener however many servers are created', () => {
@@ -86,7 +126,7 @@ describe('tool visibility across servers', () => {
   it('stops refreshing a server once it is disposed', () => {
     const server = createServer();
     server.dispose();
-    notifySessionRegistered({ type: 'ios', capabilities: {}, isAttached: false });
+    notifySessionsChanged({ type: 'ios', capabilities: {}, isAttached: false });
     expect(server.listed()).not.toContain('tap_element');
   });
 });

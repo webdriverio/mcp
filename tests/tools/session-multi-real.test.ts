@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { remote } from 'webdriverio';
-import { attachSessionRecorded, startSessionTool } from '../../src/tools/session.tool';
+import { attachSessionRecorded, closeSessionTool, startSessionTool } from '../../src/tools/session.tool';
 import { withRecording } from '../../src/recording/step-recorder';
 import * as lifecycle from '../../src/session/lifecycle';
 import { withSessionTarget, withSessionlessContext } from '../../src/session/routing';
 import { getState } from '../../src/session/state';
+import { sauceLabsProvider } from '../../src/providers/cloud/saucelabs.provider';
 
 vi.mock('webdriverio', () => ({ attach: vi.fn(), remote: vi.fn() }));
 
@@ -75,7 +76,76 @@ describe('start_session with real state', () => {
     expect(result.content[0].text).toContain('boom');
     expect(created.deleteSession).toHaveBeenCalledOnce();
   });
+
+  it('still stops the tunnel when registration throws and deleteSession rejects', async () => {
+    const created = { ...fakeBrowser('sess-t'), deleteSession: vi.fn().mockRejectedValue(new Error('gone')) };
+    mockRemote.mockResolvedValueOnce(created);
+    vi.spyOn(sauceLabsProvider, 'startTunnel').mockResolvedValueOnce('handle');
+    const stopTunnel = vi.spyOn(sauceLabsProvider, 'stopTunnel').mockResolvedValueOnce(undefined);
+    vi.spyOn(lifecycle, 'registerSession').mockImplementationOnce(() => { throw new Error('boom'); });
+    const result = await start({ platform: 'browser', provider: 'saucelabs', tunnel: true }, {});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('boom');
+    expect(created.deleteSession).toHaveBeenCalledOnce();
+    expect(stopTunnel).toHaveBeenCalledWith('handle');
+  });
+
+  it('closes the new session when startup fails after registration', async () => {
+    const created = { ...fakeBrowser('sess-n'), url: vi.fn().mockRejectedValue(new Error('nav failed')) };
+    mockRemote.mockResolvedValueOnce(created);
+    const result = await start({ platform: 'browser', provider: 'local', browser: 'firefox', navigationUrl: 'https://example.com' }, {});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('nav failed');
+    expect(getState().browsers.has('sess-n')).toBe(false);
+    expect(created.deleteSession).toHaveBeenCalledOnce();
+  });
+
+  it('reports a failed result to the provider when startup fails after registration', async () => {
+    const created = { ...fakeBrowser('sess-r'), url: vi.fn().mockRejectedValue(new Error('nav failed')) };
+    mockRemote.mockResolvedValueOnce(created);
+    const onSessionClose = vi.spyOn(sauceLabsProvider, 'onSessionClose').mockResolvedValueOnce(undefined);
+    const result = await start({ platform: 'browser', provider: 'saucelabs', navigationUrl: 'https://example.com' }, {});
+    expect(result.isError).toBe(true);
+    expect(onSessionClose).toHaveBeenCalledWith('sess-r', 'browser', { status: 'failed', reason: expect.stringContaining('nav failed') }, undefined, created, undefined);
+  });
+
+  it('holds a targeted call until startup finishes', async () => {
+    const windowSize = deferred();
+    const created = { ...fakeBrowser('sess-a'), setWindowSize: vi.fn(() => windowSize.promise) };
+    mockRemote.mockResolvedValueOnce(created);
+    const cb = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ran' }] }));
+    const targeted = withSessionTarget('get_url', cb as unknown as ToolCallback) as unknown as Fn;
+    const starting = start({ ...ext, name: 'a' }, {});
+    await vi.waitFor(() => expect(created.setWindowSize).toHaveBeenCalled());
+    const call = targeted({ session: 'a' }, {});
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(cb).not.toHaveBeenCalled();
+    windowSize.resolve();
+    await starting;
+    await call;
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it('closes a session whose startup is still running', async () => {
+    const windowSize = deferred();
+    const created = { ...fakeBrowser('sess-c'), setWindowSize: vi.fn(() => windowSize.promise) };
+    mockRemote.mockResolvedValueOnce(created);
+    const closed = withSessionTarget('close_session', closeSessionTool as unknown as ToolCallback, true) as unknown as Fn;
+    const starting = start({ ...ext, name: 'c' }, {});
+    await vi.waitFor(() => expect(created.setWindowSize).toHaveBeenCalled());
+    const result = await closed({ session: 'c' }, {});
+    expect(result.isError).toBeUndefined();
+    expect(getState().browsers.has('sess-c')).toBe(false);
+    windowSize.resolve();
+    await starting;
+  });
 });
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(r => { resolve = r; });
+  return { promise, resolve };
+}
 
 describe('attach_session with real state', () => {
   it('does not record a step for a name-only lookup', async () => {

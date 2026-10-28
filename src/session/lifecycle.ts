@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { SessionHistory } from '../types/recording';
 import type { SessionResult } from '../providers/types';
 import type { SessionMetadata } from './state';
-import { getState, notifySessionRegistered } from './state';
+import { getState, notifySessionsChanged } from './state';
 import { assertNameAvailable, setContextSession } from './routing';
 import { getProvider } from '../providers/registry';
 import { captureTraceScreenshot, endTrace } from '../trace/recorder.js';
@@ -78,7 +78,6 @@ export function registerSession(
   state.sessionHistory.set(sessionId, historyEntry);
   if (!keep || !state.currentSession) state.currentSession = sessionId;
   setContextSession(sessionId);
-  notifySessionRegistered(metadata);
 
   // If there was a previous session, terminate it to prevent orphaning
   if (oldSessionId && oldSessionId !== sessionId) {
@@ -126,20 +125,21 @@ export function registerSession(
       state.sessionMetadata.delete(oldSessionId);
     }
   }
+  notifySessionsChanged(metadata);
 }
 
 const closing = new Map<string, Promise<void>>();
 
 // close_session bypasses the per-session queue, so overlapping closes must share one teardown.
-export function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
+export function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean, result?: SessionResult): Promise<void> {
   const inFlight = closing.get(sessionId);
   if (inFlight) return inFlight;
-  const teardown = closeSessionOnce(sessionId, detach, isAttached, force).finally(() => closing.delete(sessionId));
+  const teardown = closeSessionOnce(sessionId, detach, isAttached, force, result).finally(() => closing.delete(sessionId));
   closing.set(sessionId, teardown);
   return teardown;
 }
 
-async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean): Promise<void> {
+async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean, result?: SessionResult): Promise<void> {
   const state = getState();
   const browser = state.browsers.get(sessionId);
   if (!browser) return;
@@ -163,7 +163,7 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
       if (metadata?.provider) {
         try {
           const provider = getProvider(metadata.provider, metadata.type);
-          await provider.onSessionClose?.(sessionId, metadata.type, getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
+          await provider.onSessionClose?.(sessionId, metadata.type, result ?? getSessionResult(history), metadata.tunnelHandle, browser, metadata.region);
         } catch (e) {
           console.error('[WARN] Failed to run provider onSessionClose:', e);
         }
@@ -200,6 +200,7 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
     if (state.currentSession === sessionId) {
       state.currentSession = null;
     }
+    notifySessionsChanged();
   }
 }
 

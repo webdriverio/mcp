@@ -4,10 +4,12 @@ const mocks = vi.hoisted(() => ({
   startWdioSession: vi.fn(),
   registerSession: vi.fn(),
   closeSession: vi.fn(),
+  cleanupSessionRuntime: vi.fn(),
 }));
 
 vi.mock('../../src/electron/runtime', () => ({
   getElectronService: vi.fn(async () => ({ startWdioSession: mocks.startWdioSession })),
+  cleanupSessionRuntime: mocks.cleanupSessionRuntime,
 }));
 vi.mock('../../src/session/lifecycle', () => ({ closeSession: mocks.closeSession, registerSession: mocks.registerSession }));
 
@@ -51,6 +53,19 @@ describe('start_session Electron', () => {
     expect(result.isError).toBeUndefined();
     expect(mocks.closeSession).toHaveBeenCalledWith('old', false, false, true);
     expect(mocks.startWdioSession).toHaveBeenCalled();
+  });
+
+  it('still deletes the Electron browser when runtime cleanup rejects after a failed registration', async () => {
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', deleteSession });
+    mocks.registerSession.mockImplementationOnce(() => { throw new Error('boom'); });
+    mocks.cleanupSessionRuntime.mockRejectedValueOnce(new Error('cleanup failed'));
+    const result = await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/app' } },
+    }, {});
+    expect(result).toEqual(expect.objectContaining({ isError: true, content: [expect.objectContaining({ text: expect.stringContaining('boom') })] }));
+    expect(deleteSession).toHaveBeenCalledOnce();
   });
 
   it('records immutable Electron capabilities when the standalone service mutates launch capabilities', async () => {

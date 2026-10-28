@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
-import { activeSessionId, assertNameAvailable, resolveSession, sessionLabel } from '../session/routing';
+import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
 import { matchHeadedUserAgent } from '../providers/local-browser.provider';
@@ -192,13 +192,38 @@ function replacedSessionId({ onExisting }: { onExisting?: 'close' | 'keep' }): s
   return onExisting === 'keep' ? undefined : getState().currentSession ?? undefined;
 }
 
-async function registerOrDispose(register: () => void, dispose: () => Promise<unknown>): Promise<void> {
+// startup joins the session queue synchronously with registration, so no targeted call can run before it
+async function registerOrDispose<T>(
+  sessionId: string,
+  register: () => void,
+  disposers: Array<() => Promise<unknown>>,
+  startup?: () => Promise<T>,
+): Promise<T | undefined> {
   try {
     register();
   } catch (e) {
-    await dispose().catch(() => {});
+    for (const dispose of disposers) {
+      try {
+        await dispose();
+      } catch (disposeError) {
+        console.error('[WARN] Failed to dispose new session:', disposeError);
+      }
+    }
     throw e;
   }
+  if (!startup) return undefined;
+  return runInSessionQueue(sessionId, async () => {
+    try {
+      return await startup();
+    } catch (e) {
+      try {
+        await closeSession(sessionId, false, Boolean(getState().sessionMetadata.get(sessionId)?.isAttached), false, { status: 'failed', reason: e instanceof Error ? e.message : String(e) });
+      } catch (closeError) {
+        console.error('[WARN] Failed to close session after failed startup:', closeError);
+      }
+      throw e;
+    }
+  });
 }
 
 type TabSnapshot = { activeTabUrl: string | undefined; allTabUrls: string[] };
@@ -324,38 +349,39 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     trace: args.trace ?? false,
   };
 
-  await registerOrDispose(() => registerSession(sessionId, wdioBrowser, sessionMetadata, {
+  const { sizeNote, page } = (await registerOrDispose(sessionId, () => registerSession(sessionId, wdioBrowser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
     capabilities: mergedCapabilities,
     steps: [],
-  }, { keep: args.onExisting === 'keep', name: args.name }), async () => {
-    await wdioBrowser.deleteSession();
-    if (tunnelHandle) await provider.stopTunnel?.(tunnelHandle);
-  });
-
-  if (args.trace) {
-    startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
-  }
-
-  let sizeNote = '';
-  try {
-    await wdioBrowser.setWindowSize(windowWidth, windowHeight);
-  } catch (e) {
-    sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
-  }
-
-  // set up before the first page loads, so it records that page too
-  const agent = await agentFor();
-  let page = '';
-  if (navigationUrl) {
-    await wdioBrowser.url(navigationUrl);
+  }, { keep: args.onExisting === 'keep', name: args.name }), [
+    () => wdioBrowser.deleteSession(),
+    async () => { if (tunnelHandle) await provider.stopTunnel?.(tunnelHandle); },
+  ], async () => {
     if (args.trace) {
-      await recordInitialNavigation(sessionId, navigationUrl);
+      startTrace(sessionId, mergedCapabilities, 'browser', { width: windowWidth, height: windowHeight });
     }
-    page = agent ? await pageReport(agent) : '';
-  }
+
+    let sizeNote = '';
+    try {
+      await wdioBrowser.setWindowSize(windowWidth, windowHeight);
+    } catch (e) {
+      sizeNote = `\nNote: Unable to set window size (${windowWidth}x${windowHeight}). ${e}`;
+    }
+
+    // set up before the first page loads, so it records that page too
+    const agent = await agentFor();
+    let page = '';
+    if (navigationUrl) {
+      await wdioBrowser.url(navigationUrl);
+      if (args.trace) {
+        await recordInitialNavigation(sessionId, navigationUrl);
+      }
+      page = agent ? await pageReport(agent) : '';
+    }
+    return { sizeNote, page };
+  }))!;
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
   const urlText = navigationUrl ? ` and navigated to ${navigationUrl}` : '';
@@ -435,12 +461,12 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
     provider: 'local', trace: args.trace ?? false,
     ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
-  await registerOrDispose(() => registerSession(sessionId, browser, metadata, {
+  await registerOrDispose(sessionId, () => registerSession(sessionId, browser, metadata, {
     sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities: recordedCapabilities, steps: [],
-  }, { keep: args.onExisting === 'keep', name: args.name }), async () => {
-    await cleanupSessionRuntime('electron', browser);
-    await browser.deleteSession();
-  });
+  }, { keep: args.onExisting === 'keep', name: args.name }), [
+    () => cleanupSessionRuntime('electron', browser),
+    () => browser.deleteSession(),
+  ]);
   if (args.trace) startTrace(sessionId, recordedCapabilities, 'browser', { width: args.windowWidth ?? 1280, height: args.windowHeight ?? 800 });
 
   return { content: [{ type: 'text', text: [
@@ -497,17 +523,17 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     trace: args.trace ?? false,
   };
 
-  await registerOrDispose(() => registerSession(sessionId, browser, metadata, {
+  await registerOrDispose(sessionId, () => registerSession(sessionId, browser, metadata, {
     sessionId,
     type: sessionType,
     startedAt: new Date().toISOString(),
     capabilities: mergedCapabilities,
     appiumConfig: { hostname: serverConfig.hostname, port: serverConfig.port, path: serverConfig.path },
     steps: [],
-  }, { keep: args.onExisting === 'keep', name: args.name }), async () => {
-    await browser.deleteSession();
-    if (tunnelHandle) await provider.stopTunnel?.(tunnelHandle);
-  });
+  }, { keep: args.onExisting === 'keep', name: args.name }), [
+    () => browser.deleteSession(),
+    async () => { if (tunnelHandle) await provider.stopTunnel?.(tunnelHandle); },
+  ]);
 
   if (args.trace) {
     startTrace(sessionId, mergedCapabilities, sessionType);
