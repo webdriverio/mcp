@@ -4,6 +4,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import type { Cookie } from '@wdio/protocols';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { errorResult } from '../session/agent';
 
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
@@ -41,10 +42,7 @@ export const setCookieTool: ToolCallback = async ({
       content: [{ type: 'text', text: `Cookie "${name}" set successfully` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error setting cookie: ${e}` }],
-    };
+    return errorResult(e, 'Error setting cookie');
   }
 };
 
@@ -73,9 +71,6 @@ export const deleteCookiesTool: ToolCallback = async ({ name }: { name?: string 
       content: [{ type: 'text', text: 'All cookies deleted successfully' }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error deleting cookies: ${e}` }],
-    };
+    return errorResult(e, 'Error deleting cookies');
   }
 };

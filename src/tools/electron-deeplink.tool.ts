@@ -4,6 +4,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import { errorResult } from '../session/agent';
 
 export const triggerElectronDeeplinkToolDefinition: ToolDefinition = {
   name: 'trigger_electron_deeplink',
@@ -35,6 +36,6 @@ export const triggerElectronDeeplinkTool: ToolCallback = async (args: { url: str
     await browser.electron.triggerDeeplink(args.url);
     return { content: [{ type: 'text', text: `Electron deeplink triggered: ${args.url}` }] };
   } catch (error) {
-    return { isError: true, content: [{ type: 'text', text: `Error triggering Electron deeplink: ${error instanceof Error ? error.message : String(error)}` }] };
+    return errorResult(error, 'Error triggering Electron deeplink');
   }
 };

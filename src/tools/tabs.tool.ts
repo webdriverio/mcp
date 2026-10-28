@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { errorResult } from '../session/agent';
 
 export const switchTabToolDefinition: ToolDefinition = {
   name: 'switch_tab',
@@ -30,6 +31,6 @@ export const switchTabTool: ToolCallback = async ({ handle, index }: { handle?: 
     }
     return { isError: true, content: [{ type: 'text', text: 'Error: Must provide either handle or index' }] };
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error switching tab: ${e}` }] };
+    return errorResult(e, 'Error switching tab');
   }
 };

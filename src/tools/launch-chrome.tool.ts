@@ -7,6 +7,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { errorResult } from '../session/agent';
 
 const USER_DATA_DIR = join(tmpdir(), 'chrome-debug');
 
@@ -132,9 +133,6 @@ export const launchChromeTool: ToolCallback = async ({
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error launching Chrome: ${e}` }],
-    };
+    return errorResult(e, 'Error launching Chrome');
   }
 };

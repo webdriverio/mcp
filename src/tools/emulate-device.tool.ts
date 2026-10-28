@@ -6,6 +6,7 @@ type DeviceName = Extract<Parameters<WebdriverIO.Browser['emulate']>, ['device',
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import { errorResult } from '../session/agent';
 
 // Stores restore functions returned by browser.emulate(), keyed by sessionId
 const restoreFunctions = new Map<string, () => Promise<void>>();
@@ -67,7 +68,7 @@ export const emulateDeviceTool: ToolCallback = async ({
             content: [{ type: 'text', text: `Available devices (${names.length}):\n${names.join('\n')}` }],
           };
         }
-        return { isError: true, content: [{ type: 'text', text: `Error listing devices: ${e}` }] };
+        return errorResult(e, 'Error listing devices');
       }
       return { content: [{ type: 'text', text: 'Could not retrieve device list.' }] };
     }
@@ -94,18 +95,16 @@ export const emulateDeviceTool: ToolCallback = async ({
       const msg = String(e);
       if (msg.includes('Unknown device name')) {
         return {
+          isError: true,
           content: [{
             type: 'text',
             text: `Error: Unknown device "${device}". Call emulate_device() with no arguments to list valid names.`,
           }],
         };
       }
-      return { isError: true, content: [{ type: 'text', text: `Error: ${e}` }] };
+      return errorResult(e, 'Error');
     }
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error: ${e}` }],
-    };
+    return errorResult(e, 'Error');
   }
 };

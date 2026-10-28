@@ -110,6 +110,11 @@ describe('errorResult', () => {
     expect(errorResult(new SessionError('SESSION_DIED', 'gone')).content[0]).toEqual({ type: 'text', text: `gone\n${ENDED}` });
   });
 
+  it('keeps a distinctive error name and adds the context prefix', () => {
+    const stale = Object.assign(new Error('element is gone'), { name: 'stale element reference' });
+    expect(errorResult(stale, 'Error clicking').content[0]).toEqual({ type: 'text', text: 'Error clicking: stale element reference: element is gone' });
+  });
+
   it('keeps the message of any other error', () => {
     expect(errorResult(new Error('boom'))).toEqual({ isError: true, content: [{ type: 'text', text: 'boom' }] });
   });

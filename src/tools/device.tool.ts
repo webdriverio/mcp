@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
-import { agentFor, runAction } from '../session/agent';
+import { agentFor, runAction, errorResult } from '../session/agent';
 
 export const hideKeyboardToolDefinition: ToolDefinition = {
   name: 'hide_keyboard',
@@ -45,10 +45,7 @@ export const rotateDeviceTool: ToolCallback = async (args: {
       content: [{ type: 'text', text: `Device rotated to: ${orientation}` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error rotating device: ${e}` }],
-    };
+    return errorResult(e, 'Error rotating device');
   }
 };
 
@@ -62,10 +59,7 @@ export const hideKeyboardTool: ToolCallback = async (): Promise<CallToolResult> 
       content: [{ type: 'text', text: 'Keyboard hidden' }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error hiding keyboard: ${e}` }],
-    };
+    return errorResult(e, 'Error hiding keyboard');
   }
 };
 
@@ -96,9 +90,6 @@ export const setGeolocationTool: ToolCallback = async (args: {
       ],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error setting geolocation: ${e}` }],
-    };
+    return errorResult(e, 'Error setting geolocation');
   }
 };

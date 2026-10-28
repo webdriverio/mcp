@@ -5,6 +5,7 @@ import type { ToolDefinition } from '../types/tool.js';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { MCP_DEMOTE_FACTOR, MCP_PATH_PREFIX, capPageText, pageText, search } from '../utils/docs-index';
 import { loadDocsIndex } from '../utils/docs-client';
+import { errorResult } from '../session/agent';
 
 const DEFAULT_LIMIT = 5;
 
@@ -74,6 +75,6 @@ export const queryDocsTool: ToolCallback = async (args: QueryDocsArgs) => {
       }));
     return { content: [{ type: 'text' as const, text: encode({ query, hits }) }] };
   } catch (e) {
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Error: ${e}` }] };
+    return errorResult(e, 'Error');
   }
 };

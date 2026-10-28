@@ -4,6 +4,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import { errorResult } from '../session/agent';
 
 export const executeElectronScriptToolDefinition: ToolDefinition = {
   name: 'execute_electron_script',
@@ -33,6 +34,6 @@ export const executeElectronScriptTool: ToolCallback = async (args: { script: st
     );
     return { content: [{ type: 'text', text: result === undefined ? 'Electron script executed successfully (no return value)' : `Result: ${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}` }] };
   } catch (error) {
-    return { isError: true, content: [{ type: 'text', text: `Error executing Electron script: ${error instanceof Error ? error.message : String(error)}` }] };
+    return errorResult(error, 'Error executing Electron script');
   }
 };

@@ -42,11 +42,21 @@ function sessionEnded(e: unknown): boolean {
   return hasEndedName(e) || (e instanceof Error && hasEndedName(e.cause));
 }
 
-export function errorResult(e: unknown): CallToolResult {
-  const message = e instanceof Error ? e.message : String(e);
+// a WebDriver error's class name (e.g. "stale element reference") is often the useful part; SessionError and ended-session names add nothing
+function errorMessage(e: Error): string {
+  const named = e.name && e.name !== 'Error' && !(e instanceof SessionError) && !hasEndedName(e);
+  return named ? [e.name, e.message].filter(Boolean).join(': ') : e.message;
+}
+
+function errorText(e: unknown, context?: string): string {
+  const message = e instanceof Error ? errorMessage(e) : String(e);
   const hint = e instanceof SessionError ? e.hint : undefined;
   const ended = sessionEnded(e) ? `This browser session has ended. If you did not close it, start a new one with \`${mcpHint('open')}\`.` : undefined;
-  return { isError: true, content: [{ type: 'text', text: [message, hint, ended].filter(Boolean).join('\n') }] };
+  return [context ? `${context}: ${message}` : message, hint, ended].filter(Boolean).join('\n');
+}
+
+export function errorResult(e: unknown, context?: string): CallToolResult {
+  return { isError: true, content: [{ type: 'text', text: errorText(e, context) }] };
 }
 
 /** Rejects with a TIMEOUT error when `work` takes longer than the action limit. */
@@ -89,6 +99,6 @@ export async function pageReport(agent: AgentSession): Promise<string> {
     }
     return `Page: ${url}\n${snapshot.text}`;
   } catch (e) {
-    return e instanceof SessionError && e.code === 'TIMEOUT' ? [e.message, e.hint].filter(Boolean).join('\n') : '';
+    return e instanceof SessionError && e.code === 'TIMEOUT' ? errorText(e) : '';
   }
 }

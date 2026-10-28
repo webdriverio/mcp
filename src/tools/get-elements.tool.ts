@@ -5,6 +5,7 @@ import { getBrowser } from '../session/state';
 import { getElements } from '../scripts/get-elements';
 import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { errorResult } from '../session/agent';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
@@ -38,6 +39,6 @@ export const getElementsTool: ToolCallback = async ({
     const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
     return { content: [{ type: 'text' as const, text }] };
   } catch (e) {
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Error getting elements: ${e}` }] };
+    return errorResult(e, 'Error getting elements');
   }
 };

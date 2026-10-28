@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
+import { errorResult } from '../session/agent';
 
 export const switchContextToolDefinition: ToolDefinition = {
   name: 'switch_context',
@@ -41,9 +42,6 @@ export const switchContextTool: ToolCallback = async (args: {
       content: [{ type: 'text', text: `Switched to context: ${context}` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error switching context: ${e}` }],
-    };
+    return errorResult(e, 'Error switching context');
   }
 };

@@ -4,7 +4,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { pageChange } from '../utils/page-info';
-import { runAction, agentFor } from '../session/agent';
+import { runAction, agentFor, errorResult } from '../session/agent';
 
 export const navigateToolDefinition: ToolDefinition = {
   name: 'navigate',
@@ -23,10 +23,7 @@ export const navigateAction = async (url: string): Promise<CallToolResult> => {
       content: [{ type: 'text', text: `Navigated to ${url}${await pageChange(browser, {})}` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error navigating: ${e}` }],
-    };
+    return errorResult(e, 'Error navigating');
   }
 };
 

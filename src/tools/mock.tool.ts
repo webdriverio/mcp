@@ -3,6 +3,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import { errorResult } from '../session/agent';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
 
 const electronTargetSchema = {
@@ -151,10 +152,6 @@ function withTarget<T>(target: Target, operation: (ctx: ReturnType<typeof contex
   return result;
 }
 
-function errorResult(error: unknown) {
-  return { isError: true, content: [{ type: 'text' as const, text: `Error with mock: ${error instanceof Error ? error.message : String(error)}` }] };
-}
-
 // Detached sessions outlive this registry: restore every handle so interception cannot outlive MCP's handle on the browser.
 export async function releaseSessionMocks(browser: WebdriverIO.Browser): Promise<void> {
   const mocks = sessionMocks.get(browser);
@@ -199,7 +196,7 @@ export const mockTool: ToolCallback = async (args: MockArgs) => {
       await adapter.configure(entry.handle, { ...args, behavior });
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock configured: ${adapter.describe(target)} (${behavior})` }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, 'Error with mock'); }
 };
 
 export const getMockCallsToolDefinition: ToolDefinition = {
@@ -216,7 +213,7 @@ export const getMockCallsTool: ToolCallback = async (args: Target) => {
       const { calls, callCount } = await adapter.inspect(entry.handle);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ calls, callCount }) }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, 'Error with mock'); }
 };
 
 export const manageMockToolDefinition: ToolDefinition = {
@@ -235,5 +232,5 @@ export const manageMockTool: ToolCallback = async (args: ManageArgs) => {
       if (action === 'restore') mocks.delete(key);
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock ${action} completed: ${adapter.describe(target)}` }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, 'Error with mock'); }
 };

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
+import { errorResult } from '../session/agent';
 
 export const scrollToolDefinition: ToolDefinition = {
   name: 'scroll',
@@ -35,10 +36,7 @@ export const scrollAction = async (direction: 'up' | 'down', pixels = 500): Prom
       content: [{ type: 'text', text: `Scrolled ${direction} ${pixels} pixels` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error scrolling: ${e}` }],
-    };
+    return errorResult(e, 'Error scrolling');
   }
 };
 
