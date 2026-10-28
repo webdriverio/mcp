@@ -11,6 +11,10 @@ import { deleteTraceSession, getTraceSession } from '../trace/state.js';
 import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
 import { releaseSessionMocks } from '../tools/mock.tool.js';
+import { withTimeout } from '../utils/with-timeout';
+
+// A hung driver must not block close_session (it skips the per-session queue and its 90s deadline); state cleanup in the outer finally still runs.
+const DELETE_SESSION_TIMEOUT_MS = 90_000;
 
 async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): Promise<void> {
   endTrace(sessionId);
@@ -174,7 +178,7 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
       try {
-        await browser.deleteSession();
+        await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
       } finally {
         // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs.
         // If session deletion fails, still best-effort stop the tunnel so the

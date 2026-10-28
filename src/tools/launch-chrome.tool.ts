@@ -78,7 +78,9 @@ function launchChrome(port: number): void {
     '--profile-directory=Default',
     '--no-first-run',
     '--disable-session-crashed-bubble',
-  ], { detached: true, stdio: 'ignore' }).unref();
+  ], { detached: true, stdio: 'ignore' })
+    .on('error', (error) => console.error('[WARN] Failed to launch Chrome:', error))
+    .unref();
 }
 
 async function waitForCDP(port: number, timeoutMs = 15000): Promise<void> {

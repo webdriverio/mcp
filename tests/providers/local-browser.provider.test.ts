@@ -3,7 +3,11 @@ import { localBrowserProvider, matchHeadedUserAgent } from '../../src/providers/
 
 describe('LocalBrowserProvider', () => {
   it('fails BiDi commands after 30s instead of the 180s default', () => {
-    expect(localBrowserProvider.getConnectionConfig({})).toEqual({ bidiResponseTimeout: 30_000 });
+    expect(localBrowserProvider.getConnectionConfig({})).toEqual({
+      bidiResponseTimeout: 30_000,
+      connectionRetryTimeout: 45_000,
+      connectionRetryCount: 0,
+    });
   });
 
   it.each(['chrome', 'edge'])('buildCapabilities: %s hides navigator.webdriver', (browser) => {

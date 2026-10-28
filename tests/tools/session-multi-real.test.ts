@@ -109,6 +109,24 @@ describe('start_session with real state', () => {
     expect(onSessionClose).toHaveBeenCalledWith('sess-r', 'browser', { status: 'failed', reason: expect.stringContaining('nav failed') }, undefined, created, undefined);
   });
 
+  it('keeps the session when the first page does not load in time', async () => {
+    const created = { ...fakeBrowser('sess-h'), url: vi.fn(() => new Promise(() => {})) };
+    mockRemote.mockResolvedValueOnce(created);
+    vi.useFakeTimers();
+    try {
+      const starting = start({ platform: 'browser', provider: 'local', browser: 'firefox', navigationUrl: 'https://example.com' }, {});
+      await vi.waitFor(() => expect(created.url).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await starting;
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toContain('did not finish within 30s');
+      expect(getState().browsers.has('sess-h')).toBe(true);
+      expect(created.deleteSession).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('holds a targeted call until startup finishes', async () => {
     const windowSize = deferred();
     const created = { ...fakeBrowser('sess-a'), setWindowSize: vi.fn(() => windowSize.promise) };

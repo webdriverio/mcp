@@ -3,6 +3,7 @@ import { getState, platformOf } from './state';
 import { activeSessionId, sessionContext } from './context';
 import type { SessionCallContext } from './context';
 import { toolAppliesTo } from '../toolsets';
+import { withTimeout } from '../utils/with-timeout';
 
 export { activeSessionId, sessionContext };
 export type { SessionCallContext };
@@ -52,6 +53,17 @@ function errorResult(message: string): ToolResult {
   return { isError: true, content: [{ type: 'text', text: `Error: ${message}` }] };
 }
 
+// Outlasts the 30s action timeout in agent.ts so bounded actions report their own; only unblocks the queue, the abandoned WebDriver call keeps running.
+const QUEUED_CALL_TIMEOUT_MS = 90_000;
+
+class QueuedCallTimeout extends Error {}
+
+async function withQueuedCallTimeout<T>(work: Promise<T>, toolName: string): Promise<T> {
+  return withTimeout(work, QUEUED_CALL_TIMEOUT_MS, () => new QueuedCallTimeout(
+    `"${toolName}" did not finish within ${QUEUED_CALL_TIMEOUT_MS / 1000}s. The session queue moved on; the browser may still be busy with it.`,
+  ));
+}
+
 export function assertNameAvailable(name: string | undefined, replacingSessionId?: string | null): void {
   if (!name) return;
   const state = getState();
@@ -98,7 +110,13 @@ export function withSessionTarget(toolName: string, cb: ToolCallback, unqueued =
     }
 
     const run = () => sessionContext.run({ sessionId: id }, () => call(rest, extra));
-    const result = await (unqueued ? run() : runInSessionQueue(id, run));
+    let result: ToolResult;
+    try {
+      result = await (unqueued ? run() : runInSessionQueue(id, () => withQueuedCallTimeout(run(), toolName)));
+    } catch (e) {
+      if (!(e instanceof QueuedCallTimeout)) throw e;
+      result = errorResult(e.message);
+    }
     if (!prefixNeeded) return result;
     return {
       ...result,

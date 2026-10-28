@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { parseArgs } from './utils/parse-args';
 import { extractHost, sendJsonRpcError } from './utils/http-helpers';
+import { installCrashHandlers } from './utils/crash-handlers';
 import type { ToolDefinition } from './types/tool';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
@@ -240,7 +241,8 @@ function createServer(): McpServer {
 }
 
 async function main() {
-  let args: { http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
+  installCrashHandlers(process, console.error);
+  let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (e) {
@@ -319,6 +321,9 @@ async function main() {
       console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
       console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
       console.error(`  allowed origins: ${originsMsg}`);
+    }).on('error', (error) => {
+      console.error('Fatal error starting HTTP server:', error);
+      process.exit(1);
     });
 
   } else {

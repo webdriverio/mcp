@@ -13,7 +13,8 @@ import { matchHeadedUserAgent } from '../providers/local-browser.provider';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
-import { pageReport, agentFor } from '../session/agent';
+import { SessionError } from '@wdio/session/agent';
+import { pageReport, agentFor, withActionTimeout } from '../session/agent';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -349,7 +350,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     trace: args.trace ?? false,
   };
 
-  const { sizeNote, page } = (await registerOrDispose(sessionId, () => registerSession(sessionId, wdioBrowser, sessionMetadata, {
+  const { sizeNote, page, navigationTimedOut } = (await registerOrDispose(sessionId, () => registerSession(sessionId, wdioBrowser, sessionMetadata, {
     sessionId,
     type: 'browser',
     startedAt: new Date().toISOString(),
@@ -374,17 +375,22 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     const agent = await agentFor();
     let page = '';
     if (navigationUrl) {
-      await wdioBrowser.url(navigationUrl);
+      try {
+        await withActionTimeout(wdioBrowser.url(navigationUrl), 'navigate');
+      } catch (e) {
+        if (!(e instanceof SessionError && e.code === 'TIMEOUT')) throw e;
+        return { sizeNote, page: [e.message, e.hint].filter(Boolean).join('\n'), navigationTimedOut: true };
+      }
       if (args.trace) {
         await recordInitialNavigation(sessionId, navigationUrl);
       }
       page = agent ? await pageReport(agent) : '';
     }
-    return { sizeNote, page };
+    return { sizeNote, page, navigationTimedOut: false };
   }))!;
 
   const modeText = effectiveHeadless ? 'headless' : 'headed';
-  const urlText = navigationUrl ? ` and navigated to ${navigationUrl}` : '';
+  const urlText = !navigationUrl ? '' : navigationTimedOut ? ` and started loading ${navigationUrl}` : ` and navigated to ${navigationUrl}`;
   const headlessNote = headless && !headlessSupported
     ? '\nNote: Safari does not support headless mode. Started in headed mode.'
     : '';

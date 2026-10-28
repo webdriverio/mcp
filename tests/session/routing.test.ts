@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getState } from '../../src/session/state';
 import { resolveSession, withSessionTarget, sessionContext, activeSessionId } from '../../src/session/routing';
@@ -124,6 +124,24 @@ describe('withSessionTarget', () => {
     await tick();
     const result = await (withSessionTarget('close_session', echo(), true) as unknown as Fn)({ session: 'hung1' }, extra);
     expect(result.content.at(-1)?.text).toBe('hung1');
+  });
+
+  it('times out a hung queued call so later calls on the session still run', async () => {
+    vi.useFakeTimers();
+    try {
+      addSession('hung2');
+      const hung = (async () => new Promise(() => {})) as unknown as ToolCallback;
+      const p1 = (withSessionTarget('get_screenshot', hung) as unknown as Fn)({ session: 'hung2' }, extra);
+      const p2 = (withSessionTarget('navigate', echo()) as unknown as Fn)({ session: 'hung2' }, extra);
+      await vi.advanceTimersByTimeAsync(90_000);
+      const first = await p1;
+      expect(first.isError).toBe(true);
+      expect(first.content.at(-1)?.text).toContain('did not finish within 90s');
+      const second = await p2;
+      expect(second.content.at(-1)?.text).toBe('hung2');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('runs calls to different sessions concurrently', async () => {

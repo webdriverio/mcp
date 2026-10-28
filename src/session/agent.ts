@@ -4,6 +4,7 @@ import { getBrowser, getState } from './state';
 import { activeSessionId } from './context';
 import { mcpHint } from './hints';
 import { recordCode } from '../recording/step-recorder';
+import { withTimeout } from '../utils/with-timeout';
 
 /**
  * Page and app actions run through `@wdio/session`: one page model (snapshots
@@ -40,17 +41,9 @@ export function errorResult(e: unknown): CallToolResult {
 
 /** Rejects with a TIMEOUT error when `work` takes longer than the action limit. */
 export async function withActionTimeout<T>(work: Promise<T>, label: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const limit = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new SessionError('TIMEOUT', `"${label}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`, {
-      hint: `The page may still be busy. \`${mcpHint('snapshot', { interactive: true })}\` shows where it is.`,
-    })), ACTION_TIMEOUT_MS);
-  });
-  try {
-    return await Promise.race([work, limit]);
-  } finally {
-    clearTimeout(timer);
-  }
+  return withTimeout(work, ACTION_TIMEOUT_MS, () => new SessionError('TIMEOUT', `"${label}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`, {
+    hint: `The page may still be busy. \`${mcpHint('snapshot', { interactive: true })}\` shows where it is.`,
+  }));
 }
 
 export const APP_CHANGES_HINT = "App screens don't report changes: snapshot to see the result, and snapshot again if it is still loading.";

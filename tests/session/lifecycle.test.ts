@@ -362,6 +362,28 @@ describe('closeSession', () => {
     expect(state.currentSession).toBeNull();
   });
 
+  it('rejects and removes the session when deleteSession hangs past 90s', async () => {
+    vi.useFakeTimers();
+    try {
+      const browser = makeBrowser({ deleteSession: vi.fn(() => new Promise<void>(() => {})) });
+      const state = getState();
+      state.browsers.set('hung-delete', browser);
+      state.sessionMetadata.set('hung-delete', { type: 'browser', capabilities: {}, isAttached: false });
+      state.sessionHistory.set('hung-delete', { sessionId: 'hung-delete', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+      state.currentSession = 'hung-delete';
+
+      const closed = closeSession('hung-delete', false, false);
+      const assertion = expect(closed).rejects.toThrow(/did not finish within 90s/);
+      await vi.advanceTimersByTimeAsync(90_000);
+      await assertion;
+
+      expect(state.browsers.has('hung-delete')).toBe(false);
+      expect(state.sessionMetadata.has('hung-delete')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('continues Electron teardown when runtime cleanup fails', async () => {
     const browser = makeBrowser();
     const tunnel = makeTunnel();

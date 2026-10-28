@@ -9,6 +9,8 @@ export interface ConnectionConfig {
   key?: string;
   services?: unknown[];
   bidiResponseTimeout?: number;
+  connectionRetryTimeout?: number;
+  connectionRetryCount?: number;
 }
 
 export interface SessionResult {
