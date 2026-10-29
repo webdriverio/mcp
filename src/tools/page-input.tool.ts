@@ -3,7 +3,8 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import type { AgentActionName, AgentSession } from '@wdio/session/agent';
-import { runAction, runActionWithChanges, agentFor, noSession, APP_CHANGES_HINT } from '../session/agent';
+import { runAction, runActionWithChanges, agentFor, noSession, APP_CHANGES_HINT, ACTION_TIMEOUT_MS } from '../session/agent';
+import { QUEUED_CALL_TIMEOUT_MS } from '../session/routing';
 
 export const selectOptionToolDefinition: ToolDefinition = {
   name: 'select_option',
@@ -71,6 +72,7 @@ export const performActionsTool: ToolCallback = async ({ actions }: { actions: {
   }
   const appHint = agent.session.isWeb ? [] : [APP_CHANGES_HINT];
   const out: string[] = [];
+  const startedAt = Date.now();
   for (const [i, step] of actions.entries()) {
     const label = `${step.action} ${step.action === 'press' ? step.value ?? '' : step.selector ?? ''}`.trim();
     const { result, changes } = await STEP_ACTIONS[step.action](agent, step.selector ?? '', step.value ?? '', label, step.times);
@@ -86,7 +88,10 @@ export const performActionsTool: ToolCallback = async ({ actions }: { actions: {
       ? `a new page loaded${changes.url ? ` (${changes.url})` : ''}. Continue with the new refs.`
       : actions[i + 1].action === 'press' && step.action !== 'fill' && step.action !== 'press' && (changes?.kind === 'changed' || changes?.kind === 'removed')
         ? 'the page changed before a key press, so focus may not be where you expected. Check it (or click the element), then continue.'
-        : undefined;
+        // A step that could run past the session queue's deadline would keep acting after the caller got a timeout.
+        : Date.now() - startedAt + ACTION_TIMEOUT_MS >= QUEUED_CALL_TIMEOUT_MS
+          ? `this call reached its ${QUEUED_CALL_TIMEOUT_MS / 1000}s limit. Continue with the remaining actions in a new call.`
+          : undefined;
     if (stopReason) {
       out.push(`${skippedText}: ${stopReason}`);
       break;
