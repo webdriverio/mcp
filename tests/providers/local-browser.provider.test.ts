@@ -56,41 +56,14 @@ describe('LocalBrowserProvider', () => {
     expect(caps[prefKey]).toEqual({ performance: 'ALL' });
   });
 
-  it('buildCapabilities: chrome driver spawns detached so its process group can be killed', () => {
-    const caps = localBrowserProvider.buildCapabilities({ browser: 'chrome' });
-    expect(caps['wdio:chromedriverOptions']).toEqual({ spawnOpts: { detached: true } });
-  });
-
-  it('buildCapabilities: user chromedriver options are preserved alongside detached spawn', () => {
+  it('buildCapabilities: passes user chromedriver options through unchanged and adds none by default', () => {
+    expect(localBrowserProvider.buildCapabilities({ browser: 'chrome' })['wdio:chromedriverOptions']).toBeUndefined();
+    const chromedriverOptions = { port: 9515, spawnOpts: { cwd: '/tmp/driver' } };
     const caps = localBrowserProvider.buildCapabilities({
       browser: 'chrome',
-      capabilities: { 'wdio:chromedriverOptions': { port: 9515, spawnOpts: { cwd: '/tmp/driver' } } },
+      capabilities: { 'wdio:chromedriverOptions': chromedriverOptions },
     });
-    expect(caps['wdio:chromedriverOptions']).toEqual({ port: 9515, spawnOpts: { detached: true, cwd: '/tmp/driver' } });
-  });
-
-  it('buildCapabilities: user spawnOpts cannot turn off detached spawn', () => {
-    const caps = localBrowserProvider.buildCapabilities({
-      browser: 'chrome',
-      capabilities: { 'wdio:chromedriverOptions': { spawnOpts: { detached: false } } },
-    });
-    expect(caps['wdio:chromedriverOptions']).toEqual({ spawnOpts: { detached: true } });
-  });
-
-  it.each(['firefox', 'edge', 'safari'] as const)('buildCapabilities: %s adds no chromedriver options', (browser) => {
-    const caps = localBrowserProvider.buildCapabilities({ browser });
-    expect(caps['wdio:chromedriverOptions']).toBeUndefined();
-  });
-
-  it('buildCapabilities: chrome on win32 adds no chromedriver options', () => {
-    const original = Object.getOwnPropertyDescriptor(process, 'platform')!;
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-    try {
-      const caps = localBrowserProvider.buildCapabilities({ browser: 'chrome' });
-      expect(caps['wdio:chromedriverOptions']).toBeUndefined();
-    } finally {
-      Object.defineProperty(process, 'platform', original);
-    }
+    expect(caps['wdio:chromedriverOptions']).toEqual(chromedriverOptions);
   });
 
   it('getSessionType returns browser', () => {

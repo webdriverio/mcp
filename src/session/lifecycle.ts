@@ -12,7 +12,7 @@ import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
 import { releaseSessionMocks } from '../tools/mock.tool.js';
 import { withTimeout } from '../utils/with-timeout';
-import { killDriverGroup } from './driver-group';
+import { driverTree, killPids } from './driver-tree';
 
 // A hung driver must not block close_session (it skips the per-session queue and its 90s deadline); state cleanup in the outer finally still runs.
 const DELETE_SESSION_TIMEOUT_MS = 90_000;
@@ -111,10 +111,11 @@ export function registerSession(
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
+          const oldTree = driverTree(oldMetadata?.driverPid);
           try {
             await oldBrowser.deleteSession();
           } catch {
-            killDriverGroup(oldMetadata?.driverPid);
+            killPids(oldTree);
             // Continue to tunnel teardown. The state entry is removed below,
             // so this is the last opportunity to release an auto-managed tunnel.
           }
@@ -179,13 +180,14 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
+      const tree = driverTree(metadata?.driverPid);
       try {
         await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
         // the driver has exited, so its pid may be reused before the tunnel stop below finishes
         if (metadata) { metadata.driverPid = undefined; }
       } catch (e) {
         // only on failure: after a clean delete the driver has exited and its pid may already be reused
-        killDriverGroup(metadata?.driverPid);
+        killPids(tree);
         throw e;
       } finally {
         // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs.
@@ -216,8 +218,8 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
   }
 }
 
-export function killAllDriverGroups(): void {
-  for (const metadata of getState().sessionMetadata.values()) killDriverGroup(metadata.driverPid);
+export function killAllDriverTrees(): void {
+  for (const metadata of getState().sessionMetadata.values()) killPids(driverTree(metadata.driverPid));
 }
 
 /**

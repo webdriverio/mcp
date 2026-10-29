@@ -9,7 +9,7 @@ import { closeSession, registerSession } from '../session/lifecycle';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
-import { matchHeadedUserAgent, spawnsDetachedDriver } from '../providers/local-browser.provider';
+import { matchHeadedUserAgent, tracksDriverTree } from '../providers/local-browser.provider';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
@@ -344,7 +344,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
-  const isLocalChrome = (args.provider ?? 'local') === 'local' && spawnsDetachedDriver(browser);
+  const isLocalChrome = (args.provider ?? 'local') === 'local' && tracksDriverTree(browser);
   const sessionMetadata: SessionMetadata = {
     type: 'browser',
     capabilities: mergedCapabilities,

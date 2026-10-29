@@ -43,7 +43,7 @@ import { getElementsTool, getElementsToolDefinition } from './tools/get-elements
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
-import { closeAllSessions, killAllDriverGroups } from './session/lifecycle';
+import { closeAllSessions, killAllDriverTrees } from './session/lifecycle';
 import { setupToolVisibility } from './tool-visibility';
 import { withTrace } from './trace/recorder.js';
 import {
@@ -244,7 +244,7 @@ function createServer(): McpServer {
 
 async function main() {
   installCrashHandlers(process, console.error);
-  process.on('exit', killAllDriverGroups);
+  process.on('exit', killAllDriverTrees);
   let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
   try {
     args = parseArgs(process.argv.slice(2));
@@ -351,7 +351,7 @@ let shuttingDown = false;
 function shutdown(): void {
   if (shuttingDown) return;
   shuttingDown = true;
-  setTimeout(killAllDriverGroups, DRIVER_KILL_AFTER_MS).unref();
+  setTimeout(killAllDriverTrees, DRIVER_KILL_AFTER_MS).unref();
   const timeout = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS).unref());
   void Promise.race([closeAllSessions(), timeout]).finally(() => process.exit(0));
 }

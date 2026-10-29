@@ -362,7 +362,7 @@ describe('closeSession', () => {
     expect(state.currentSession).toBeNull();
   });
 
-  it('SIGKILLs the chromedriver process group when deleteSession fails', async () => {
+  it('SIGKILLs the chromedriver process tree when deleteSession fails', async () => {
     const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
     try {
       const browser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('hung page')) });
@@ -373,7 +373,7 @@ describe('closeSession', () => {
       state.currentSession = 'hung';
 
       await expect(closeSession('hung', false, false)).rejects.toThrow('hung page');
-      expect(kill).toHaveBeenCalledWith(-4321, 'SIGKILL');
+      expect(kill).toHaveBeenCalledWith(4321, 'SIGKILL');
     } finally {
       kill.mockRestore();
     }

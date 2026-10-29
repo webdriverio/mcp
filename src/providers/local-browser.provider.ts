@@ -6,7 +6,7 @@ const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
 const CONNECTION_RETRY_TIMEOUT_MS = 45_000;
 const HEADLESS_TOKEN = 'HeadlessChrome/';
 
-export function spawnsDetachedDriver(browser: string | undefined): boolean {
+export function tracksDriverTree(browser: string | undefined): boolean {
   return (browser ?? 'chrome') === 'chrome' && process.platform !== 'win32';
 }
 
@@ -103,9 +103,6 @@ export class LocalBrowserProvider implements SessionProvider {
     const mergedCapabilities: Record<string, unknown> = {
       ...capabilities,
       ...userCapabilities,
-      ...(spawnsDetachedDriver(selectedBrowser) && {
-        'wdio:chromedriverOptions': this.withDetachedDriver(userCapabilities['wdio:chromedriverOptions']),
-      }),
       'goog:chromeOptions': this.mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),
       'goog:loggingPrefs': this.mergeCapabilityOptions(capabilities['goog:loggingPrefs'], userCapabilities['goog:loggingPrefs']),
       'ms:edgeOptions': this.mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
@@ -128,11 +125,6 @@ export class LocalBrowserProvider implements SessionProvider {
 
   shouldAutoDetach(_options: Record<string, unknown>): boolean {
     return false;
-  }
-
-  private withDetachedDriver(customOptions: unknown): Record<string, unknown> {
-    const custom = (customOptions ?? {}) as Record<string, unknown>;
-    return { ...custom, spawnOpts: { ...(custom.spawnOpts as Record<string, unknown> | undefined), detached: true } };
   }
 
   private mergeCapabilityOptions(defaultOptions: unknown, customOptions: unknown): unknown {
