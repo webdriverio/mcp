@@ -29,7 +29,7 @@ export function agentFor(): Promise<AgentSession> | undefined {
 }
 
 /** longest a single page action may take before the agent gets the turn back */
-const ACTION_TIMEOUT_MS = 30_000;
+export const ACTION_TIMEOUT_MS = 30_000;
 
 export const noSession = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'No active session. Start one with start_session.' }] });
 
