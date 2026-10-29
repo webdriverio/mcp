@@ -63,7 +63,7 @@
     "@wdio/session": "10.1.0",
     "@xmldom/xmldom": "^0.9.10",
     "browserstack-local": "^1.5.12",
-    "puppeteer-core": "^24.40.0",
+    "puppeteer-core": "^25.16.0",
     "saucelabs": "^9.0.2",
     "sharp": "^0.35.3",
     "testingbot-tunnel-launcher": "^1.1.18",
@@ -74,7 +74,7 @@
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^10.0.6",
-    "@types/node": "^20.19.37",
+    "@types/node": "^22.20.5",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@wdio/eslint": "^0.1.3",
