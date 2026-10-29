@@ -102,7 +102,7 @@ export const emulateDeviceTool: ToolCallback = async ({
           }],
         };
       }
-      return errorResult(e, 'Error');
+      throw e;
     }
   } catch (e) {
     return errorResult(e, 'Error');

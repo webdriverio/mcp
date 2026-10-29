@@ -239,11 +239,19 @@ function nextFence(fence: number | null, line: string): number | null {
   return closer && closer[1].length >= fence ? null : fence;
 }
 
+function* headingLines(lines: string[]): Generator<{ line: string; heading: Section | null }> {
+  let fence: number | null = null;
+  for (const line of lines) {
+    const inFence = fence !== null;
+    fence = nextFence(fence, line);
+    yield { line, heading: inFence || fence !== null ? null : headingOf(line) };
+  }
+}
+
 export function chunkCorpus(text: string, entries: TocEntry[] = tocEntries(text)): DocChunk[] {
   const markerAt = text.indexOf(FULL_DOCS_MARKER);
   const lines = (markerAt >= 0 ? text.slice(markerAt + FULL_DOCS_MARKER.length) : text).split('\n');
   const chunks: DocChunk[] = [];
-  let fence: number | null = null;
   let page = -1;
   let pageTitle = '';
   let sections: Section[] = [];
@@ -255,14 +263,7 @@ export function chunkCorpus(text: string, entries: TocEntry[] = tocEntries(text)
     }
     buf = [];
   };
-  for (const line of lines) {
-    const inFence = fence !== null;
-    fence = nextFence(fence, line);
-    if (inFence || fence !== null) {
-      buf.push(line);
-      continue;
-    }
-    const heading = headingOf(line);
+  for (const { line, heading } of headingLines(lines)) {
     if (!heading) {
       buf.push(line);
       continue;
@@ -392,7 +393,7 @@ export function getIndex(text: string): DocsIndex {
 // Anchors on the densest *window* rather than the densest line: a single line can
 // outscore a whole relevant section (a URL in a "View on GitHub" link repeats the
 // query term), which would push the excerpt past the signature the caller wants.
-function excerptChunk(chunk: DocChunk, terms: string[]): { excerpt: string; startLine: number } {
+function excerptChunk(chunk: DocChunk, terms: string[]): { excerpt: string; startLine: number; lines: string[] } {
   const wanted = new Set(terms);
   const lines = chunk.text.split('\n');
   const hits = lines.map((line) => {
@@ -423,18 +424,13 @@ function excerptChunk(chunk: DocChunk, terms: string[]): { excerpt: string; star
     out.push(lines[i]);
     used += add;
   }
-  return { excerpt: out.join('\n'), startLine: bestStart };
+  return { excerpt: out.join('\n'), startLine: bestStart, lines };
 }
 
 // Line 0 opens the chunk: a page's H1 (in its title) or a heading already in its sections.
-function trailAt(chunk: DocChunk, lineIndex: number): string[] {
+function trailAt(chunk: DocChunk, lines: string[], lineIndex: number): string[] {
   const sections = [...chunk.sections];
-  let fence: number | null = null;
-  for (const line of chunk.text.split('\n').slice(1, lineIndex + 1)) {
-    const inFence = fence !== null;
-    fence = nextFence(fence, line);
-    if (inFence || fence !== null) continue;
-    const heading = headingOf(line);
+  for (const { heading } of headingLines(lines.slice(1, lineIndex + 1))) {
     if (heading) pushSection(sections, heading);
   }
   return [chunk.title, ...sections.map((s) => s.title)];
@@ -447,10 +443,9 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
   const scores = new Map<number, number>();
   const tokens = queryTerms(query);
   const compounds = joinedPairs(query);
-  const scoring: [string, number | null][] = [...tokens.map((t): [string, number | null] => [t, null]), ...compounds.map((t): [string, number | null] => [t, TITLE_FIELD])];
-  for (const [token, onlyField] of scoring) {
+  const scoreToken = (token: string, onlyField?: number): void => {
     index.fields.forEach((field, f) => {
-      if (onlyField !== null && f !== onlyField) { return; }
+      if (onlyField !== undefined && f !== onlyField) { return; }
       for (const term of FIELD_TERMS[f](token)) {
         const posting = field.postings.get(term);
         if (!posting) { continue; }
@@ -462,11 +457,13 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
         }
       }
     });
-  }
+  };
+  for (const token of tokens) scoreToken(token);
+  for (const compound of compounds) scoreToken(compound, TITLE_FIELD);
   const { demotePathPrefix, demoteFactor } = opts;
   const demote = Boolean(demotePathPrefix && demoteFactor) && !tokens.some((t) => t.toLowerCase() === 'mcp');
   const terms = tokens.flatMap(termsOf);
-  const queryNames = [...new Set([...tokens, ...compounds].map((t) => t.toLowerCase()))];
+  const queryNames = [...new Set([...tokens.map((t) => t.toLowerCase()), ...compounds])];
   // A page whose path names the query terms is the page the query is about; BM25 alone lets an
   // overview that merely repeats a term outscore it by a hair. Title words already score in
   // the title field, so boosting them too counted them twice.
@@ -487,7 +484,7 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
     .slice(0, limit)
     .map(([i, score]) => {
       const chunk = index.chunks[i];
-      const { excerpt, startLine } = excerptChunk(chunk, terms);
-      return { page: chunk.page, title: chunk.title, trail: trailAt(chunk, startLine), path: chunk.path, score, excerpt };
+      const { excerpt, startLine, lines } = excerptChunk(chunk, terms);
+      return { page: chunk.page, title: chunk.title, trail: trailAt(chunk, lines, startLine), path: chunk.path, score, excerpt };
     });
 }

@@ -6,6 +6,10 @@ const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
 const CONNECTION_RETRY_TIMEOUT_MS = 45_000;
 const HEADLESS_TOKEN = 'HeadlessChrome/';
 
+export function spawnsDetachedDriver(browser: string | undefined): boolean {
+  return (browser ?? 'chrome') === 'chrome' && process.platform !== 'win32';
+}
+
 export type LocalBrowserOptions = {
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   headless?: boolean;
@@ -99,7 +103,7 @@ export class LocalBrowserProvider implements SessionProvider {
     const mergedCapabilities: Record<string, unknown> = {
       ...capabilities,
       ...userCapabilities,
-      ...(selectedBrowser === 'chrome' && process.platform !== 'win32' && {
+      ...(spawnsDetachedDriver(selectedBrowser) && {
         'wdio:chromedriverOptions': this.withDetachedDriver(userCapabilities['wdio:chromedriverOptions']),
       }),
       'goog:chromeOptions': this.mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),

@@ -45,6 +45,7 @@ type MockAdapter = {
   describe(target: Target): string;
 };
 const kindLabels = { electron: 'Electron', browser: 'Browser' } as const;
+const MOCK_ERROR_CONTEXT = 'Error with mock';
 type MockEntry = { adapter: MockAdapter; handle: unknown };
 // Browser ownership keeps handles isolated and lets teardown release them without another cleanup hook.
 const sessionMocks = new WeakMap<WebdriverIO.Browser, Map<string, MockEntry>>();
@@ -196,7 +197,7 @@ export const mockTool: ToolCallback = async (args: MockArgs) => {
       await adapter.configure(entry.handle, { ...args, behavior });
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock configured: ${adapter.describe(target)} (${behavior})` }] };
     });
-  } catch (error) { return errorResult(error, 'Error with mock'); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };
 
 export const getMockCallsToolDefinition: ToolDefinition = {
@@ -213,7 +214,7 @@ export const getMockCallsTool: ToolCallback = async (args: Target) => {
       const { calls, callCount } = await adapter.inspect(entry.handle);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ calls, callCount }) }] };
     });
-  } catch (error) { return errorResult(error, 'Error with mock'); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };
 
 export const manageMockToolDefinition: ToolDefinition = {
@@ -232,5 +233,5 @@ export const manageMockTool: ToolCallback = async (args: ManageArgs) => {
       if (action === 'restore') mocks.delete(key);
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock ${action} completed: ${adapter.describe(target)}` }] };
     });
-  } catch (error) { return errorResult(error, 'Error with mock'); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };

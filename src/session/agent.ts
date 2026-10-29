@@ -43,13 +43,14 @@ function sessionEnded(e: unknown): boolean {
 }
 
 // a WebDriver error's class name (e.g. "stale element reference") is often the useful part; SessionError and ended-session names add nothing
-function errorMessage(e: Error): string {
+function errorMessage(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
   const named = e.name && e.name !== 'Error' && !(e instanceof SessionError) && !hasEndedName(e);
   return named ? [e.name, e.message].filter(Boolean).join(': ') : e.message;
 }
 
 function errorText(e: unknown, context?: string): string {
-  const message = e instanceof Error ? errorMessage(e) : String(e);
+  const message = errorMessage(e);
   const hint = e instanceof SessionError ? e.hint : undefined;
   const ended = sessionEnded(e) ? `This browser session has ended. If you did not close it, start a new one with \`${mcpHint('open')}\`.` : undefined;
   return [context ? `${context}: ${message}` : message, hint, ended].filter(Boolean).join('\n');
