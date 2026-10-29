@@ -1,4 +1,5 @@
 import type { SessionProvider, ConnectionConfig } from './types';
+import type { NetworkLogsMode } from '../session/state';
 
 const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
 // Aborts hung classic commands natively and never replays a timed-out command; longer than the 30s action/BiDi timeouts.
@@ -11,6 +12,7 @@ export type LocalBrowserOptions = {
   windowWidth?: number;
   windowHeight?: number;
   capabilities?: Record<string, unknown>;
+  networkLogs?: NetworkLogsMode;
 };
 
 export class LocalBrowserProvider implements SessionProvider {
@@ -24,12 +26,13 @@ export class LocalBrowserProvider implements SessionProvider {
     };
   }
 
-  buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
-    const selectedBrowser = (options.browser as string | undefined) ?? 'chrome';
-    const headless = (options.headless as boolean | undefined) ?? true;
-    const windowWidth = (options.windowWidth as number | undefined) ?? 1280;
-    const windowHeight = (options.windowHeight as number | undefined) ?? 800;
-    const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
+  buildCapabilities(options: LocalBrowserOptions): Record<string, unknown> {
+    const selectedBrowser = options.browser ?? 'chrome';
+    const headless = options.headless ?? true;
+    const windowWidth = options.windowWidth ?? 1280;
+    const windowHeight = options.windowHeight ?? 800;
+    const userCapabilities = options.capabilities ?? {};
+    const networkLogs = options.networkLogs ?? 'none';
 
     const headlessSupported = selectedBrowser !== 'safari';
     const effectiveHeadless = headless && headlessSupported;
@@ -71,10 +74,16 @@ export class LocalBrowserProvider implements SessionProvider {
       case 'chrome':
         capabilities.browserName = 'chrome';
         capabilities['goog:chromeOptions'] = { args: chromiumArgs };
+        if (networkLogs !== 'none') {
+          capabilities['goog:loggingPrefs'] = { performance: 'ALL' };
+        }
         break;
       case 'edge':
         capabilities.browserName = 'msedge';
         capabilities['ms:edgeOptions'] = { args: chromiumArgs };
+        if (networkLogs !== 'none') {
+          capabilities['ms:loggingPrefs'] = { performance: 'ALL' };
+        }
         break;
       case 'firefox':
         capabilities.browserName = 'firefox';
@@ -91,7 +100,9 @@ export class LocalBrowserProvider implements SessionProvider {
       ...capabilities,
       ...userCapabilities,
       'goog:chromeOptions': this.mergeCapabilityOptions(capabilities['goog:chromeOptions'], userCapabilities['goog:chromeOptions']),
+      'goog:loggingPrefs': this.mergeCapabilityOptions(capabilities['goog:loggingPrefs'], userCapabilities['goog:loggingPrefs']),
       'ms:edgeOptions': this.mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
+      'ms:loggingPrefs': this.mergeCapabilityOptions(capabilities['ms:loggingPrefs'], userCapabilities['ms:loggingPrefs']),
       'moz:firefoxOptions': this.mergeCapabilityOptions(capabilities['moz:firefoxOptions'], userCapabilities['moz:firefoxOptions']),
     };
 

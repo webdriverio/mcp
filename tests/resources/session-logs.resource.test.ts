@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { NetworkLogsMode } from '../../src/session/state';
 
-function createMockState(sessionType: 'browser' | 'ios' | 'android' = 'browser') {
+function createMockState(
+  sessionType: 'browser' | 'ios' | 'android' = 'browser',
+  networkLogs?: NetworkLogsMode,
+) {
   const metadata = new Map();
-  metadata.set('test-session', { type: sessionType });
+  metadata.set('test-session', { type: sessionType, ...(networkLogs ? { networkLogs } : {}) });
   return {
     browsers: new Map(),
     currentSession: 'test-session',
@@ -19,7 +23,7 @@ vi.mock('../../src/session/state', () => ({
 }));
 
 import { getBrowser } from '../../src/session/state';
-import { readSessionLogs } from '../../src/resources';
+import { readSessionLogs, sessionLogsResource } from '../../src/resources';
 
 const mockGetBrowser = getBrowser as ReturnType<typeof vi.fn>;
 
@@ -51,6 +55,85 @@ describe('readSessionLogs — browser', () => {
     expect(parsed.entries[0].message).toContain('Uncaught TypeError');
     expect(parsed.entries[0].timestamp).toBe(1717000000000);
     expect(parsed.entries[0].timestampISO).toBe(new Date(1717000000000).toISOString());
+    expect(parsed.entries[0].source).toBe('browser');
+  });
+
+  it('passes every performance entry through when networkLogs is all', async () => {
+    mockState = createMockState('browser', 'all');
+    const getLogs = vi.fn()
+      .mockResolvedValueOnce([
+        { level: 'SEVERE', message: 'Failed to load resource: 500', timestamp: 1717000000000 },
+      ])
+      .mockResolvedValueOnce([
+        { level: 'INFO', message: '{"message":{"method":"Network.responseReceived","params":{"response":{"status":200}}}}', timestamp: 1717000001000 },
+        { level: 'INFO', message: '{"message":{"method":"Network.responseReceived","params":{"response":{"status":500}}}}', timestamp: 1717000002000 },
+        { level: 'INFO', message: '{"message":{"method":"Network.loadingFailed","params":{"errorText":"net::ERR_FAILED"}}}', timestamp: 1717000003000 },
+        { level: 'INFO', message: '{"message":{"method":"Page.loadEventFired","params":{"timestamp":123}}}', timestamp: 1717000004000 },
+      ]);
+
+    mockGetBrowser.mockReturnValue({
+      getLogTypes: vi.fn().mockResolvedValue(['browser', 'performance', 'driver']),
+      getLogs,
+    });
+
+    const result = await readSessionLogs();
+    const parsed = JSON.parse(result.text);
+
+    expect(getLogs).toHaveBeenCalledTimes(2);
+    expect(getLogs).toHaveBeenNthCalledWith(1, 'browser');
+    expect(getLogs).toHaveBeenNthCalledWith(2, 'performance');
+    expect(parsed.entries).toHaveLength(5);
+    expect(parsed.entries[0].source).toBe('browser');
+    expect(parsed.entries.slice(1).map((e: { source: string }) => e.source)).toEqual([
+      'performance',
+      'performance',
+      'performance',
+      'performance',
+    ]);
+  });
+
+  it('filters performance entries in failures mode (keeps 500 response and loadingFailed, drops 200 and Page.*)', async () => {
+    mockState = createMockState('browser', 'failures');
+    const getLogs = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { level: 'INFO', message: '{"message":{"method":"Network.responseReceived","params":{"response":{"status":200}}}}', timestamp: 1717000001000 },
+        { level: 'INFO', message: '{"message":{"method":"Network.responseReceived","params":{"response":{"status":500}}}}', timestamp: 1717000002000 },
+        { level: 'INFO', message: '{"message":{"method":"Network.loadingFailed","params":{"errorText":"net::ERR_FAILED"}}}', timestamp: 1717000003000 },
+        { level: 'INFO', message: '{"message":{"method":"Page.frameNavigated","params":{}}}', timestamp: 1717000004000 },
+      ]);
+
+    mockGetBrowser.mockReturnValue({
+      getLogTypes: vi.fn().mockResolvedValue(['browser', 'performance']),
+      getLogs,
+    });
+
+    const result = await readSessionLogs();
+    const parsed = JSON.parse(result.text);
+
+    expect(parsed.entries).toHaveLength(2);
+    expect(parsed.entries[0].message).toContain('"status":500');
+    expect(parsed.entries[1].message).toContain('Network.loadingFailed');
+  });
+
+  it('continues and reports errors when performance log fetch throws', async () => {
+    mockGetBrowser.mockReturnValue({
+      getLogTypes: vi.fn().mockResolvedValue(['browser', 'performance']),
+      getLogs: vi.fn()
+        .mockResolvedValueOnce([{ level: 'SEVERE', message: 'Console error', timestamp: 1717000000000 }])
+        .mockRejectedValueOnce(new Error('performance log disabled')),
+    });
+
+    const result = await readSessionLogs();
+    const parsed = JSON.parse(result.text);
+    expect(parsed.entries).toHaveLength(1);
+    expect(parsed.entries[0].source).toBe('browser');
+    expect(parsed.entries[0].message).toBe('Console error');
+    expect(parsed.errors).toEqual(['performance: performance log disabled']);
+  });
+
+  it('mentions local Chromium only in the resource description', () => {
+    expect(sessionLogsResource.description).toContain('local Chromium only');
   });
 
   it('returns empty entries when no logs exist', async () => {
@@ -159,6 +242,7 @@ describe('readSessionLogs — ios', () => {
     expect(parsed.entries).toHaveLength(1);
     expect(parsed.entries[0].message).toContain('System log entry');
     expect(parsed.entries[0].source).toBe('syslog');
+    expect(parsed.errors).toEqual(['crashlog: crashlog unavailable']);
   });
 
   it('does not throw all-failed when one type succeeds with empty entries while other throws', async () => {

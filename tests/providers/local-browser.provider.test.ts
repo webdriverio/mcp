@@ -10,7 +10,7 @@ describe('LocalBrowserProvider', () => {
     });
   });
 
-  it.each(['chrome', 'edge'])('buildCapabilities: %s hides navigator.webdriver', (browser) => {
+  it.each(['chrome', 'edge'] as const)('buildCapabilities: %s hides navigator.webdriver', (browser) => {
     const caps = localBrowserProvider.buildCapabilities({ browser });
     const key = browser === 'chrome' ? 'goog:chromeOptions' : 'ms:edgeOptions';
     expect((caps[key] as any).args).toContain('--disable-blink-features=AutomationControlled');
@@ -36,6 +36,24 @@ describe('LocalBrowserProvider', () => {
     });
     const args = (caps['goog:chromeOptions'] as any)?.args ?? [];
     expect(args).toContain('--custom-flag');
+  });
+
+  it.each([
+    ['chrome', 'goog:loggingPrefs'],
+    ['edge', 'ms:loggingPrefs'],
+  ] as const)('buildCapabilities: %s sets no loggingPrefs when networkLogs is none or omitted', (browser, prefKey) => {
+    expect(localBrowserProvider.buildCapabilities({ browser })[prefKey]).toBeUndefined();
+    expect(localBrowserProvider.buildCapabilities({ browser, networkLogs: 'none' })[prefKey]).toBeUndefined();
+  });
+
+  it.each([
+    ['chrome', 'goog:loggingPrefs', 'failures'],
+    ['chrome', 'goog:loggingPrefs', 'all'],
+    ['edge', 'ms:loggingPrefs', 'failures'],
+    ['edge', 'ms:loggingPrefs', 'all'],
+  ] as const)('buildCapabilities: %s enables only performance loggingPrefs when networkLogs is %s', (browser, prefKey, networkLogs) => {
+    const caps = localBrowserProvider.buildCapabilities({ browser, networkLogs });
+    expect(caps[prefKey]).toEqual({ performance: 'ALL' });
   });
 
   it('getSessionType returns browser', () => {

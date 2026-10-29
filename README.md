@@ -712,6 +712,8 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, the raw element list, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. With several live sessions, tools are listed for the union of their platforms. Set `WDIO_MCP_TOOLS=all` to list everything up front.
 
+Set `WDIO_MCP_NETWORK_LOGS` to configure the default Chromium network/performance log capture mode for `start_session`: `none` (default, off), `failures` (`Network.loadingFailed` and `Network.responseReceived` entries with HTTP status `>= 400`), or `all` (every Chromium `performance` log entry). Individual sessions can override this default via `start_session({ networkLogs: 'none' | 'failures' | 'all' })`.
+
 | Tool           | Description                                                                                                       |
 |----------------|-------------------------------------------------------------------------------------------------------------------|
 | `enable_tools` | Add a group of tools: `mocks`, `cookies`, `device`, `extensions`, `attach`, `elements`, `cloud-apps`                          |

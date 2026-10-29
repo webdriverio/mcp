@@ -3,7 +3,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import type { SessionMetadata } from '../session/state';
+import type { NetworkLogsMode, SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
@@ -20,6 +20,7 @@ const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
 const automationEnum = z.enum(['XCUITest', 'UiAutomator2']);
+const networkLogsEnum = z.enum(['none', 'failures', 'all']);
 const uriScheme = z.string().regex(/^[A-Za-z][A-Za-z0-9+.-]*$/, 'Must be a URI scheme without ":" (for example, "myapp")').transform(value => value.toLowerCase());
 
 export const startSessionToolDefinition: ToolDefinition = {
@@ -85,6 +86,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     saucelabsLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: tunnel'),
     testmuLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: tunnel'),
     navigationUrl: z.string().optional().describe('URL to open after starting'),
+    networkLogs: networkLogsEnum.optional().describe('Local Chromium performance log capture (default from WDIO_MCP_NETWORK_LOGS or "none")'),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Extra capabilities to merge, e.g. "wdio:electronServiceOptions"'),
   },
 };
@@ -161,6 +163,7 @@ type StartSessionArgs = {
   saucelabsLocal?: boolean | 'external';
   testmuLocal?: boolean | 'external';
   navigationUrl?: string;
+  networkLogs?: NetworkLogsMode;
   capabilities?: Record<string, unknown>;
 };
 
@@ -282,7 +285,7 @@ async function waitForCDP(host: string, port: number, timeoutMs = 10000): Promis
   throw new Error(`Chrome did not expose CDP on ${host}:${port} within ${timeoutMs}ms`);
 }
 
-async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResult> {
+async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: NetworkLogsMode = 'none'): Promise<CallToolResult> {
   const {
     browser = 'chrome',
     headless = true,
@@ -291,6 +294,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     navigationUrl,
     capabilities: userCapabilities = {},
   } = args;
+  const networkLogs: NetworkLogsMode = args.networkLogs ?? defaultNetworkLogs;
 
   const browserDisplayNames: Record<string, string> = {
     chrome: 'Chrome',
@@ -319,6 +323,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     windowHeight,
     capabilities: userCapabilities,
     tunnelName,
+    networkLogs,
   });
 
   const tunnelHandle = tunnelEnabled
@@ -348,6 +353,7 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
     tunnelName,
     tunnelHandle,
     trace: args.trace ?? false,
+    networkLogs,
   };
 
   const { sizeNote, page, navigationTimedOut } = (await registerOrDispose(sessionId, () => registerSession(sessionId, wdioBrowser, sessionMetadata, {
@@ -394,6 +400,11 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
   const headlessNote = headless && !headlessSupported
     ? '\nNote: Safari does not support headless mode. Started in headed mode.'
     : '';
+  const effectiveProvider = args.provider ?? 'local';
+  const networkLogsSupported = effectiveProvider === 'local' && (browser === 'chrome' || browser === 'edge');
+  const networkLogsNote = networkLogs !== 'none' && !networkLogsSupported
+    ? '\nNote: networkLogs is only supported for local Chrome and Edge sessions and has no effect for this session.'
+    : '';
   const reportNote = provider.getStartNote?.(wdioBrowser) ?? '';
   const startMessage = args.provider === 'external'
     ? [
@@ -401,9 +412,10 @@ async function startBrowserSession(args: StartSessionArgs): Promise<CallToolResu
       `Endpoint: ${connectionConfig.protocol ?? 'http'}://${connectionConfig.hostname ?? '127.0.0.1'}:${connectionConfig.port ?? 4445}${connectionConfig.path ?? '/'}`,
       `Capabilities: ${JSON.stringify(mergedCapabilities)}`,
       sizeNote.trim(),
+      networkLogsNote.trim(),
       reportNote.trim(),
     ].filter(Boolean).join('\n')
-    : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${userAgentNote}${reportNote}`;
+    : `${browserDisplayNames[browser]} browser started in ${modeText} mode with sessionId: ${sessionId} (${windowWidth}x${windowHeight})${urlText}${headlessNote}${sizeNote}${userAgentNote}${networkLogsNote}${reportNote}`;
 
   const text = page ? `${startMessage}\n${page}` : startMessage;
 
@@ -712,29 +724,42 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
   };
 }
 
-export const startSessionTool: ToolCallback = async (args: StartSessionArgs): Promise<CallToolResult> => {
-  try {
-    if (args.provider === 'external' && args.platform !== 'browser') {
-      return {
-        isError: true,
-        content: [{ type: 'text', text: 'Error starting session: provider "external" currently supports browser platform sessions only.' }],
-      };
-    }
-
-    assertNameAvailable(args.name, replacedSessionId(args));
-
-    if (args.platform === 'electron') return await startElectronSession(args);
-    if (args.platform === 'browser') {
-      if (args.attach) {
-        return await attachBrowserSession(args);
-      }
-      return await startBrowserSession(args);
-    }
-    return await startMobileSession(args);
-  } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error starting session: ${e}` }] };
+export function parseNetworkLogsMode(value: string | undefined): NetworkLogsMode {
+  if (value === undefined || value.trim() === '') return 'none';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'none' || normalized === 'failures' || normalized === 'all') {
+    return normalized;
   }
-};
+  throw new Error(`Invalid WDIO_MCP_NETWORK_LOGS value "${value}". Accepted values: none, failures, all.`);
+}
+
+export function createStartSessionTool(defaultNetworkLogs: NetworkLogsMode = 'none'): ToolCallback {
+  return async (args: StartSessionArgs): Promise<CallToolResult> => {
+    try {
+      if (args.provider === 'external' && args.platform !== 'browser') {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: 'Error starting session: provider "external" currently supports browser platform sessions only.' }],
+        };
+      }
+
+      assertNameAvailable(args.name, replacedSessionId(args));
+
+      if (args.platform === 'electron') return await startElectronSession(args);
+      if (args.platform === 'browser') {
+        if (args.attach) {
+          return await attachBrowserSession(args);
+        }
+        return await startBrowserSession(args, defaultNetworkLogs);
+      }
+      return await startMobileSession(args);
+    } catch (e) {
+      return { isError: true, content: [{ type: 'text', text: `Error starting session: ${e}` }] };
+    }
+  };
+}
+
+export const startSessionTool: ToolCallback = createStartSessionTool();
 
 export const attachSessionTool: ToolCallback = async (args: AttachSessionArgs): Promise<CallToolResult> => {
   try {

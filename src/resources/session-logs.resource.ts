@@ -1,5 +1,5 @@
 import type { ResourceDefinition } from '../types/resource';
-import { getBrowser, getState } from '../session/state';
+import { getBrowser, getState, type NetworkLogsMode } from '../session/state';
 import { activeSessionId } from '../session/context';
 
 interface LogEntry {
@@ -14,15 +14,43 @@ interface SessionLogsResult {
   sessionType: string;
   logTypes: string[];
   entries: LogEntry[];
+  errors?: string[];
+}
+
+function isPerformanceFailureEntry(rawMessage: string): boolean {
+  try {
+    const parsed = JSON.parse(rawMessage) as {
+      message?: { method?: string; params?: { response?: { status?: number } } };
+      method?: string;
+      params?: { response?: { status?: number } };
+    };
+    const cdpMessage = parsed?.message ?? parsed;
+    if (cdpMessage?.method === 'Network.loadingFailed') {
+      return true;
+    }
+    if (
+      cdpMessage?.method === 'Network.responseReceived' &&
+      typeof cdpMessage.params?.response?.status === 'number' &&
+      cdpMessage.params.response.status >= 400
+    ) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Fetch logs appropriate to the current session type:
- * - browser: console logs + JS exceptions via getLogs('browser')
+ * - browser: console logs + JS exceptions via getLogs('browser') and network/CDP events via getLogs('performance') (local Chromium only)
  * - android: system/crash logs via getLogs('logcat')
  * - ios: crash logs via getLogs('crashlog') + system logs via getLogs('syslog')
  */
-async function fetchLogsForSession(sessionType: string): Promise<{ logTypes: string[]; entries: LogEntry[] }> {
+async function fetchLogsForSession(
+  sessionType: string,
+  networkLogs?: NetworkLogsMode,
+): Promise<{ logTypes: string[]; entries: LogEntry[]; errors?: string[] }> {
   const browser = getBrowser();
   const b = browser as unknown as Record<string, unknown>;
 
@@ -34,19 +62,36 @@ async function fetchLogsForSession(sessionType: string): Promise<{ logTypes: str
 
   switch (sessionType) {
     case 'browser': {
-      // Console output + uncaught JS exceptions
-      const logType = 'browser';
-      if (availableTypes.includes(logType)) {
-        const raw: Array<{ level: string; message: string; timestamp: number }> =
-          await (b.getLogs as (t: string) => Promise<Array<{ level: string; message: string; timestamp: number }>>)(logType);
-        entries.push(...raw.map((e) => ({
-          level: e.level,
-          message: e.message,
-          timestamp: e.timestamp,
-          timestampISO: new Date(e.timestamp).toISOString(),
-        })));
+      // Console output + uncaught JS exceptions + network/performance events
+      const errors: string[] = [];
+      let attempted = 0;
+      let succeeded = 0;
+      for (const logType of ['browser', 'performance']) {
+        if (availableTypes.includes(logType)) {
+          attempted++;
+          try {
+            const raw: Array<{ level: string; message: string; timestamp: number }> =
+              await (b.getLogs as (t: string) => Promise<Array<{ level: string; message: string; timestamp: number }>>)(logType);
+            const filtered = logType === 'performance' && networkLogs === 'failures'
+              ? raw.filter((e) => isPerformanceFailureEntry(e.message))
+              : raw;
+            entries.push(...filtered.map((e) => ({
+              level: e.level,
+              message: e.message,
+              timestamp: e.timestamp,
+              timestampISO: new Date(e.timestamp).toISOString(),
+              source: logType,
+            })));
+            succeeded++;
+          } catch (err) {
+            errors.push(`${logType}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
       }
-      return { logTypes: availableTypes, entries };
+      if (attempted > 0 && succeeded === 0) {
+        throw new Error(`All browser log types failed: ${errors.join('; ')}`);
+      }
+      return { logTypes: availableTypes, entries, ...(errors.length > 0 ? { errors } : {}) };
     }
 
     case 'android': {
@@ -94,7 +139,7 @@ async function fetchLogsForSession(sessionType: string): Promise<{ logTypes: str
       if (attempted > 0 && succeeded === 0) {
         throw new Error(`All iOS log types failed: ${errors.join('; ')}`);
       }
-      return { logTypes: availableTypes, entries };
+      return { logTypes: availableTypes, entries, ...(errors.length > 0 ? { errors } : {}) };
     }
 
     default:
@@ -108,12 +153,13 @@ export async function readSessionLogs(): Promise<{ mimeType: string; text: strin
     const metadata = state.sessionMetadata.get(activeSessionId() ?? '');
     const sessionType = metadata?.type ?? 'browser';
 
-    const { logTypes, entries } = await fetchLogsForSession(sessionType);
+    const { logTypes, entries, errors } = await fetchLogsForSession(sessionType, metadata?.networkLogs);
 
     const result: SessionLogsResult = {
       sessionType,
       logTypes,
       entries,
+      ...(errors ? { errors } : {}),
     };
 
     return { mimeType: 'application/json', text: JSON.stringify(result) };
@@ -134,7 +180,7 @@ export async function readSessionLogs(): Promise<{ mimeType: string; text: strin
 export const sessionLogsResource: ResourceDefinition = {
   name: 'session-current-logs',
   uri: 'wdio://session/current/logs',
-  description: 'Session logs, console errors, and crash reports for the current session. Auto-detects session type — browser: console logs + JS exceptions via getLogs(\'browser\'); Android: system/crash logs via getLogs(\'logcat\'); iOS: crash/panic + system logs via getLogs(\'crashlog\') and getLogs(\'syslog\'). NOTE: Reading this resource clears the log buffer per protocol spec — subsequent reads return only entries accumulated since the last read. Browser logs require Chromium (Chrome/Edge).',
+  description: 'Session logs, console errors, network performance events, and crash reports for the current session. Auto-detects session type — browser: console logs + JS exceptions via getLogs(\'browser\') and network/performance events via getLogs(\'performance\') (local Chromium only); Android: system/crash logs via getLogs(\'logcat\'); iOS: crash/panic + system logs via getLogs(\'crashlog\') and getLogs(\'syslog\'). NOTE: Reading this resource clears the log buffer per protocol spec — subsequent reads return only entries accumulated since the last read. Browser logs require Chromium (Chrome/Edge).',
   handler: async () => {
     const result = await readSessionLogs();
     return {

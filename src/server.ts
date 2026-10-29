@@ -75,7 +75,8 @@ import {
   attachSessionToolDefinition,
   closeSessionTool,
   closeSessionToolDefinition,
-  startSessionTool,
+  createStartSessionTool,
+  parseNetworkLogsMode,
   startSessionToolDefinition
 } from './tools/session.tool';
 import { switchTabTool, switchTabToolDefinition } from './tools/tabs.tool';
@@ -101,6 +102,7 @@ console.info = (...args) => console.error('[INFO]', ...args);
 console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 
+const defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS);
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
 function createServer(): McpServer {
@@ -157,7 +159,7 @@ function createServer(): McpServer {
   const instrument = (name: string, cb: ToolCallback): ToolCallback =>
     withTrace(name, withRecording(name, cb));
 
-  registerTool(startSessionToolDefinition, withRecording('start_session', startSessionTool));
+  registerTool(startSessionToolDefinition, withRecording('start_session', createStartSessionTool(defaultNetworkLogs)));
   registerTool(attachSessionToolDefinition, attachSessionRecorded);
   registerTool(closeSessionToolDefinition, closeSessionTool);
   registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
