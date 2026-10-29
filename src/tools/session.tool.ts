@@ -37,9 +37,9 @@ export const startSessionToolDefinition: ToolDefinition = {
     browserVersion: z.string().optional().describe('Cloud only'),
     electronRootDir: z.string().min(1).optional().describe('Electron: project root for Builder/Forge discovery'),
     electronDeeplinkScheme: uriScheme.optional().describe('Electron: URI scheme (no ":") allowed for trigger_electron_deeplink'),
-    os: z.string().optional().describe('Cloud browser OS, e.g. "Windows", "macOS"'),
-    osVersion: z.string().optional().describe('Cloud browser OS version, e.g. "11", "Sequoia"'),
-    app: z.string().optional().describe('Cloud app URL from upload_app (bs://, storage:filename=, lt://, tb://, cloud:<id>)'),
+    os: z.string().optional().describe('Cloud browser OS, provider-native, passed as-is: BrowserStack "OS X"/"Windows", Sauce Labs and TestMu "macOS"/"Windows", TestingBot "SEQUOIA"/"WIN11"'),
+    osVersion: z.string().optional().describe('Cloud browser OS version, provider-native: BrowserStack and TestMu "Sequoia", Sauce Labs "15", Windows "11"; omit for TestingBot'),
+    app: z.string().optional().describe('Cloud app URL from upload_app (bs://, storage:filename=, lt://, tb://, cloud:<name>)'),
     reporting: z.object({
       project: z.string().optional(),
       build: z.string().optional(),
