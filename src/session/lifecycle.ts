@@ -181,6 +181,8 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
       }
       try {
         await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
+        // the driver has exited, so its pid may be reused before the tunnel stop below finishes
+        if (metadata) { metadata.driverPid = undefined; }
       } catch (e) {
         // only on failure: after a clean delete the driver has exited and its pid may already be reused
         killDriverGroup(metadata?.driverPid);

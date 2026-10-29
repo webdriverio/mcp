@@ -128,7 +128,7 @@ export class LocalBrowserProvider implements SessionProvider {
 
   private withDetachedDriver(customOptions: unknown): Record<string, unknown> {
     const custom = (customOptions ?? {}) as Record<string, unknown>;
-    return { ...custom, spawnOpts: { detached: true, ...(custom.spawnOpts as Record<string, unknown> | undefined) } };
+    return { ...custom, spawnOpts: { ...(custom.spawnOpts as Record<string, unknown> | undefined), detached: true } };
   }
 
   private mergeCapabilityOptions(defaultOptions: unknown, customOptions: unknown): unknown {

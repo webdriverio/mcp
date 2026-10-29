@@ -379,6 +379,24 @@ describe('closeSession', () => {
     }
   });
 
+  it('forgets the driver pid once deleteSession succeeds, so a later group kill cannot hit a reused pid', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      const metadata: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false, driverPid: 4321 };
+      const state = getState();
+      state.browsers.set('clean', makeBrowser());
+      state.sessionMetadata.set('clean', metadata);
+      state.sessionHistory.set('clean', { sessionId: 'clean', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+      state.currentSession = 'clean';
+
+      await closeSession('clean', false, false);
+      expect(metadata.driverPid).toBeUndefined();
+      expect(kill).not.toHaveBeenCalled();
+    } finally {
+      kill.mockRestore();
+    }
+  });
+
   it('rejects and removes the session when deleteSession hangs past 90s', async () => {
     vi.useFakeTimers();
     try {

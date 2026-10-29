@@ -69,6 +69,14 @@ describe('LocalBrowserProvider', () => {
     expect(caps['wdio:chromedriverOptions']).toEqual({ port: 9515, spawnOpts: { detached: true, cwd: '/tmp/driver' } });
   });
 
+  it('buildCapabilities: user spawnOpts cannot turn off detached spawn', () => {
+    const caps = localBrowserProvider.buildCapabilities({
+      browser: 'chrome',
+      capabilities: { 'wdio:chromedriverOptions': { spawnOpts: { detached: false } } },
+    });
+    expect(caps['wdio:chromedriverOptions']).toEqual({ spawnOpts: { detached: true } });
+  });
+
   it.each(['firefox', 'edge', 'safari'] as const)('buildCapabilities: %s adds no chromedriver options', (browser) => {
     const caps = localBrowserProvider.buildCapabilities({ browser });
     expect(caps['wdio:chromedriverOptions']).toBeUndefined();
