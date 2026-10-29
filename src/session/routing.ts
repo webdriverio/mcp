@@ -54,7 +54,7 @@ function errorResult(message: string): ToolResult {
 }
 
 // Outlasts the 30s action timeout in agent.ts so bounded actions report their own; only unblocks the queue, the abandoned WebDriver call keeps running.
-const QUEUED_CALL_TIMEOUT_MS = 90_000;
+export const QUEUED_CALL_TIMEOUT_MS = 90_000;
 
 class QueuedCallTimeout extends Error {}
 
