@@ -348,6 +348,15 @@ describe('chunkCorpus', () => {
     expect(chunks[1].trail).toEqual(['Big', 'Later']);
     expect(chunks[0].page).toBe(chunks[1].page);
   });
+
+  it('names where each split chunk starts, not the last heading it contains', () => {
+    const lines = Array.from({ length: CHUNK_LINE_CAP }, (_, i) => `line ${i + 1}`);
+    const text = ['# Full Documentation Content', '', '# Big', '', '## First', '', '## Second', '', ...lines, '## Third', '', 'tail', ''].join('\n');
+    const chunks = chunkCorpus(text);
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0].trail).toEqual(['Big']);
+    expect(chunks[1].trail).toEqual(['Big', 'Third']);
+  });
 });
 
 describe('queryTerms', () => {
@@ -437,6 +446,28 @@ describe('search', () => {
   it('still ranks a waitUntil chunk for a camelCase segment query', () => {
     const hits = search(buildIndex(FIXTURE), 'until', 5);
     expect(hits.some((h) => h.title === 'waitUntil')).toBe(true);
+  });
+
+  it('reports the section the excerpt starts in, not the last heading of the chunk', () => {
+    const text = [
+      '# Full Documentation Content',
+      '',
+      '# Guide',
+      '',
+      '## Alpha',
+      'a'.repeat(1200),
+      '## Beta',
+      '',
+      'zebra crossing setup',
+      '',
+      '## Gamma',
+      '',
+      'gamma text',
+      '',
+    ].join('\n');
+    const [hit] = search(buildIndex(text), 'zebra', 1);
+    expect(hit.excerpt.startsWith('## Beta')).toBe(true);
+    expect(hit.trail).toEqual(['Guide', 'Beta']);
   });
 
   it('returns [] for a nonsense query', () => {
@@ -540,6 +571,35 @@ describe('search demotion', () => {
   });
 });
 
+describe('compound query terms', () => {
+  const COMPOUND_PAGES = [
+    '# Full Documentation Content',
+    '',
+    '# Overview',
+    '',
+    'test and runner options are described in the guide, along with the other settings and the rest of the configuration reference for every supported hook and option.',
+    '',
+    '# Testrunner',
+    '',
+    'Configure the reporter here.',
+    '',
+    '# Setup',
+    '',
+    'install dependencies',
+    '',
+  ].join('\n');
+
+  it('finds a page titled with the joined form of a spaced query', () => {
+    const hits = search(buildIndex(COMPOUND_PAGES), 'test runner', 5);
+    expect(hits.map((h) => h.title)).toContain('Testrunner');
+  });
+
+  it('joins a pair whose second word is a stopword', () => {
+    const hits = search(buildIndex(COMPOUND_PAGES), 'set up', 5);
+    expect(hits[0].title).toBe('Setup');
+  });
+});
+
 interface Expectation { query: string; title?: string; path?: string; maxRank: number }
 
 // Frozen against the real corpus. The API-name rows are the no-regression gate: each
@@ -567,6 +627,9 @@ const EXPECTATIONS: Expectation[] = [
   { query: 'appium capabilities', path: '/docs/api/appium.md', maxRank: 2 },
   { query: 'appium capabilities', path: '/docs/capabilities.md', maxRank: 3 },
   { query: 'custom reporter', path: '/docs/customreporter.md', maxRank: 1 },
+  { query: 'test runner', path: '/docs/testrunner.md', maxRank: 3 },
+  { query: 'multi-remote', path: '/docs/multiremote.md', maxRank: 1 },
+  { query: 'multiremote', path: '/docs/multiremote.md', maxRank: 3 },
   { query: 'mcp transport', path: '/docs/mcp/transport.md', maxRank: 1 },
   { query: 'how do I set up a custom reporter', path: '/docs/customreporter.md', maxRank: 1 },
   // Measured limitation, not a target: any query containing "wire" is dominated by the
