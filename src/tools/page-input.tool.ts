@@ -63,6 +63,8 @@ export const performActionsToolDefinition: ToolDefinition = {
 };
 
 export const performActionsTool: ToolCallback = async ({ actions }: { actions: { action: StepAction; selector?: string; value?: string; times?: number }[] }) => {
+  const startedAt = Date.now();
+  const outOfTime = () => Date.now() - startedAt + ACTION_TIMEOUT_MS >= QUEUED_CALL_TIMEOUT_MS;
   const agent = await agentFor();
   if (!agent) return noSession();
   const supported = new Set(agent.actions.map((s) => s.name));
@@ -70,9 +72,11 @@ export const performActionsTool: ToolCallback = async ({ actions }: { actions: {
   if (unsupported.length) {
     return { isError: true, content: [{ type: 'text', text: `${unsupported.map((a) => `"${a}"`).join(', ')} not supported in this session, so no step ran. Steps available here: ${Object.keys(STEP_ACTIONS).filter((a) => supported.has(a)).join(', ')}.` }] } as CallToolResult;
   }
+  if (outOfTime()) {
+    return { isError: true, content: [{ type: 'text', text: `The session took too long to get ready, so no step ran within this call's ${QUEUED_CALL_TIMEOUT_MS / 1000}s limit. Call again.` }] } as CallToolResult;
+  }
   const appHint = agent.session.isWeb ? [] : [APP_CHANGES_HINT];
   const out: string[] = [];
-  const startedAt = Date.now();
   for (const [i, step] of actions.entries()) {
     const label = `${step.action} ${step.action === 'press' ? step.value ?? '' : step.selector ?? ''}`.trim();
     const { result, changes } = await STEP_ACTIONS[step.action](agent, step.selector ?? '', step.value ?? '', label, step.times);
@@ -89,7 +93,7 @@ export const performActionsTool: ToolCallback = async ({ actions }: { actions: {
       : actions[i + 1].action === 'press' && step.action !== 'fill' && step.action !== 'press' && (changes?.kind === 'changed' || changes?.kind === 'removed')
         ? 'the page changed before a key press, so focus may not be where you expected. Check it (or click the element), then continue.'
         // A step that could run past the session queue's deadline would keep acting after the caller got a timeout.
-        : Date.now() - startedAt + ACTION_TIMEOUT_MS >= QUEUED_CALL_TIMEOUT_MS
+        : outOfTime()
           ? `this call reached its ${QUEUED_CALL_TIMEOUT_MS / 1000}s limit. Continue with the remaining actions in a new call.`
           : undefined;
     if (stopReason) {
