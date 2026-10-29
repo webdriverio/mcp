@@ -111,3 +111,21 @@ describe('press repeat', () => {
     expect(run).toHaveBeenCalledWith('press', { keys: 'Tab', times: 3 });
   });
 });
+
+describe('perform_actions time budget', () => {
+  it('stops before a step that could outlast the session queue deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      run.mockImplementation(async () => {
+        vi.advanceTimersByTime(30_000);
+        return { text: 'ok' };
+      });
+      const result = await call(performActionsTool, { actions: Array.from({ length: 5 }, (_, i) => ({ action: 'click', selector: `e${i}` })) });
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toContain('3 later actions skipped: this call reached its 90s limit');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
