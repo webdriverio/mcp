@@ -1,6 +1,7 @@
 import { activeSessionId } from './context';
 import type { SessionHistory } from '../types/recording';
 import type { ToolGroup, ToolPlatform } from '../toolsets';
+import type { ProcessIdentity } from './driver-tree';
 
 export type NetworkLogsMode = 'none' | 'failures' | 'all';
 
@@ -16,7 +17,7 @@ export interface SessionMetadata {
   region?: string;
   tunnelName?: string;
   tunnelHandle?: unknown;
-  driverPid?: number;
+  driverRoots?: ProcessIdentity[];
   trace?: boolean;
   networkLogs?: NetworkLogsMode;
   /** The remote session lifecycle is owned outside this MCP process. */

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { NetworkLogsMode, SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
+import { captureDriverRoots } from '../session/driver-tree';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
@@ -353,7 +354,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
     region: args.region,
     tunnelName,
     tunnelHandle,
-    driverPid: isLocalChrome ? (wdioBrowser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined : undefined,
+    driverRoots: isLocalChrome ? captureDriverRoots((wdioBrowser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined) : undefined,
     trace: args.trace ?? false,
     networkLogs,
   };
