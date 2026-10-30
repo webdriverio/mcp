@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.1.0](https://github.com/webdriverio/mcp/compare/v4.0.1...v4.1.0) (2026-10-30)
+
+### Features
+
+* fetch performance log entries in browser session logs resource ([#176](https://github.com/webdriverio/mcp/issues/176)) ([aec5074](https://github.com/webdriverio/mcp/commit/aec507486cddda3365bfab5a2ae724d503ef20e0))
+* **session:** Support concurrent, routable sessions ([#177](https://github.com/webdriverio/mcp/issues/177)) ([1345a7d](https://github.com/webdriverio/mcp/commit/1345a7d18aa44e0ed2988d09fb2a17f54336b999)), closes [#170](https://github.com/webdriverio/mcp/issues/170) [#180](https://github.com/webdriverio/mcp/issues/180)
+
+### Refactoring
+
+* Fix chrome process and server fails, update webdriverio to v10.1.0 ([#181](https://github.com/webdriverio/mcp/issues/181)) ([3ab11dc](https://github.com/webdriverio/mcp/commit/3ab11dc569e4949f944fa09063b5ccf1b6172e9d))
+
 ## [4.0.1](https://github.com/webdriverio/mcp/compare/v4.0.0...v4.0.1) (2026-10-25)
 
 ### Bug Fixes
