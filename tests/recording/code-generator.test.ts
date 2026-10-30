@@ -338,7 +338,7 @@ describe('generateCode - BrowserStack Local tunnel', () => {
         {
           index: 1,
           tool: 'start_session',
-          params: { platform: 'browser', browser: 'chrome', browserstackLocal: true },
+          params: { platform: 'browser', browser: 'chrome', tunnel: true },
           status: 'ok',
           durationMs: 100,
           timestamp: '2026-01-01T00:00:00.000Z',

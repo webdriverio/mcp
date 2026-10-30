@@ -83,9 +83,6 @@ export const startSessionToolDefinition: ToolDefinition = {
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs only'),
     tunnel: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Cloud: true starts a tunnel, "external" uses a running one'),
     tunnelName: z.string().optional(),
-    browserstackLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: tunnel'),
-    saucelabsLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: tunnel'),
-    testmuLocal: z.union([z.literal('external'), coerceBoolean]).optional().describe('Deprecated: tunnel'),
     navigationUrl: z.string().optional().describe('URL to open after starting'),
     networkLogs: networkLogsEnum.optional().describe('Local Chromium performance log capture (default from WDIO_MCP_NETWORK_LOGS or "none")'),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Extra capabilities to merge, e.g. "wdio:electronServiceOptions"'),
@@ -160,9 +157,6 @@ type StartSessionArgs = {
   region?: 'us-west-1' | 'eu-central-1' | 'apac-southeast-1';
   tunnel?: boolean | 'external';
   tunnelName?: string;
-  browserstackLocal?: boolean | 'external';
-  saucelabsLocal?: boolean | 'external';
-  testmuLocal?: boolean | 'external';
   navigationUrl?: string;
   networkLogs?: NetworkLogsMode;
   capabilities?: Record<string, unknown>;
@@ -185,7 +179,7 @@ type AttachSessionArgs = {
 
 export const closeSessionToolDefinition: ToolDefinition = {
   name: 'close_session',
-  description: 'Closes the session, or with detach: true disconnects and leaves it running. Attached sessions and Appium sessions with noReset are detached unless detach: false.',
+  description: 'Closes the session, or with detach: true disconnects and leaves it running. Sessions from attach_session or provider "external" are detached unless detach: false; every other session, including Appium sessions with noReset, is closed.',
   annotations: { title: 'Close Session', destructiveHint: true },
   unqueued: true,
   inputSchema: {
@@ -310,10 +304,8 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
   const provider = getProvider(args.provider ?? 'local', 'browser');
   const connectionConfig = provider.getConnectionConfig(args as Record<string, unknown>);
 
-  // Normalize tunnel flag — support legacy browserstackLocal/saucelabsLocal/testmuLocal params
   // MUST compute tunnelName BEFORE buildCapabilities so it is available in the capabilities
-  const effectiveTunnel = args.tunnel ?? args.browserstackLocal ?? args.saucelabsLocal ?? args.testmuLocal ?? false;
-  const tunnelEnabled = effectiveTunnel === true;
+  const tunnelEnabled = args.tunnel === true;
   const tunnelName = tunnelEnabled && !args.tunnelName ? `wdio-mcp-${Date.now()}` : args.tunnelName;
 
   const mergedCapabilities = provider.buildCapabilities({
@@ -515,10 +507,8 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   const provider = getProvider(args.provider ?? 'local', args.platform);
   const serverConfig = provider.getConnectionConfig(args as Record<string, unknown>);
 
-  // Normalize tunnel flag — support legacy browserstackLocal/saucelabsLocal/testmuLocal params
   // MUST compute tunnelName BEFORE buildCapabilities so it is available in the capabilities
-  const effectiveTunnel = args.tunnel ?? args.browserstackLocal ?? args.saucelabsLocal ?? args.testmuLocal ?? false;
-  const tunnelEnabled = effectiveTunnel === true;
+  const tunnelEnabled = args.tunnel === true;
   const tunnelName = tunnelEnabled && !args.tunnelName ? `wdio-mcp-${Date.now()}` : args.tunnelName;
 
   const mergedCapabilities = provider.buildCapabilities({ ...args as Record<string, unknown>, tunnelName });
@@ -566,8 +556,8 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
     : appPath
       ? `\nApp: ${appPath}`
       : '\nApp: (connected to running app)';
-  const detachNote = shouldAutoDetach
-    ? '\n\n(Auto-detach enabled: session will be preserved on close. Use close_session({ detach: false }) to force terminate.)'
+  const detachNote = noReset === true
+    ? '\n\n(noReset: app data is kept. close_session ends the Appium session; close_session({ detach: true }) leaves it running.)'
     : '';
 
   const reportNote = provider.getStartNote?.(browser) ?? '';
