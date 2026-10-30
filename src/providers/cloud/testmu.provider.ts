@@ -24,7 +24,7 @@ export class TestMuProvider implements SessionProvider {
   buildCapabilities(options: Record<string, unknown>): Record<string, unknown> {
     const platform = options.platform as string;
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
-    const tunnel = (options.tunnel ?? options.testmuLocal) as boolean | string | undefined;
+    const tunnel = options.tunnel as boolean | string | undefined;
     const reporting = options.reporting as { project?: string; build?: string; session?: string } | undefined;
 
     const ltOptions: Record<string, unknown> = { w3c: true };

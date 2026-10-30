@@ -31,7 +31,7 @@ export class SauceLabsProvider implements SessionProvider {
     const platform = options.platform as string;
     const region = this.resolveRegion(options);
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
-    const saucelabsLocal = (options.tunnel ?? options.saucelabsLocal) as boolean | string | undefined;
+    const saucelabsLocal = options.tunnel as boolean | string | undefined;
     const reporting = options.reporting as { project?: string; build?: string; session?: string } | undefined;
 
     const userSauceOptions = (userCapabilities['sauce:options'] as Record<string, unknown> | undefined) ?? {};

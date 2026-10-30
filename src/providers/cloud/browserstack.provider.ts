@@ -25,7 +25,7 @@ export class BrowserStackProvider implements SessionProvider {
     const platform = options.platform as string;
     const userCapabilities = (options.capabilities as Record<string, unknown> | undefined) ?? {};
 
-    const browserstackLocal = (options.tunnel ?? options.browserstackLocal) as boolean | string | undefined;
+    const browserstackLocal = options.tunnel as boolean | string | undefined;
 
     if (platform === 'browser') {
       const bstackOptions: Record<string, unknown> = {

@@ -659,7 +659,7 @@ start_session({
 })
 ```
 
-The `tunnel` parameter replaces the deprecated `browserstackLocal`, `saucelabsLocal`, and `testmuLocal` params. Set it to `true` to auto-start the tunnel (stopped automatically after the session), or `'external'` to use a tunnel already running on your machine.
+Set `tunnel` to `true` to auto-start the tunnel (stopped automatically after the session), or `'external'` to use a tunnel already running on your machine.
 
 > **Note**: With `tunnel: true` the provider downloads and manages the tunnel binary for you. For `tunnel: 'external'` you run it yourself — the `wdio://saucelabs/local-binary`, `wdio://testmu/local-binary`, and `wdio://testingbot/local-binary` resources provide download URLs and setup instructions. The TestingBot Tunnel is a single cross-platform Java JAR (requires Java 11+) rather than a per-platform binary.
 
@@ -1200,7 +1200,7 @@ Test my hybrid app:
 - To switch between browser and mobile, close the current session first
 - Use `close_session({ detach: true })` to disconnect without terminating the session on the Appium server
 - **State preservation** can be controlled with `noReset` and `fullReset` parameters during session creation
-- Sessions created with `noReset: true` or without `appPath` will automatically detach on close
+- Sessions created with `noReset: true` keep app data but are closed by `close_session`; pass `detach: true` to leave them running
 - Sessions adopted with `attach_session` always detach on close unless `detach: false` is explicitly requested
 
 ⚠️ **Task Planning:**
@@ -1275,8 +1275,8 @@ close_session({detach: true})
 close_session({detach: false})
 ```
 
-Sessions created with `noReset: true` or without `appPath` will automatically detach on close.
-Sessions adopted with `attach_session` are externally managed and also detach by default; pass `detach: false` only when the
+Sessions created with `noReset: true` are closed like any other; pass `detach: true` to leave them running.
+Sessions adopted with `attach_session` are externally managed and detach by default; pass `detach: false` only when the
 MCP should deliberately terminate the existing remote session.
 
 This is particularly useful when:
