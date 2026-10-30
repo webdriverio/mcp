@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
-import { agentFor, runAction } from '../session/agent';
+import { agentFor, runAction, errorResult } from '../session/agent';
 
 // Tap Tool
 export const tapElementToolDefinition: ToolDefinition = {
@@ -49,10 +49,7 @@ export const tapAction = async (args: {
       content: [{ type: 'text', text: 'Error: Must provide either selector or x,y coordinates' }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error tapping: ${e}` }],
-    };
+    return errorResult(e, 'Error tapping');
   }
 };
 
@@ -116,10 +113,7 @@ export const swipeAction = async (args: {
       content: [{ type: 'text', text: `Swiped ${direction}` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error swiping: ${e}` }],
-    };
+    return errorResult(e, 'Error swiping');
   }
 };
 
@@ -174,10 +168,7 @@ export const dragAndDropAction = async (args: {
       content: [{ type: 'text', text: 'Error: Must provide either targetSelector or x,y coordinates' }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error dragging: ${e}` }],
-    };
+    return errorResult(e, 'Error dragging');
   }
 };
 

@@ -18,9 +18,9 @@ npx vitest run tests/tools/get-elements-tool.test.ts   # one file
 npx vitest run -t "filter pattern"                      # tests matching a name
 npx vitest tests/trace/                                 # watch mode for a directory
 
-# Type-check. Use the repo-pinned TypeScript, not bare `npx tsc` — that resolves a newer
-# build which rejects this repo's own tsconfig (moduleResolution=node10, baseUrl removed)
-# and reports TS5108/TS5102 instead of any real error.
+# Type-check. Use the repo-pinned TypeScript, not a plain `tsc` from PATH — a global
+# TypeScript 7 rejects this repo's tsconfig (`baseUrl` removed) and reports TS5102
+# instead of any real error.
 ./node_modules/.bin/tsc --noEmit
 ```
 
@@ -177,7 +177,7 @@ Only files whose purpose is not evident from the tree above.
 | `src/providers/types.ts` | `SessionProvider` interface — `startTunnel()`, `onSessionClose()` lifecycle hooks |
 | `src/providers/cloud/browserstack.provider.ts` | Tunnel lifecycle + session result marking via `onSessionClose()` |
 | `src/providers/cloud/testingbot.provider.ts` | `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
-| `src/providers/cloud/digitalai.provider.ts` | `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<id>` app refs; REST API via Bearer accessKey |
+| `src/providers/cloud/digitalai.provider.ts` | `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<name>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts` | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts` | `get_elements` — all elements with filtering + pagination |
 | `src/tools/cloud-provider.tool.ts` | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Bearer auth) |

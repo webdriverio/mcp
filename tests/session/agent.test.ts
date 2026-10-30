@@ -13,7 +13,7 @@ vi.mock('@wdio/session/agent', async (importOriginal) => ({
 }));
 
 const { SessionError } = await import('@wdio/session/agent');
-const { agentFor, pageReport, runAction, APP_CHANGES_HINT } = await import('../../src/session/agent');
+const { agentFor, errorResult, pageReport, runAction, APP_CHANGES_HINT } = await import('../../src/session/agent');
 const { mcpHint } = await import('../../src/session/hints');
 const { performActionsTool, pressKeyTool, selectOptionTool } = await import('../../src/tools/page-input.tool');
 const { clickTool } = await import('../../src/tools/click.tool');
@@ -89,6 +89,34 @@ describe('runAction', () => {
     const result = await runAction({ run, session } as never, 'click', { target: 'e9' }, 'Clicked.');
     expect(result.isError).toBe(true);
     expect(result.content[0]).toEqual({ type: 'text', text: 'e9 no longer exists on the page.\nRun `snapshot()` to get fresh refs.' });
+  });
+});
+
+describe('errorResult', () => {
+  const ENDED = 'This browser session has ended. If you did not close it, start a new one with `start_session()`.';
+  const CLOSED_MESSAGE = 'WebDriver Bidi command "script.callFunction" with id 7 got no result: the browser or the driver closed the connection';
+  const closed = () => Object.assign(new Error(CLOSED_MESSAGE), { name: 'session ended' });
+
+  it('reports an ended session wrapped by SessionError', () => {
+    const wrapped = new SessionError('INTERNAL', 'got no result', { cause: closed() });
+    expect(errorResult(wrapped)).toEqual({ isError: true, content: [{ type: 'text', text: `got no result\n${ENDED}` }] });
+  });
+
+  it('reports an ended session thrown by webdriver directly', () => {
+    expect(errorResult(closed()).content[0]).toEqual({ type: 'text', text: `${CLOSED_MESSAGE}\n${ENDED}` });
+  });
+
+  it('keeps the message of a SESSION_DIED SessionError and adds the ended-session note', () => {
+    expect(errorResult(new SessionError('SESSION_DIED', 'gone')).content[0]).toEqual({ type: 'text', text: `gone\n${ENDED}` });
+  });
+
+  it('keeps a distinctive error name and adds the context prefix', () => {
+    const stale = Object.assign(new Error('element is gone'), { name: 'stale element reference' });
+    expect(errorResult(stale, 'Error clicking').content[0]).toEqual({ type: 'text', text: 'Error clicking: stale element reference: element is gone' });
+  });
+
+  it('keeps the message of any other error', () => {
+    expect(errorResult(new Error('boom'))).toEqual({ isError: true, content: [{ type: 'text', text: 'boom' }] });
   });
 });
 

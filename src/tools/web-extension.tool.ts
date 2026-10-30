@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
 import type { ToolDefinition } from '../types/tool';
+import { errorResult } from '../session/agent';
 
 type WebExtensionData =
   | { type: 'path'; path: string }
@@ -130,9 +131,6 @@ export const openWebExtensionTool: ToolCallback = async (args: OpenWebExtensionA
       content: [{ type: 'text', text: `Opened web extension page: ${targetUrl}` }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error opening web extension: ${e}` }],
-    };
+    return errorResult(e, 'Error opening web extension');
   }
 };

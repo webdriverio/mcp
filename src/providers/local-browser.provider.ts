@@ -6,6 +6,10 @@ const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
 const CONNECTION_RETRY_TIMEOUT_MS = 45_000;
 const HEADLESS_TOKEN = 'HeadlessChrome/';
 
+export function tracksDriverTree(browser: string | undefined): boolean {
+  return (browser ?? 'chrome') === 'chrome' && process.platform !== 'win32';
+}
+
 export type LocalBrowserOptions = {
   browser?: 'chrome' | 'firefox' | 'edge' | 'safari';
   headless?: boolean;

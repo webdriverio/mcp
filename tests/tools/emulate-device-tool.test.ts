@@ -31,7 +31,7 @@ vi.mock('../../src/session/state', () => ({
 import { getState } from '../../src/session/state';
 import { emulateDeviceTool } from '../../src/tools/emulate-device.tool';
 
-type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
+type ToolFn = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
 const callTool = emulateDeviceTool as unknown as ToolFn;
 
 beforeEach(() => {
@@ -99,5 +99,13 @@ describe('emulate_device — guards', () => {
     const result = await callTool({ device: 'BadDevice' });
     expect(result.content[0].text).toContain('BadDevice');
     expect(result.content[0].text).toContain('emulate_device()');
+  });
+
+  it('flags unknown device as an error result', async () => {
+    mockEmulate.mockRejectedValue(
+      new Error('Unknown device name "BadDevice", please use one of the following: iPhone 15')
+    );
+    const result = await callTool({ device: 'BadDevice' });
+    expect(result.isError).toBe(true);
   });
 });

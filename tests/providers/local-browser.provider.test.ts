@@ -56,6 +56,16 @@ describe('LocalBrowserProvider', () => {
     expect(caps[prefKey]).toEqual({ performance: 'ALL' });
   });
 
+  it('buildCapabilities: passes user chromedriver options through unchanged and adds none by default', () => {
+    expect(localBrowserProvider.buildCapabilities({ browser: 'chrome' })['wdio:chromedriverOptions']).toBeUndefined();
+    const chromedriverOptions = { port: 9515, spawnOpts: { cwd: '/tmp/driver' } };
+    const caps = localBrowserProvider.buildCapabilities({
+      browser: 'chrome',
+      capabilities: { 'wdio:chromedriverOptions': chromedriverOptions },
+    });
+    expect(caps['wdio:chromedriverOptions']).toEqual(chromedriverOptions);
+  });
+
   it('getSessionType returns browser', () => {
     expect(localBrowserProvider.getSessionType({})).toBe('browser');
   });

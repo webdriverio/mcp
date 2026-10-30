@@ -6,15 +6,16 @@ import { z } from 'zod';
 import type { NetworkLogsMode, SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
+import { captureDriverRoots } from '../session/driver-tree';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
-import { matchHeadedUserAgent } from '../providers/local-browser.provider';
+import { matchHeadedUserAgent, tracksDriverTree } from '../providers/local-browser.provider';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
 import { SessionError } from '@wdio/session/agent';
-import { pageReport, agentFor, withActionTimeout } from '../session/agent';
+import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -37,9 +38,9 @@ export const startSessionToolDefinition: ToolDefinition = {
     browserVersion: z.string().optional().describe('Cloud only'),
     electronRootDir: z.string().min(1).optional().describe('Electron: project root for Builder/Forge discovery'),
     electronDeeplinkScheme: uriScheme.optional().describe('Electron: URI scheme (no ":") allowed for trigger_electron_deeplink'),
-    os: z.string().optional().describe('Cloud browser OS, e.g. "Windows", "macOS"'),
-    osVersion: z.string().optional().describe('Cloud browser OS version, e.g. "11", "Sequoia"'),
-    app: z.string().optional().describe('Cloud app URL from upload_app (bs://, storage:filename=, lt://, tb://, cloud:<id>)'),
+    os: z.string().optional().describe('Cloud browser OS, provider-native, passed as-is: BrowserStack "OS X"/"Windows", Sauce Labs and TestMu "macOS"/"Windows", TestingBot "SEQUOIA"/"WIN11"'),
+    osVersion: z.string().optional().describe('Cloud browser OS version, provider-native: BrowserStack and TestMu "Sequoia", Sauce Labs "15", Windows "11"; omit for TestingBot'),
+    app: z.string().optional().describe('Cloud app URL from upload_app (bs://, storage:filename=, lt://, tb://, cloud:<name>)'),
     reporting: z.object({
       project: z.string().optional(),
       build: z.string().optional(),
@@ -344,6 +345,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
   const { sessionId } = wdioBrowser;
   const shouldAutoDetach = provider.shouldAutoDetach(args as Record<string, unknown>);
 
+  const isLocalChrome = (args.provider ?? 'local') === 'local' && tracksDriverTree(browser);
   const sessionMetadata: SessionMetadata = {
     type: 'browser',
     capabilities: mergedCapabilities,
@@ -352,6 +354,7 @@ async function startBrowserSession(args: StartSessionArgs, defaultNetworkLogs: N
     region: args.region,
     tunnelName,
     tunnelHandle,
+    driverRoots: isLocalChrome ? captureDriverRoots((wdioBrowser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined) : undefined,
     trace: args.trace ?? false,
     networkLogs,
   };
@@ -754,7 +757,7 @@ export function createStartSessionTool(defaultNetworkLogs: NetworkLogsMode = 'no
       }
       return await startMobileSession(args);
     } catch (e) {
-      return { isError: true, content: [{ type: 'text', text: `Error starting session: ${e}` }] };
+      return errorResult(e, 'Error starting session');
     }
   };
 }
@@ -773,7 +776,7 @@ export const attachSessionTool: ToolCallback = async (args: AttachSessionArgs): 
     assertNameAvailable(name, replacedSessionId(args));
     return await attachExistingSession({ ...args, sessionId, platform });
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error attaching to session: ${e}` }] };
+    return errorResult(e, 'Error attaching to session');
   }
 };
 
@@ -806,7 +809,7 @@ export const closeSessionTool: ToolCallback = async (args: { detach?: boolean } 
       content: [{ type: 'text', text: `Session ${sessionId} ${action}${note}` }],
     };
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error closing session: ${e}` }] };
+    return errorResult(e, 'Error closing session');
   }
 };
 

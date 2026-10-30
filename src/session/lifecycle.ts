@@ -12,6 +12,7 @@ import { buildTraceZip } from '../trace/zip-writer.js';
 import { cleanupSessionRuntime } from '../electron/runtime.js';
 import { releaseSessionMocks } from '../tools/mock.tool.js';
 import { withTimeout } from '../utils/with-timeout';
+import { driverTree, killPids, type ProcessIdentity } from './driver-tree';
 
 // A hung driver must not block close_session (it skips the per-session queue and its 90s deadline); state cleanup in the outer finally still runs.
 const DELETE_SESSION_TIMEOUT_MS = 90_000;
@@ -110,9 +111,11 @@ export function registerSession(
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
+          const oldTree = driverTree(oldMetadata?.driverRoots);
           try {
             await oldBrowser.deleteSession();
           } catch {
+            killPids(oldTree);
             // Continue to tunnel teardown. The state entry is removed below,
             // so this is the last opportunity to release an auto-managed tunnel.
           }
@@ -133,6 +136,7 @@ export function registerSession(
 }
 
 const closing = new Map<string, Promise<void>>();
+const capturedTrees = new Map<string, ProcessIdentity[]>();
 
 // close_session bypasses the per-session queue, so overlapping closes must share one teardown.
 export function closeSession(sessionId: string, detach: boolean, isAttached: boolean, force?: boolean, result?: SessionResult): Promise<void> {
@@ -177,9 +181,17 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
+      const tree = driverTree(metadata?.driverRoots);
+      capturedTrees.set(sessionId, tree);
       try {
         await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
+      } catch (e) {
+        killPids(tree);
+        throw e;
       } finally {
+        // the tree is gone either way, so the shutdown fallback must not target it during the tunnel stop below
+        if (metadata) { metadata.driverRoots = undefined; }
+        capturedTrees.delete(sessionId);
         // Stop tunnel AFTER deleteSession so SC doesn't wait for active jobs.
         // If session deletion fails, still best-effort stop the tunnel so the
         // teardown path does not leak resources.
@@ -199,12 +211,20 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
   } finally {
     state.browsers.delete(sessionId);
     state.sessionMetadata.delete(sessionId);
+    capturedTrees.delete(sessionId);
 
     // Only clear currentSession if it matches the session being closed
     if (state.currentSession === sessionId) {
       state.currentSession = null;
     }
     notifySessionsChanged();
+  }
+}
+
+export function killAllDriverTrees(): void {
+  // An in-flight close's captured tree still names Chrome children after the driver exits and they are reparented.
+  for (const [sessionId, metadata] of getState().sessionMetadata.entries()) {
+    killPids(capturedTrees.get(sessionId) ?? driverTree(metadata.driverRoots));
   }
 }
 

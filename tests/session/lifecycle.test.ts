@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SessionMetadata } from '../../src/session/state';
 import { getState } from '../../src/session/state';
-import { closeSession, registerSession } from '../../src/session/lifecycle';
+import { closeSession, killAllDriverTrees, registerSession } from '../../src/session/lifecycle';
 import { runInSessionQueue } from '../../src/session/routing';
+import { driverTree, killPids, type ProcessIdentity } from '../../src/session/driver-tree';
 import type { SessionHistory } from '../../src/types/recording';
 import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
@@ -22,8 +23,19 @@ vi.mock('../../src/providers/registry', () => ({
 vi.mock('../../src/electron/runtime', () => ({
   cleanupSessionRuntime: mockCleanupSessionRuntime,
 }));
+vi.mock('../../src/session/driver-tree', async (importOriginal) => {
+  const actual = await importOriginal<{ killPids: typeof killPids }>();
+  return {
+    ...actual,
+    driverTree: vi.fn((roots?: ProcessIdentity[]) => roots ?? []),
+    killPids: vi.fn(),
+  };
+});
 
-const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const DRIVER_ROOTS: ProcessIdentity[] = [{ pid: 4321, started: 'Thu Oct 30 10:00:00 2026' }];
+const CHILD_TREE: ProcessIdentity[] = [{ pid: 10, started: 'x' }, { pid: 11, started: 'x' }];
+
+const TINY_PNG ='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 function makeBrowser(overrides: Record<string, unknown> = {}) {
   return { deleteSession: vi.fn().mockResolvedValue(undefined), ...overrides } as unknown as WebdriverIO.Browser;
@@ -57,6 +69,7 @@ beforeEach(() => {
   mockOnSessionClose.mockResolvedValue(undefined);
   mockStopTunnel.mockResolvedValue(undefined);
   mockCleanupSessionRuntime.mockResolvedValue(undefined);
+  vi.mocked(driverTree).mockImplementation((roots) => roots ?? []);
 });
 
 describe('registerSession', () => {
@@ -360,6 +373,95 @@ describe('closeSession', () => {
 
     expect(browser.deleteSession).toHaveBeenCalled();
     expect(state.currentSession).toBeNull();
+  });
+
+  it('SIGKILLs the chromedriver process tree when deleteSession fails', async () => {
+    const browser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('hung page')) });
+    const state = getState();
+    state.browsers.set('hung', browser);
+    state.sessionMetadata.set('hung', { type: 'browser', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS });
+    state.sessionHistory.set('hung', { sessionId: 'hung', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'hung';
+
+    await expect(closeSession('hung', false, false)).rejects.toThrow('hung page');
+    expect(killPids).toHaveBeenCalledWith(DRIVER_ROOTS);
+  });
+
+  it('kills the tree captured by an in-flight close even after driverTree would return nothing', async () => {
+    let finishDelete: () => void = () => {};
+    const browser = makeBrowser({ deleteSession: vi.fn(() => new Promise<void>((resolve) => { finishDelete = resolve; })) });
+    const state = getState();
+    state.browsers.set('in-flight', browser);
+    state.sessionMetadata.set('in-flight', { type: 'browser', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS });
+    state.sessionHistory.set('in-flight', { sessionId: 'in-flight', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'in-flight';
+    vi.mocked(driverTree).mockReturnValueOnce(CHILD_TREE);
+
+    const closed = closeSession('in-flight', false, false);
+    await vi.waitFor(() => expect(browser.deleteSession).toHaveBeenCalled());
+    vi.mocked(driverTree).mockReturnValue([]);
+
+    killAllDriverTrees();
+    expect(killPids).toHaveBeenCalledWith(CHILD_TREE);
+
+    finishDelete();
+    await closed;
+  });
+
+  it('forgets the captured tree once deleteSession succeeds, before the tunnel stop', async () => {
+    let finishStop: () => void = () => {};
+    const browser = makeBrowser();
+    const state = getState();
+    state.browsers.set('clean', browser);
+    state.sessionMetadata.set('clean', { type: 'browser', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS, provider: 'browserstack', tunnelHandle: {} });
+    state.sessionHistory.set('clean', { sessionId: 'clean', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    vi.mocked(driverTree).mockReturnValueOnce(CHILD_TREE).mockReturnValue([]);
+    mockStopTunnel.mockImplementationOnce(() => new Promise<void>((resolve) => { finishStop = resolve; }));
+
+    const closed = closeSession('clean', false, false);
+    await vi.waitFor(() => expect(mockStopTunnel).toHaveBeenCalled());
+
+    killAllDriverTrees();
+    expect(killPids).not.toHaveBeenCalledWith(CHILD_TREE);
+
+    finishStop();
+    await closed;
+  });
+
+  it('does not re-kill the captured tree during a pending tunnel stop after deleteSession fails', async () => {
+    let finishStop: () => void = () => {};
+    const browser = makeBrowser({ deleteSession: vi.fn().mockRejectedValue(new Error('hung page')) });
+    const state = getState();
+    state.browsers.set('failed-tree', browser);
+    state.sessionMetadata.set('failed-tree', { type: 'browser', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS, provider: 'browserstack', tunnelHandle: makeTunnel() });
+    state.sessionHistory.set('failed-tree', { sessionId: 'failed-tree', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'failed-tree';
+    vi.mocked(driverTree).mockReturnValueOnce(CHILD_TREE);
+    mockStopTunnel.mockImplementationOnce(() => new Promise<void>((resolve) => { finishStop = resolve; }));
+
+    const closed = expect(closeSession('failed-tree', false, false)).rejects.toThrow('hung page');
+    await vi.waitFor(() => expect(mockStopTunnel).toHaveBeenCalled());
+    expect(killPids).toHaveBeenCalledWith(CHILD_TREE);
+    vi.mocked(killPids).mockClear();
+
+    killAllDriverTrees();
+    expect(vi.mocked(killPids).mock.calls.every(([tree]) => tree.length === 0)).toBe(true);
+
+    finishStop();
+    await closed;
+  });
+
+  it('forgets the driver pid once deleteSession succeeds, so a later group kill cannot hit a reused pid', async () => {
+    const metadata: SessionMetadata = { type: 'browser', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS };
+    const state = getState();
+    state.browsers.set('clean', makeBrowser());
+    state.sessionMetadata.set('clean', metadata);
+    state.sessionHistory.set('clean', { sessionId: 'clean', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'clean';
+
+    await closeSession('clean', false, false);
+    expect(metadata.driverRoots).toBeUndefined();
+    expect(killPids).not.toHaveBeenCalled();
   });
 
   it('rejects and removes the session when deleteSession hangs past 90s', async () => {

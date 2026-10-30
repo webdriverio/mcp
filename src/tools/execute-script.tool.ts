@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
-import { agentFor } from '../session/agent';
+import { agentFor, errorResult } from '../session/agent';
 
 const FUNCTION_SYNTAX = /^\s*(async\b|function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/;
 
@@ -78,9 +78,6 @@ export const executeScriptTool: ToolCallback = async (args: {
       content: [{ type: 'text', text: resultText }],
     };
   } catch (e) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Error executing script: ${e}` }],
-    };
+    return errorResult(e, 'Error executing script');
   }
 };

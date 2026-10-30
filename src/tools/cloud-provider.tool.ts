@@ -5,6 +5,7 @@ import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { basicAuth } from '../utils/auth';
 import { resolveCloudHost } from '../providers/cloud/digitalai.provider';
+import { errorResult } from '../session/agent';
 
 // ─── Provider API config ───────────────────────────────────────────────────────
 
@@ -279,7 +280,7 @@ export const listAppsTool: ToolCallback = async (args: ListAppsArgs) => {
       : apps.sort((a, b) => (b.uploadedAt ?? '').localeCompare(a.uploadedAt ?? ''));
     return { content: [{ type: 'text' as const, text: formatAppList(apps) }] };
   } catch (e) {
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Error listing apps: ${e}` }] };
+    return errorResult(e, 'Error listing apps');
   }
 };
 
@@ -342,6 +343,6 @@ export const uploadAppTool: ToolCallback = async (args: UploadAppArgs) => {
     const customIdNote = customId ? `\nCustom ID: ${customId}` : '';
     return { content: [{ type: 'text' as const, text: `Upload successful.\nApp: ${appRef}${customIdNote}\n\nUse "${appRef}" as the "app" parameter in start_session with provider: "${provider}".` }] };
   } catch (e) {
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Error uploading app: ${e}` }] };
+    return errorResult(e, 'Error uploading app');
   }
 };

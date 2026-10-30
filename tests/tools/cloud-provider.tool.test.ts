@@ -108,6 +108,13 @@ describe('list_apps tool (BrowserStack)', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('network error');
   });
+
+  it('prefixes the rejected Error message without doubling Error:', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('network error'));
+    const result = await callList({ provider: 'browserstack' });
+    expect(result.content[0].text.startsWith('Error listing apps: network error')).toBe(true);
+    expect(result.content[0].text).not.toContain('Error: network error');
+  });
 });
 
 describe('upload_app tool (BrowserStack)', () => {

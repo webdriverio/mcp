@@ -33,10 +33,31 @@ export const ACTION_TIMEOUT_MS = 30_000;
 
 export const noSession = (): CallToolResult => ({ isError: true, content: [{ type: 'text', text: 'No active session. Start one with start_session.' }] });
 
-export function errorResult(e: unknown): CallToolResult {
-  const message = e instanceof Error ? e.message : String(e);
+const SESSION_ENDED_ERROR_NAME = 'session ended';
+
+const hasEndedName = (e: unknown) => e instanceof Error && e.name === SESSION_ENDED_ERROR_NAME;
+
+function sessionEnded(e: unknown): boolean {
+  if (e instanceof SessionError && e.code === 'SESSION_DIED') return true;
+  return hasEndedName(e) || (e instanceof Error && hasEndedName(e.cause));
+}
+
+// a WebDriver error's class name (e.g. "stale element reference") is often the useful part; SessionError and ended-session names add nothing
+function errorMessage(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const named = e.name && e.name !== 'Error' && !(e instanceof SessionError) && !hasEndedName(e);
+  return named ? [e.name, e.message].filter(Boolean).join(': ') : e.message;
+}
+
+function errorText(e: unknown, context?: string): string {
+  const message = errorMessage(e);
   const hint = e instanceof SessionError ? e.hint : undefined;
-  return { isError: true, content: [{ type: 'text', text: [message, hint].filter(Boolean).join('\n') }] };
+  const ended = sessionEnded(e) ? `This browser session has ended. If you did not close it, start a new one with \`${mcpHint('open')}\`.` : undefined;
+  return [context ? `${context}: ${message}` : message, hint, ended].filter(Boolean).join('\n');
+}
+
+export function errorResult(e: unknown, context?: string): CallToolResult {
+  return { isError: true, content: [{ type: 'text', text: errorText(e, context) }] };
 }
 
 /** Rejects with a TIMEOUT error when `work` takes longer than the action limit. */
@@ -79,6 +100,6 @@ export async function pageReport(agent: AgentSession): Promise<string> {
     }
     return `Page: ${url}\n${snapshot.text}`;
   } catch (e) {
-    return e instanceof SessionError && e.code === 'TIMEOUT' ? [e.message, e.hint].filter(Boolean).join('\n') : '';
+    return e instanceof SessionError && e.code === 'TIMEOUT' ? errorText(e) : '';
   }
 }

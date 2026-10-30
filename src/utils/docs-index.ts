@@ -7,7 +7,8 @@ export const CHUNK_LINE_CAP = 200;
 export const EXCERPT_CHAR_CAP = 1200;
 
 export interface TocEntry { title: string; path: string }
-export interface DocChunk { page: number; title: string; trail: string[]; text: string; path: string | null }
+interface Section { level: number; title: string }
+export interface DocChunk { page: number; title: string; trail: string[]; sections: Section[]; text: string; path: string | null }
 export interface DocHit { page: number; title: string; trail: string[]; path: string | null; score: number; excerpt: string }
 export interface DocField { postings: Map<string, Map<number, number>>; lengths: number[]; avgdl: number }
 export interface DocsIndex { chunks: DocChunk[]; fields: DocField[]; toc: TocEntry[] }
@@ -40,7 +41,7 @@ export const BM25_K1 = 1.2;
 export const BM25_B = 0.75;
 const SUB_SEGMENT_MIN_LEN = 3;
 const TITLE_FIELD = 2;
-const TITLE_TERM_BOOST = 1.5;
+const PATH_TERM_BOOST = 1.5;
 // Closed-class English function words. Derived grammatically, not from corpus frequency:
 // `i` has df 59 (0.1·n) and idf 2.299, so on both frequency signals it looks like a
 // content word — only grammar separates it from `appium`. A df threshold cannot find it.
@@ -222,50 +223,63 @@ function resolvePagePaths(chunks: DocChunk[], entries: TocEntry[]): { matched: n
   return { matched, leftover: entries.length - matched };
 }
 
+function headingOf(line: string): Section | null {
+  const m = HEADING_LINE.exec(line);
+  return m ? { level: m[1].length, title: m[2].replace(ANCHOR_SUFFIX, '').trim() } : null;
+}
+
+function pushSection(sections: Section[], section: Section): void {
+  while (sections.length > 0 && sections[sections.length - 1].level >= section.level) sections.pop();
+  sections.push(section);
+}
+
+function nextFence(fence: number | null, line: string): number | null {
+  if (fence === null) return FENCE_OPEN.exec(line)?.[1].length ?? null;
+  const closer = FENCE_CLOSE.exec(line);
+  return closer && closer[1].length >= fence ? null : fence;
+}
+
+function* headingLines(lines: string[]): Generator<{ line: string; heading: Section | null }> {
+  let fence: number | null = null;
+  for (const line of lines) {
+    const inFence = fence !== null;
+    fence = nextFence(fence, line);
+    yield { line, heading: inFence || fence !== null ? null : headingOf(line) };
+  }
+}
+
 export function chunkCorpus(text: string, entries: TocEntry[] = tocEntries(text)): DocChunk[] {
   const markerAt = text.indexOf(FULL_DOCS_MARKER);
   const lines = (markerAt >= 0 ? text.slice(markerAt + FULL_DOCS_MARKER.length) : text).split('\n');
   const chunks: DocChunk[] = [];
-  let fence: number | null = null;
   let page = -1;
   let pageTitle = '';
-  let sections: { level: number; title: string }[] = [];
+  let sections: Section[] = [];
+  let chunkSections: Section[] = [];
   let buf: string[] = [];
   const flush = (): void => {
     if (page >= 0 && buf.length > 0) {
-      chunks.push({ page, title: pageTitle, trail: [pageTitle, ...sections.map((s) => s.title)], text: buf.join('\n'), path: null });
+      chunks.push({ page, title: pageTitle, trail: [pageTitle, ...chunkSections.map((s) => s.title)], sections: chunkSections, text: buf.join('\n'), path: null });
     }
     buf = [];
   };
-  for (const line of lines) {
-    if (fence !== null) {
-      const closer = FENCE_CLOSE.exec(line);
-      if (closer && closer[1].length >= fence) { fence = null; }
-      buf.push(line);
-      continue;
-    }
-    const opener = FENCE_OPEN.exec(line);
-    if (opener) {
-      fence = opener[1].length;
-      buf.push(line);
-      continue;
-    }
-    const heading = HEADING_LINE.exec(line);
+  for (const { line, heading } of headingLines(lines)) {
     if (!heading) {
       buf.push(line);
       continue;
     }
-    const level = heading[1].length;
-    const title = heading[2].replace(ANCHOR_SUFFIX, '').trim();
-    if (level === 1) {
+    if (heading.level === 1) {
       flush();
       page += 1;
-      pageTitle = title;
+      pageTitle = heading.title;
       sections = [];
+      chunkSections = [];
     } else if (page >= 0) {
-      if (buf.length > CHUNK_LINE_CAP) flush();
-      while (sections.length > 0 && sections[sections.length - 1].level >= level) sections.pop();
-      sections.push({ level, title });
+      pushSection(sections, heading);
+      if (buf.length > CHUNK_LINE_CAP) {
+        flush();
+        chunkSections = [...sections];
+      }
     }
     buf.push(line);
   }
@@ -303,6 +317,14 @@ export function queryTerms(query: string): string[] {
   const raw = [...query.matchAll(WORD)].map((m) => m[0]);
   const kept = raw.filter((t) => !STOPWORDS.has(t.toLowerCase()));
   return [...new Set(kept.length > 0 ? kept : raw)];
+}
+
+// A query may spell a compound apart (`test runner`) that the corpus holds as one token
+// (`Testrunner`). Pairs come from the raw words, so a pair containing a stopword (`set up`) still joins.
+// Scored against titles only: a joined form's body postings (`waitfor`, `mainprocess`) pull prose pages.
+function joinedPairs(query: string): string[] {
+  const raw = [...query.matchAll(WORD)].map((m) => m[0]);
+  return [...new Set(raw.slice(1).map((word, i) => `${raw[i]}${word}`.toLowerCase()))];
 }
 
 function emptyField(): DocField {
@@ -371,7 +393,7 @@ export function getIndex(text: string): DocsIndex {
 // Anchors on the densest *window* rather than the densest line: a single line can
 // outscore a whole relevant section (a URL in a "View on GitHub" link repeats the
 // query term), which would push the excerpt past the signature the caller wants.
-function excerptChunk(chunk: DocChunk, terms: string[]): string {
+function excerptChunk(chunk: DocChunk, terms: string[]): { excerpt: string; startLine: number; lines: string[] } {
   const wanted = new Set(terms);
   const lines = chunk.text.split('\n');
   const hits = lines.map((line) => {
@@ -402,7 +424,16 @@ function excerptChunk(chunk: DocChunk, terms: string[]): string {
     out.push(lines[i]);
     used += add;
   }
-  return out.join('\n');
+  return { excerpt: out.join('\n'), startLine: bestStart, lines };
+}
+
+// Line 0 opens the chunk: a page's H1 (in its title) or a heading already in its sections.
+function trailAt(chunk: DocChunk, lines: string[], lineIndex: number): string[] {
+  const sections = [...chunk.sections];
+  for (const { heading } of headingLines(lines.slice(1, lineIndex + 1))) {
+    if (heading) pushSection(sections, heading);
+  }
+  return [chunk.title, ...sections.map((s) => s.title)];
 }
 
 export function search(index: DocsIndex, query: string, limit: number, opts: SearchOptions = {}): DocHit[] {
@@ -411,8 +442,10 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
   const n = index.chunks.length;
   const scores = new Map<number, number>();
   const tokens = queryTerms(query);
-  for (const token of tokens) {
+  const compounds = joinedPairs(query);
+  const scoreToken = (token: string, onlyField?: number): void => {
     index.fields.forEach((field, f) => {
+      if (onlyField !== undefined && f !== onlyField) { return; }
       for (const term of FIELD_TERMS[f](token)) {
         const posting = field.postings.get(term);
         if (!posting) { continue; }
@@ -424,23 +457,26 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
         }
       }
     });
-  }
+  };
+  for (const token of tokens) scoreToken(token);
+  for (const compound of compounds) scoreToken(compound, TITLE_FIELD);
   const { demotePathPrefix, demoteFactor } = opts;
   const demote = Boolean(demotePathPrefix && demoteFactor) && !tokens.some((t) => t.toLowerCase() === 'mcp');
   const terms = tokens.flatMap(termsOf);
-  const queryNames = [...new Set(tokens.map((t) => t.toLowerCase()))];
-  // A page whose title or path names the query terms is the page the query is about; BM25
-  // alone lets an overview that merely repeats a term outscore it by a hair.
+  const queryNames = [...new Set([...tokens.map((t) => t.toLowerCase()), ...compounds])];
+  // A page whose path names the query terms is the page the query is about; BM25 alone lets an
+  // overview that merely repeats a term outscore it by a hair. Title words already score in
+  // the title field, so boosting them too counted them twice.
   const nameTerms = (i: number): Set<string> => {
-    const { title, path } = index.chunks[i];
-    return new Set([...tokenize(title), ...tokenize(path ?? '')].map((t) => t.toLowerCase()));
+    const { path } = index.chunks[i];
+    return new Set(tokenize(path ?? '').map((t) => t.toLowerCase()));
   };
   return [...scores]
     .filter(([, score]) => score > 0)
     .map(([i, score]) => {
       const path = index.chunks[i].path;
       const own = nameTerms(i);
-      const boosted = score * TITLE_TERM_BOOST ** queryNames.filter((t) => own.has(t)).length;
+      const boosted = score * PATH_TERM_BOOST ** queryNames.filter((t) => own.has(t)).length;
       const adjusted = demote && path && path.startsWith(demotePathPrefix as string) ? boosted * (demoteFactor as number) : boosted;
       return [i, adjusted] as const;
     })
@@ -448,6 +484,7 @@ export function search(index: DocsIndex, query: string, limit: number, opts: Sea
     .slice(0, limit)
     .map(([i, score]) => {
       const chunk = index.chunks[i];
-      return { page: chunk.page, title: chunk.title, trail: chunk.trail, path: chunk.path, score, excerpt: excerptChunk(chunk, terms) };
+      const { excerpt, startLine, lines } = excerptChunk(chunk, terms);
+      return { page: chunk.page, title: chunk.title, trail: trailAt(chunk, lines, startLine), path: chunk.path, score, excerpt };
     });
 }

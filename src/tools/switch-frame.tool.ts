@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
-import { runAction, agentFor } from '../session/agent';
+import { runAction, agentFor, errorResult } from '../session/agent';
 
 export const switchFrameToolDefinition: ToolDefinition = {
   name: 'switch_frame',
@@ -39,6 +39,6 @@ export const switchFrameTool: ToolCallback = async ({
     await browser.switchFrame(iframe);
     return { content: [{ type: 'text', text: `Switched to iframe: ${selector}` }] };
   } catch (e) {
-    return { isError: true, content: [{ type: 'text', text: `Error switching frame: ${e}` }] };
+    return errorResult(e, 'Error switching frame');
   }
 };

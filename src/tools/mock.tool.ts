@@ -3,6 +3,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import { errorResult } from '../session/agent';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
 
 const electronTargetSchema = {
@@ -44,6 +45,7 @@ type MockAdapter = {
   describe(target: Target): string;
 };
 const kindLabels = { electron: 'Electron', browser: 'Browser' } as const;
+const MOCK_ERROR_CONTEXT = 'Error with mock';
 type MockEntry = { adapter: MockAdapter; handle: unknown };
 // Browser ownership keeps handles isolated and lets teardown release them without another cleanup hook.
 const sessionMocks = new WeakMap<WebdriverIO.Browser, Map<string, MockEntry>>();
@@ -151,10 +153,6 @@ function withTarget<T>(target: Target, operation: (ctx: ReturnType<typeof contex
   return result;
 }
 
-function errorResult(error: unknown) {
-  return { isError: true, content: [{ type: 'text' as const, text: `Error with mock: ${error instanceof Error ? error.message : String(error)}` }] };
-}
-
 // Detached sessions outlive this registry: restore every handle so interception cannot outlive MCP's handle on the browser.
 export async function releaseSessionMocks(browser: WebdriverIO.Browser): Promise<void> {
   const mocks = sessionMocks.get(browser);
@@ -199,7 +197,7 @@ export const mockTool: ToolCallback = async (args: MockArgs) => {
       await adapter.configure(entry.handle, { ...args, behavior });
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock configured: ${adapter.describe(target)} (${behavior})` }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };
 
 export const getMockCallsToolDefinition: ToolDefinition = {
@@ -216,7 +214,7 @@ export const getMockCallsTool: ToolCallback = async (args: Target) => {
       const { calls, callCount } = await adapter.inspect(entry.handle);
       return { content: [{ type: 'text' as const, text: JSON.stringify({ calls, callCount }) }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };
 
 export const manageMockToolDefinition: ToolDefinition = {
@@ -235,5 +233,5 @@ export const manageMockTool: ToolCallback = async (args: ManageArgs) => {
       if (action === 'restore') mocks.delete(key);
       return { content: [{ type: 'text' as const, text: `${kindLabels[kind]} mock ${action} completed: ${adapter.describe(target)}` }] };
     });
-  } catch (error) { return errorResult(error); }
+  } catch (error) { return errorResult(error, MOCK_ERROR_CONTEXT); }
 };

@@ -5,10 +5,11 @@ import { getBrowser } from '../session/state';
 import { getElements } from '../scripts/get-elements';
 import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
+import { errorResult } from '../session/agent';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
-  description: 'Returns interactable elements on the current page with selectors, text, and bounding boxes. Supports filtering by element type, viewport visibility, and pagination. Use when the wdio://session/current/elements resource does not return desired elements.',
+  description: 'Returns interactable elements on the current page with selectors, text, and bounding boxes. Supports filtering by viewport visibility, containers, and pagination. Use when the wdio://session/current/elements resource does not return desired elements.',
   annotations: { title: 'Get Visible Elements', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only return elements visible in the current viewport (default: false).'),
@@ -38,6 +39,6 @@ export const getElementsTool: ToolCallback = async ({
     const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
     return { content: [{ type: 'text' as const, text }] };
   } catch (e) {
-    return { isError: true as const, content: [{ type: 'text' as const, text: `Error getting elements: ${e}` }] };
+    return errorResult(e, 'Error getting elements');
   }
 };
