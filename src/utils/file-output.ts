@@ -1,4 +1,4 @@
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { activeSessionId } from '../session/context';
@@ -9,6 +9,7 @@ export type OutputMode = 'inline' | 'file';
 const DEFAULT_OUTPUT_PREFIX = 'wdio-mcp-outputs-';
 
 const sessionOutputFiles = new Map<string, Set<string>>();
+const privateSubdirs = new Map<string, string>();
 let privateDefaultOutputDir: string | null = null;
 
 export function parseOutputMode(value: string | undefined): OutputMode {
@@ -40,19 +41,34 @@ function sessionFilePrefix(sessionId: string): string {
 function ensurePrivateOutputDir(explicitDir?: string): string {
   const configuredDir = explicitDir?.trim() || process.env.WDIO_MCP_OUTPUT_DIR?.trim();
   if (configuredDir) {
-    mkdirSync(configuredDir, { recursive: true, mode: 0o700 });
+    const existed = existsSync(configuredDir);
+    if (!existed) {
+      mkdirSync(configuredDir, { recursive: true, mode: 0o700 });
+    }
     const stat = lstatSync(configuredDir);
     if (!stat.isDirectory() || stat.isSymbolicLink()) {
       throw new Error(`Invalid output directory "${configuredDir}": must be a real directory.`);
     }
-    if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) {
-      throw new Error(`Invalid output directory "${configuredDir}": not owned by current user.`);
+    if (!existed) {
+      chmodSync(configuredDir, 0o700);
+      return configuredDir;
     }
-    chmodSync(configuredDir, 0o700);
-    return configuredDir;
+    const isPrivateToCurrentUser =
+      (typeof process.getuid !== 'function' || stat.uid === process.getuid()) &&
+      (stat.mode & 0o077) === 0;
+    if (isPrivateToCurrentUser) {
+      return configuredDir;
+    }
+    let subdir = privateSubdirs.get(configuredDir);
+    if (!subdir || !existsSync(subdir)) {
+      subdir = mkdtempSync(join(configuredDir, DEFAULT_OUTPUT_PREFIX));
+      chmodSync(subdir, 0o700);
+      privateSubdirs.set(configuredDir, subdir);
+    }
+    return subdir;
   }
 
-  if (!privateDefaultOutputDir) {
+  if (!privateDefaultOutputDir || !existsSync(privateDefaultOutputDir)) {
     privateDefaultOutputDir = mkdtempSync(join(tmpdir(), DEFAULT_OUTPUT_PREFIX));
     chmodSync(privateDefaultOutputDir, 0o700);
   }
