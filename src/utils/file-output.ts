@@ -1,4 +1,16 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  fchmodSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { activeSessionId } from '../session/context';
@@ -38,44 +50,89 @@ function sessionFilePrefix(sessionId: string): string {
   return name ? `${sanitizeSegment(name)}-${shortId}` : shortId;
 }
 
+function isPrivateDirectory(dirPath: string): boolean {
+  try {
+    const stat = lstatSync(dirPath);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      return false;
+    }
+    if (typeof process.getuid === 'function') {
+      return stat.uid === process.getuid() && (stat.mode & 0o077) === 0;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateSafeParentDirectory(dirPath: string): ReturnType<typeof lstatSync> {
+  const stat = lstatSync(dirPath);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`Invalid output directory "${dirPath}": must be a real directory.`);
+  }
+  if (typeof process.getuid === 'function') {
+    const currentUid = process.getuid();
+    const isGroupOrWorldWritable = (stat.mode & 0o022) !== 0;
+    const hasStickyBit = (stat.mode & 0o1000) !== 0;
+    if (isGroupOrWorldWritable && !hasStickyBit) {
+      throw new Error(
+        `Unsafe output directory "${dirPath}": shared writable directories must have the sticky bit set.`,
+      );
+    }
+    if (stat.uid !== currentUid && !hasStickyBit) {
+      throw new Error(
+        `Unsafe output directory "${dirPath}": directory must be owned by the current user or have the sticky bit set.`,
+      );
+    }
+  }
+  return stat;
+}
+
 function ensurePrivateOutputDir(explicitDir?: string): string {
   const configuredDir = explicitDir?.trim() || process.env.WDIO_MCP_OUTPUT_DIR?.trim();
   if (configuredDir) {
-    const existed = existsSync(configuredDir);
-    if (!existed) {
-      mkdirSync(configuredDir, { recursive: true, mode: 0o700 });
+    let created = false;
+    try {
+      lstatSync(configuredDir);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        mkdirSync(configuredDir, { recursive: true, mode: 0o700 });
+        chmodSync(configuredDir, 0o700);
+        created = true;
+      } else {
+        throw err;
+      }
     }
-    const stat = lstatSync(configuredDir);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) {
-      throw new Error(`Invalid output directory "${configuredDir}": must be a real directory.`);
-    }
-    if (!existed) {
-      chmodSync(configuredDir, 0o700);
+
+    validateSafeParentDirectory(configuredDir);
+
+    if (created || isPrivateDirectory(configuredDir)) {
       return configuredDir;
     }
-    const isPrivateToCurrentUser =
-      (typeof process.getuid !== 'function' || stat.uid === process.getuid()) &&
-      (stat.mode & 0o077) === 0;
-    if (isPrivateToCurrentUser) {
-      return configuredDir;
-    }
+
     let subdir = privateSubdirs.get(configuredDir);
-    if (!subdir || !existsSync(subdir)) {
+    if (!subdir || !isPrivateDirectory(subdir)) {
       subdir = mkdtempSync(join(configuredDir, DEFAULT_OUTPUT_PREFIX));
       chmodSync(subdir, 0o700);
+      if (!isPrivateDirectory(subdir)) {
+        throw new Error(`Failed to create a private output directory inside "${configuredDir}".`);
+      }
       privateSubdirs.set(configuredDir, subdir);
     }
     return subdir;
   }
 
-  if (!privateDefaultOutputDir || !existsSync(privateDefaultOutputDir)) {
-    privateDefaultOutputDir = mkdtempSync(join(tmpdir(), DEFAULT_OUTPUT_PREFIX));
+  const baseTmp = tmpdir();
+  validateSafeParentDirectory(baseTmp);
+  if (!privateDefaultOutputDir || !isPrivateDirectory(privateDefaultOutputDir)) {
+    privateDefaultOutputDir = mkdtempSync(join(baseTmp, DEFAULT_OUTPUT_PREFIX));
     chmodSync(privateDefaultOutputDir, 0o700);
+    if (!isPrivateDirectory(privateDefaultOutputDir)) {
+      throw new Error(`Failed to create a private output directory inside "${baseTmp}".`);
+    }
   }
   return privateDefaultOutputDir;
 }
-
-let fileCounter = 0;
 
 export function writeSessionOutputFile(params: {
   kind: string;
@@ -91,15 +148,24 @@ export function writeSessionOutputFile(params: {
   }
 
   const dir = ensurePrivateOutputDir(outputDir);
+  if (!isPrivateDirectory(dir)) {
+    throw new Error(`Unsafe output directory "${dir}": directory is no longer private.`);
+  }
 
-  fileCounter = (fileCounter + 1) % 1_000_000;
   const prefix = sessionFilePrefix(sessionId);
   const safeKind = sanitizeSegment(kind);
-  const fileName = `${prefix}-${safeKind}-${Date.now()}-${fileCounter}.${ext}`;
+  const fileName = `${prefix}-${safeKind}-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
   const filePath = join(dir, fileName);
 
-  writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
-  chmodSync(filePath, 0o600);
+  const flags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0);
+  const fd = openSync(filePath, flags, 0o600);
+  try {
+    fchmodSync(fd, 0o600);
+    writeFileSync(fd, content, { encoding: 'utf8' });
+  } finally {
+    closeSync(fd);
+  }
+
   const bytes = Buffer.byteLength(content, 'utf8');
   const lines = content.length === 0 ? 0 : content.split('\n').length;
 

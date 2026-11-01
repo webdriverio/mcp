@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -284,5 +284,17 @@ describe('snapshot & get_elements file output mode (#178)', () => {
     expect(() => parseOutputMode('invalid')).toThrow(
       'Invalid WDIO_MCP_OUTPUT_MODE value "invalid". Accepted values: inline, file.',
     );
+  });
+
+  it('rejects shared writable output directories without the sticky bit', async () => {
+    if (process.platform === 'win32') return;
+    chmodSync(tempDir, 0o777);
+    snapshotFn.mockResolvedValue({ text: '- main\n  - button "Go" [ref=e1]' });
+
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const result = await call(routedSnapshot, { outputMode: 'file', outputDir: tempDir });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('shared writable directories must have the sticky bit set');
   });
 });
