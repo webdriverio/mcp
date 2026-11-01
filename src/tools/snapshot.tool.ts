@@ -63,23 +63,27 @@ export function createSnapshotTool(defaultOutputMode?: OutputMode): ToolCallback
       }
       const result = await runAction(agent, 'find', { text: find, ...(scope && { scope }) }, `No match for ${JSON.stringify(find)}.`);
       if (effectiveOutputMode === 'file' && !result.isError) {
-        const text = (result.content ?? [])
-          .filter((item): item is { type: 'text'; text: string } => item.type === 'text')
-          .map(item => item.text)
-          .join('\n');
-        const { filePath, bytes, lines } = writeSessionOutputFile({
-          kind: 'snapshot-find',
-          content: text,
-          ext: 'txt',
-          outputDir,
-        });
-        const { root, refCount } = summarizeSnapshot(text);
-        return {
-          content: [{
-            type: 'text',
-            text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes)`,
-          }],
-        };
+        try {
+          const text = (result.content ?? [])
+            .filter((item): item is { type: 'text'; text: string } => item.type === 'text')
+            .map(item => item.text)
+            .join('\n');
+          const { filePath, bytes, lines } = writeSessionOutputFile({
+            kind: 'snapshot-find',
+            content: text,
+            ext: 'txt',
+            outputDir,
+          });
+          const { root, refCount } = summarizeSnapshot(text);
+          return {
+            content: [{
+              type: 'text',
+              text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes)`,
+            }],
+          };
+        } catch (e) {
+          return errorResult(e);
+        }
       }
       return result;
     }

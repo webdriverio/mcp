@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const snapshotFn = vi.fn();
@@ -27,7 +27,7 @@ const { createSnapshotTool, snapshotTool } = await import('../../src/tools/snaps
 const { getElementsTool } = await import('../../src/tools/get-elements.tool');
 const { getState } = await import('../../src/session/state');
 const { closeSession, registerSession } = await import('../../src/session/lifecycle');
-const { withSessionTarget } = await import('../../src/session/routing');
+const { sessionContext, withSessionTarget } = await import('../../src/session/routing');
 const { parseOutputMode } = await import('../../src/utils/file-output');
 
 type Result = { content: { type: string; text: string }[]; isError?: boolean };
@@ -96,7 +96,8 @@ describe('snapshot & get_elements file output mode (#178)', () => {
       notes: ['1 interactive element'],
     });
 
-    const result = await call(snapshotTool, {});
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const result = await call(routedSnapshot, {});
     expect(snapshotFn).toHaveBeenCalledWith({
       interactive: true,
       scope: undefined,
@@ -107,7 +108,7 @@ describe('snapshot & get_elements file output mode (#178)', () => {
     expect(result.content[0].text).toContain('1 interactive element');
   });
 
-  it('writes untruncated snapshot to a file when outputMode is "file"', async () => {
+  it('writes untruncated snapshot to a file with owner-only permissions when outputMode is "file"', async () => {
     const sampleTree = [
       '- document "Checkout"',
       '  - button "Pay now" [ref=e1]',
@@ -119,7 +120,7 @@ describe('snapshot & get_elements file output mode (#178)', () => {
     });
 
     const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
-    const result = await call(routedSnapshot, { outputMode: 'file', outputDir: tempDir });
+    const result = await call(routedSnapshot, { outputMode: 'file' });
 
     expect(snapshotFn).toHaveBeenCalledWith({
       interactive: true,
@@ -137,6 +138,11 @@ describe('snapshot & get_elements file output mode (#178)', () => {
     const filePath = match![1];
     expect(existsSync(filePath)).toBe(true);
     expect(readFileSync(filePath, 'utf8')).toBe(`${sampleTree}\nNote: full page`);
+    if (process.platform !== 'win32') {
+      expect(statSync(filePath).mode & 0o777).toBe(0o600);
+      expect(statSync(dirname(filePath)).mode & 0o777).toBe(0o700);
+    }
+    await closeSession('sess-11112222-3333', false, false);
   });
 
   it('respects WDIO_MCP_OUTPUT_MODE=file and WDIO_MCP_OUTPUT_DIR env vars, and allows inline override', async () => {
@@ -146,7 +152,10 @@ describe('snapshot & get_elements file output mode (#178)', () => {
       text: '- main\n  - link "Docs" [ref=e4]',
     });
 
-    const envSnapshotTool = createSnapshotTool(parseOutputMode(process.env.WDIO_MCP_OUTPUT_MODE));
+    const envSnapshotTool = withSessionTarget(
+      'snapshot',
+      createSnapshotTool(parseOutputMode(process.env.WDIO_MCP_OUTPUT_MODE)),
+    );
     const fileResult = await call(envSnapshotTool, {});
     expect(fileResult.content[0].text).toContain(`Snapshot written to ${tempDir}`);
     expect(fileResult.content[0].text).toContain('1 refs');
@@ -160,7 +169,8 @@ describe('snapshot & get_elements file output mode (#178)', () => {
       text: '- form [ref=e1]\n  - button "Submit" [ref=e2]',
     });
 
-    const result = await call(snapshotTool, {
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const result = await call(routedSnapshot, {
       find: 'Submit',
       outputMode: 'file',
       outputDir: tempDir,
@@ -184,7 +194,9 @@ describe('snapshot & get_elements file output mode (#178)', () => {
       ],
     });
 
-    const result = await call(getElementsTool, { outputMode: 'file', outputDir: tempDir });
+    const result = await sessionContext.run({ sessionId: 'sess-11112222-3333' }, () =>
+      call(getElementsTool, { outputMode: 'file', outputDir: tempDir }),
+    );
 
     expect(result.content[0].text).toContain('Elements written to ');
     expect(result.content[0].text).toContain('(2 of 2 elements,');
@@ -252,6 +264,20 @@ describe('snapshot & get_elements file output mode (#178)', () => {
 
     await closeSession('bbbb2222-0000', false, false);
     expect(existsSync(betaPath)).toBe(false);
+  });
+
+  it('rejects late file writes when a session was already closed or replaced', async () => {
+    snapshotFn.mockImplementation(async () => {
+      await closeSession('sess-11112222-3333', false, false);
+      return { text: '- main\n  - button "Late" [ref=e1]' };
+    });
+
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const result = await call(routedSnapshot, { outputMode: 'file', outputDir: tempDir });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('session is already closed or inactive');
+    expect(readdirSync(tempDir)).toEqual([]);
   });
 
   it('rejects invalid WDIO_MCP_OUTPUT_MODE values', () => {
