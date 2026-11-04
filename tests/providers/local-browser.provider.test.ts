@@ -10,10 +10,16 @@ describe('LocalBrowserProvider', () => {
     });
   });
 
-  it.each(['chrome', 'edge'] as const)('buildCapabilities: %s hides navigator.webdriver', (browser) => {
-    const caps = localBrowserProvider.buildCapabilities({ browser });
+  it.each(['chrome', 'edge'] as const)('buildCapabilities: headless %s hides navigator.webdriver', (browser) => {
+    const caps = localBrowserProvider.buildCapabilities({ browser, headless: true });
     const key = browser === 'chrome' ? 'goog:chromeOptions' : 'ms:edgeOptions';
     expect((caps[key] as any).args).toContain('--disable-blink-features=AutomationControlled');
+  });
+
+  it.each(['chrome', 'edge'] as const)('buildCapabilities: headed %s keeps navigator.webdriver', (browser) => {
+    const caps = localBrowserProvider.buildCapabilities({ browser, headless: false });
+    const key = browser === 'chrome' ? 'goog:chromeOptions' : 'ms:edgeOptions';
+    expect((caps[key] as any).args).not.toContain('--disable-blink-features=AutomationControlled');
   });
 
   it('buildCapabilities: chrome headless includes --headless=new arg', () => {

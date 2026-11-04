@@ -46,7 +46,6 @@ export class LocalBrowserProvider implements SessionProvider {
       '--no-sandbox',
       '--disable-search-engine-choice-screen',
       '--disable-infobars',
-      '--disable-blink-features=AutomationControlled',
       '--log-level=3',
       '--use-fake-device-for-media-stream',
       '--use-fake-ui-for-media-stream',
@@ -56,6 +55,8 @@ export class LocalBrowserProvider implements SessionProvider {
 
     if (effectiveHeadless) {
       chromiumArgs.push('--headless=new');
+      // Headless only: a headed session should still report navigator.webdriver = true
+      chromiumArgs.push('--disable-blink-features=AutomationControlled');
       chromiumArgs.push('--disable-gpu');
       chromiumArgs.push('--disable-dev-shm-usage');
     }
