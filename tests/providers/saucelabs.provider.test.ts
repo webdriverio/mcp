@@ -116,17 +116,6 @@ describe('SauceLabsProvider', () => {
       expect(sauce.tunnelName).toBe('my-tunnel');
     });
 
-    it('supports legacy saucelabsLocal alias', () => {
-      const caps = provider.buildCapabilities({
-        platform: 'browser',
-        browser: 'chrome',
-        saucelabsLocal: true,
-        tunnelName: 'legacy-tunnel',
-      });
-      const sauce = caps['sauce:options'] as Record<string, unknown>;
-      expect(sauce.tunnelName).toBe('legacy-tunnel');
-    });
-
     it('does not set tunnelName when tunnel is enabled but no tunnelName is given', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',

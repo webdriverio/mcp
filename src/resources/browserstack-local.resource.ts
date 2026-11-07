@@ -59,13 +59,13 @@ function getLocalBinaryInfo(): {
 export const browserstackLocalBinaryResource: ResourceDefinition = {
   name: 'browserstack-local-binary',
   uri: 'wdio://browserstack/local-binary',
-  description: 'BrowserStack Local binary download URL and daemon setup instructions for the current platform. MUST be read and followed before using browserstackLocal: true in start_session.',
+  description: 'BrowserStack Local binary download URL and daemon setup instructions for the current platform. Only needed for tunnel: "external" — tunnel: true starts BrowserStack Local for you.',
   handler: async () => {
     const info = getLocalBinaryInfo();
     const accessKey = process.env.BROWSERSTACK_ACCESS_KEY ?? '<BROWSERSTACK_ACCESS_KEY>';
 
     const content = {
-      requirement: 'MUST start the BrowserStack Local daemon BEFORE calling start_session with browserstackLocal: true. Without it, all navigation to local/internal URLs will fail with ERR_TUNNEL_CONNECTION_FAILED.',
+      requirement: 'Start the BrowserStack Local daemon before calling start_session with tunnel: "external". Without a tunnel, navigation to local/internal URLs fails with ERR_TUNNEL_CONNECTION_FAILED. (tunnel: true starts it automatically.)',
       platform: info.platform,
       arch: info.arch,
       downloadUrl: info.downloadUrl,
@@ -81,7 +81,7 @@ export const browserstackLocalBinaryResource: ResourceDefinition = {
         stop: `./${info.binaryName} --key ${accessKey} --daemon stop`,
         status: `./${info.binaryName} --daemon list`,
       },
-      afterDaemonIsRunning: 'Call start_session with browserstackLocal: true to route BrowserStack traffic through the tunnel.',
+      afterDaemonIsRunning: 'Call start_session with tunnel: "external" to route BrowserStack traffic through the tunnel.',
     };
 
     return {

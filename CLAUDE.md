@@ -44,9 +44,9 @@ src/
 │       ├── testingbot.provider.ts    # TestingBot (browser + mobile + Storage)
 │       └── digitalai.provider.ts     # Digital.ai Testing (browser + mobile; accessKey cap, deviceQuery)
 ├── trace/             # Playwright-compatible trace recording (recorder.ts, tool-mapping.ts, zip-writer.ts)
-├── tools/             # One file per MCP tool (see Tool Pattern below); includes the Electron
+├── tools/             # One file per tool family (some define several tools; see Tool Pattern below); includes the Electron
 │                       #   surface (electron-execute, electron-deeplink), mocking, and web extensions
-├── resources/         # One file per MCP resource (see Recording below)
+├── resources/         # One file per resource family (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
 ├── scripts/           # Browser/mobile scripts executed via browser.execute() — no try/catch, raw data only
 ├── locators/          # Element detection, selector generation, XML parsing (mobile)
@@ -59,9 +59,9 @@ src/
 ### Session State
 
 Multiple live sessions: `state.ts` holds the session maps plus the default (`currentSession`); read `SessionMetadata` there.
-`src/session/routing.ts` — `registerTool` wraps every tool in `withSessionTarget` (adds the optional `session` arg) unless
-`sessionless`; it resolves the target via `resolveSession()`, queues calls per session and prefixes results with `[session: name (id8)]` only when a target is passed or more than one session is live.
-`src/session/context.ts` — AsyncLocalStorage; `activeSessionId()` is what `getBrowser()` reads. Never read `currentSession` directly in tools.
+`registerTool` (in `server.ts`) wraps every tool in `withSessionTarget` from `src/session/routing.ts` (adds the optional `session` arg) unless
+the definition is `sessionless`; `withSessionTarget` resolves the target via `resolveSession()`, queues calls per session and prefixes results with `[session: name (id8)]` only when a target is passed or more than one session is live.
+`src/session/context.ts` — AsyncLocalStorage; `activeSessionId()` is what `getBrowser()` reads. Tools use `getBrowser()`/`activeSessionId()`; only the session start/attach tools read `currentSession` directly.
 `registerSession()` takes `{ keep, name }`: `keep` leaves the existing default in place.
 
 Session lifecycle managed via `src/session/lifecycle.ts`:
@@ -71,8 +71,9 @@ Session lifecycle managed via `src/session/lifecycle.ts`:
 
 ### Tool Pattern
 
-All tools follow this structure — one file per tool under `src/tools/`, registered in `server.ts`
-with `registerTool(myToolDefinition, myTool)`, or `withRecording('my_tool', myTool)` to record steps:
+All tools follow this structure — defined under `src/tools/` and registered in `server.ts` with
+`registerTool(myToolDefinition, myTool)`; wrap the callback in `instrument('my_tool', myTool)`
+(`withTrace` + `withRecording`) to record steps and trace:
 
 ```typescript
 // 1. Definition with Zod schema
@@ -101,11 +102,12 @@ registerTool(myToolDefinition, myTool);
 
 ### Recording
 
-Selected tools are wrapped with `withRecording()` in `server.ts`. Steps accumulate in `state.sessionHistory` (keyed by sessionId).
+Selected tools are wrapped with `instrument()` (`withTrace` + `withRecording`) in `server.ts`; `start_session` uses `withRecording` directly. Steps accumulate in `state.sessionHistory` (keyed by sessionId).
 
-MCP resources expose live session data — all at fixed URIs discoverable via ListResources:
+MCP resources expose live session data. Fixed URIs appear in ListResources; template URIs (`{param}` path segments) are not listed and must be read by constructing the URI:
 
 **Session history:**
+
 - `wdio://sessions` — index of all sessions
 - `wdio://session/current/steps` — current session step log
 - `wdio://session/current/code` — generated WebdriverIO JS for current session
@@ -113,7 +115,8 @@ MCP resources expose live session data — all at fixed URIs discoverable via Li
 - `wdio://session/{sessionId}/code` — generated JS for any session (URI template)
 
 **Live page state (current session):** `wdio://session/current/` + `elements`, `accessibility`,
-`screenshot`, `cookies`, `tabs`, `contexts`, `context`, `app-state`, `geolocation`, `capabilities`, `logs`.
+`screenshot`, `cookies`, `tabs`, `contexts`, `context`, `geolocation`, `capabilities`, `logs`, and the
+template `app-state/{bundleId}`.
 
 - `elements` is viewport-only — use the `get_elements` tool with `inViewportOnly: false` for all
 - `capabilities` are the *resolved* values the driver accepted, including provider defaults
@@ -196,7 +199,7 @@ Only files whose purpose is not evident from the tree above.
 
 ### Package Manager Is pnpm
 
-`packageManager: pnpm@10.32.1` and only `pnpm-lock.yaml` at the root. The `npm run` scripts below work,
+`packageManager: pnpm@10.32.1` and only `pnpm-lock.yaml` at the root. The `npm run` scripts above work,
 but installing a dependency with `npm install` forks the lockfile — use `pnpm add`.
 
 ### Console Output
@@ -209,14 +212,13 @@ stdout, which corrupts the MCP stdio protocol. Do not remove those reassignments
 `get-interactable-browser-elements.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
 external imports.
 
-### Auto-Detach Behavior
+### Close vs Detach
 
-Sessions created with `noReset: true` or without `appPath` automatically detach on close (don't terminate on Appium
-server).
+`close_session` ends the session unless it came from `attach_session` or `provider: 'external'` — those detach by default and keep running. Appium `noReset` sessions are closed (app data kept). `detach: true` detaches any non-Electron session.
 
 ### MCP Resource URI Templates
 
-The MCP SDK only supports path-segment templates `{param}` in resource URIs — NOT RFC 6570 query param syntax `{?param}`. Resources using `{?param}` silently return "Resource not found". Keep resources at fixed URIs; expose parameterised access via tools instead.
+The MCP SDK only supports path-segment templates `{param}` in resource URIs — NOT RFC 6570 query param syntax `{?param}`. Resources using `{?param}` silently return "Resource not found". Use path-segment templates or fixed URIs; expose query-style parameters via tools instead.
 
 ### Scripts vs Tools vs Resources
 
