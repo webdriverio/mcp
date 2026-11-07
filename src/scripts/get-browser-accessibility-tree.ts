@@ -124,43 +124,104 @@ const accessibilityTreeScript = () => (function () {
     return (el.textContent?.trim().replace(/\s+/g, ' ') || '').slice(0, 100);
   }
 
+  function getSelectorAccessibleName(el: HTMLElement, role: string | null): string {
+    const ariaLabel = el.getAttribute('aria-label');
+    if (ariaLabel) return ariaLabel.trim();
+
+    const labelledBy = el.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const texts = labelledBy.split(/\s+/)
+        .map(id => document.getElementById(id)?.textContent?.trim() || '')
+        .filter(Boolean);
+      if (texts.length > 0) return texts.join(' ').slice(0, 100);
+    }
+
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'img' || (tag === 'input' && el.getAttribute('type') === 'image')) {
+      const alt = el.getAttribute('alt');
+      if (alt !== null) return alt.trim();
+    }
+
+    if (['input', 'select', 'textarea'].includes(tag)) {
+      const id = el.getAttribute('id');
+      if (id) {
+        const label = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+        if (label) return label.textContent?.trim() || '';
+      }
+      const parentLabel = el.closest('label');
+      if (parentLabel) {
+        const clone = parentLabel.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('input,select,textarea').forEach(n => n.remove());
+        const lt = clone.textContent?.trim();
+        if (lt) return lt;
+      }
+      return '';
+    }
+
+    if (role && CONTAINER_ROLES.has(role)) return '';
+    return (el.textContent?.trim().replace(/\s+/g, ' ') || '').slice(0, 100);
+  }
+
+  function isLikelyGeneratedId(id: string): boolean {
+    return /^[0-9a-f]{8,}$/i.test(id) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ||
+      /(?:^|[-_:])\d{8,}(?:$|[-_:])/.test(id) ||
+      /^(?:ember|react-select|radix|headlessui|mui|mantine|chakra|auto|generated)[-_:]?\d+/i.test(id);
+  }
+
+  function uniqueCssSelector(selector: string): string | null {
+    return document.querySelectorAll(selector).length === 1 ? selector : null;
+  }
+
   function getSelector(element: HTMLElement): string {
     const tag = element.tagName.toLowerCase();
 
-    const text = element.textContent?.trim().replace(/\s+/g, ' ');
-    if (text && text.length > 0 && text.length <= 50) {
-      const sameTagElements = document.querySelectorAll(tag);
+    for (const attr of ['data-testid', 'data-test', 'data-qa']) {
+      const value = element.getAttribute(attr);
+      if (!value) continue;
+      const selector = uniqueCssSelector(`[${attr}="${CSS.escape(value)}"]`);
+      if (selector) return selector;
+    }
+
+    const role = getRole(element);
+    const accessibleName = getSelectorAccessibleName(element, role);
+    if (role && accessibleName && accessibleName.length <= 80) {
       let matchCount = 0;
-      sameTagElements.forEach(el => { if (el.textContent?.includes(text)) matchCount++; });
-      if (matchCount === 1) return `${tag}*=${text}`;
+      document.querySelectorAll('*').forEach(el => {
+        const htmlEl = el as HTMLElement;
+        const candidateRole = getRole(htmlEl);
+        if (isVisible(htmlEl) && candidateRole && getSelectorAccessibleName(htmlEl, candidateRole) === accessibleName) matchCount++;
+      });
+      if (matchCount === 1) return `aria/${accessibleName}`;
     }
 
-    const ariaLabel = element.getAttribute('aria-label');
-    if (ariaLabel && ariaLabel.length <= 80) return `aria/${ariaLabel}`;
-
-    const testId = element.getAttribute('data-testid');
-    if (testId) {
-      const sel = `[data-testid="${CSS.escape(testId)}"]`;
-      if (document.querySelectorAll(sel).length === 1) return sel;
-    }
-
-    if (element.id) return `#${CSS.escape(element.id)}`;
+    if (element.id && !isLikelyGeneratedId(element.id)) return `#${CSS.escape(element.id)}`;
 
     const nameAttr = element.getAttribute('name');
     if (nameAttr) {
       const sel = `${tag}[name="${CSS.escape(nameAttr)}"]`;
-      if (document.querySelectorAll(sel).length === 1) return sel;
+      const selector = uniqueCssSelector(sel);
+      if (selector) return selector;
+    }
+
+    const placeholder = element.getAttribute('placeholder');
+    if (placeholder) {
+      const sel = `${tag}[placeholder="${CSS.escape(placeholder)}"]`;
+      const selector = uniqueCssSelector(sel);
+      if (selector) return selector;
     }
 
     if (element.className && typeof element.className === 'string') {
       const classes = element.className.trim().split(/\s+/).filter(Boolean);
       for (const cls of classes) {
         const sel = `${tag}.${CSS.escape(cls)}`;
-        if (document.querySelectorAll(sel).length === 1) return sel;
+        const selector = uniqueCssSelector(sel);
+        if (selector) return selector;
       }
       if (classes.length >= 2) {
         const sel = `${tag}${classes.slice(0, 2).map(c => `.${CSS.escape(c)}`).join('')}`;
-        if (document.querySelectorAll(sel).length === 1) return sel;
+        const selector = uniqueCssSelector(sel);
+        if (selector) return selector;
       }
     }
 
@@ -168,7 +229,7 @@ const accessibilityTreeScript = () => (function () {
     const path: string[] = [];
     while (current && current !== document.documentElement) {
       let seg = current.tagName.toLowerCase();
-      if (current.id) { path.unshift(`#${CSS.escape(current.id)}`); break; }
+      if (current.id && !isLikelyGeneratedId(current.id)) { path.unshift(`#${CSS.escape(current.id)}`); break; }
       const parent = current.parentElement;
       if (parent) {
         const siblings = Array.from(parent.children).filter(c => c.tagName === current!.tagName);
