@@ -714,6 +714,8 @@ The server lists only the tools that fit the current session: browser sessions g
 
 Set `WDIO_MCP_NETWORK_LOGS` to configure the default Chromium network/performance log capture mode for `start_session`: `none` (default, off), `failures` (`Network.loadingFailed` and `Network.responseReceived` entries with HTTP status `>= 400`), or `all` (every Chromium `performance` log entry). Individual sessions can override this default via `start_session({ networkLogs: 'none' | 'failures' | 'all' })`.
 
+Set `WDIO_MCP_OUTPUT_MODE` (`inline` default, or `file`) and `WDIO_MCP_OUTPUT_DIR` to configure the default output mode and output directory for `snapshot` and `get_elements`. Individual calls can override either via `outputMode: 'inline' | 'file'` and `outputDir`.
+
 | Tool           | Description                                                                                                       |
 |----------------|-------------------------------------------------------------------------------------------------------------------|
 | `enable_tools` | Add a group of tools: `mocks`, `cookies`, `device`, `extensions`, `attach`, `elements`, `cloud-apps`                          |
@@ -746,8 +748,8 @@ navigate({ url: "https://example.com", session: "bob" })
 | Tool                     | Description                                                                                                                                                                                            |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
-| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen. Works for apps too (the screen's accessibility tree). |
-| `get_elements`           | Get visible, interactable elements with bounds. Supports `inViewportOnly` (default: true) and `includeContainers` (default: false). Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
+| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen. Supports `outputMode: "inline" \| "file"` and `outputDir`. Works for apps too (the screen's accessibility tree). |
+| `get_elements`           | Get visible, interactable elements with bounds. Supports `inViewportOnly` (default: false), `includeContainers` (default: false), `outputMode: "inline" \| "file"`, and `outputDir`. Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
 | `get_accessibility_tree` | Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
@@ -760,6 +762,24 @@ navigate({ url: "https://example.com", session: "bob" })
 | `manage_mock` | Clear, reset, or restore a session-scoped mock |
 | `switch_tab`             | Switch to a different browser tab by handle or 0-based index. Browser-only.                                                                                                                            |
 | `switch_frame`           | Switch into an iframe by CSS/XPath selector, or back to the top-level frame if no selector is given. Browser-only.                                                                                     |
+
+#### File output mode (`snapshot` and `get_elements`)
+
+Both `snapshot` (including `find` queries) and `get_elements` support writing large outputs to disk instead of returning the full payload inline in context:
+
+- **Parameters & environment defaults:**
+  - `outputMode`: `"inline"` (default) returns the output directly in the tool response (`snapshot` truncates at 12,000 characters in inline mode). `"file"` skips the inline character cap, writes the full output to a session-scoped file (`.txt` for `snapshot`, `.toon` for `get_elements`), and returns a compact summary with the file path, root/element counts, line count, and byte size.
+  - `outputDir`: Optional directory for `outputMode: "file"`.
+  - `WDIO_MCP_OUTPUT_MODE`: Set to `"file"` or `"inline"` to configure the server-wide default when `outputMode` is omitted on a tool call.
+  - `WDIO_MCP_OUTPUT_DIR`: Default base directory for file output when `outputDir` is omitted on a tool call.
+- **Default temp location & permissions (`0600` / `0700`):**
+  - When neither `outputDir` nor `WDIO_MCP_OUTPUT_DIR` is set, files are written under a private `0700` directory in the OS temp directory (`<os.tmpdir()>/wdio-mcp-outputs-<pid>-<random>`).
+  - Output files are created exclusively with `0600` (owner read/write only) permissions, and newly created output directories use `0700` (owner read/write/execute only).
+  - **Shared `outputDir` behavior:** If `outputDir` or `WDIO_MCP_OUTPUT_DIR` points to an existing directory that allows group or other access (`mode & 0o077 !== 0`), the server leaves that directory's permissions unchanged and creates a private `0700` subdirectory (`wdio-mcp-outputs-<pid>-<random>`) inside it to protect page contents. Both the returned file path and the summary note (`written to private 0700 subdirectory because outputDir is shared`) indicate when a private subdirectory was used. Shared writable directories without the sticky bit are rejected.
+- **Cleanup lifecycle:**
+  - Files are named and tracked per session (`<sessionName-or-id8>-<kind>-<timestamp>-<pid>-<uuid8>.<ext>`).
+  - All files written for a session (and any empty `wdio-mcp-outputs-*` directories) are automatically removed when the session closes (`close_session`), when `start_session` replaces the session, or when the server exits.
+  - On server startup (and when first initializing a configured `outputDir`), stale orphaned `wdio-mcp-outputs-*` directories and output files left behind by dead/crashed server processes are automatically pruned.
 
 ### Element Interaction (Web & Mobile)
 

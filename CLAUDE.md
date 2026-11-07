@@ -257,6 +257,8 @@ catch (e) {
 | `TESTINGBOT_SECRET` | TestingBot sessions + tools |
 | `DIGITALAI_CLOUD_URL` | Digital.ai sessions + tools (cloud host, e.g. `https://cloud.example.com`) |
 | `DIGITALAI_ACCESS_KEY` | Digital.ai sessions + tools |
+| `WDIO_MCP_OUTPUT_MODE` | Default output mode (`inline` \| `file`) for `snapshot` and `get_elements` |
+| `WDIO_MCP_OUTPUT_DIR` | Default directory for `outputMode: "file"` when `outputDir` is omitted |
 
 ## Planned Improvements
 
