@@ -25,7 +25,7 @@ export const snapshotToolDefinition: ToolDefinition = {
     scope: z.string().optional().describe('Only below this ref or selector'),
     viewport: coerceBoolean.optional().default(false).describe('Only what is on screen'),
     outputMode: outputModeEnum.optional().describe('Return snapshot inline (default, or WDIO_MCP_OUTPUT_MODE) or write to a temp file and return its path + summary'),
-    outputDir: z.string().min(1).optional().describe('Directory for outputMode: "file" (defaults to WDIO_MCP_OUTPUT_DIR or OS temp dir)'),
+    outputDir: z.string().min(1).optional().describe('Directory for outputMode: "file" (defaults to WDIO_MCP_OUTPUT_DIR or OS temp dir; creates a private 0700 wdio-mcp-outputs-* subdirectory when pointing at a shared directory)'),
   },
 };
 
@@ -68,17 +68,18 @@ export function createSnapshotTool(defaultOutputMode?: OutputMode): ToolCallback
             .filter((item): item is { type: 'text'; text: string } => item.type === 'text')
             .map(item => item.text)
             .join('\n');
-          const { filePath, bytes, lines } = writeSessionOutputFile({
+          const { filePath, bytes, lines, usedPrivateSubdir } = writeSessionOutputFile({
             kind: 'snapshot-find',
             content: text,
             ext: 'txt',
             outputDir,
           });
           const { root, refCount } = summarizeSnapshot(text);
+          const subdirNote = usedPrivateSubdir ? '; written to private 0700 subdirectory because outputDir is shared' : '';
           return {
             content: [{
               type: 'text',
-              text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes)`,
+              text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes${subdirNote})`,
             }],
           };
         } catch (e) {
@@ -100,17 +101,18 @@ export function createSnapshotTool(defaultOutputMode?: OutputMode): ToolCallback
       );
       const text = [snapshot.text, ...(snapshot.notes ?? [])].join('\n');
       if (effectiveOutputMode === 'file') {
-        const { filePath, bytes, lines } = writeSessionOutputFile({
+        const { filePath, bytes, lines, usedPrivateSubdir } = writeSessionOutputFile({
           kind: 'snapshot',
           content: text,
           ext: 'txt',
           outputDir,
         });
         const { root, refCount } = summarizeSnapshot(snapshot.text);
+        const subdirNote = usedPrivateSubdir ? '; written to private 0700 subdirectory because outputDir is shared' : '';
         return {
           content: [{
             type: 'text',
-            text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes)`,
+            text: `Snapshot written to ${filePath} (root: ${root}, ${refCount} refs, ${lines} lines, ${bytes} bytes${subdirNote})`,
           }],
         };
       }

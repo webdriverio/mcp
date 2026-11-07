@@ -85,7 +85,7 @@ import { listAppsTool, listAppsToolDefinition, uploadAppTool, uploadAppToolDefin
 import { queryDocsTool, queryDocsToolDefinition } from './tools/query-docs.tool';
 import { screenshotTool, screenshotToolDefinition } from './tools/screenshot.tool';
 import { createSnapshotTool, snapshotToolDefinition } from './tools/snapshot.tool';
-import { parseOutputMode } from './utils/file-output';
+import { cleanupAllOutputFiles, parseOutputMode, pruneStaleOutputFiles } from './utils/file-output';
 import { performActionsTool, performActionsToolDefinition, pressKeyTool, pressKeyToolDefinition, selectOptionTool, selectOptionToolDefinition } from './tools/page-input.tool';
 import { accessibilityTool, accessibilityToolDefinition } from './tools/accessibility.tool';
 import { getTabsTool, getTabsToolDefinition } from './tools/get-tabs.tool';
@@ -246,7 +246,9 @@ function createServer(): McpServer {
 
 async function main() {
   installCrashHandlers(process, console.error);
+  pruneStaleOutputFiles();
   process.on('exit', killAllDriverTrees);
+  process.on('exit', cleanupAllOutputFiles);
   let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
   try {
     args = parseArgs(process.argv.slice(2));

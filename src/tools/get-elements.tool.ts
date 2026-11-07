@@ -25,7 +25,7 @@ export const getElementsToolDefinition: ToolDefinition = {
     limit: z.number().optional().default(0).describe('Maximum number of elements to return (0 = no limit)'),
     offset: z.number().optional().default(0).describe('Number of elements to skip (for pagination)'),
     outputMode: outputModeEnum.optional().describe('Return elements inline (default, or WDIO_MCP_OUTPUT_MODE) or write to a temp file and return its path + summary'),
-    outputDir: z.string().min(1).optional().describe('Directory for outputMode: "file" (defaults to WDIO_MCP_OUTPUT_DIR or OS temp dir)'),
+    outputDir: z.string().min(1).optional().describe('Directory for outputMode: "file" (defaults to WDIO_MCP_OUTPUT_DIR or OS temp dir; creates a private 0700 wdio-mcp-outputs-* subdirectory when pointing at a shared directory)'),
   },
 };
 
@@ -53,16 +53,17 @@ export function createGetElementsTool(defaultOutputMode?: OutputMode): ToolCallb
       const result = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset });
       const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
       if (effectiveOutputMode === 'file') {
-        const { filePath, bytes, lines } = writeSessionOutputFile({
+        const { filePath, bytes, lines, usedPrivateSubdir } = writeSessionOutputFile({
           kind: 'elements',
           content: text,
           ext: 'toon',
           outputDir,
         });
+        const subdirNote = usedPrivateSubdir ? '; written to private 0700 subdirectory because outputDir is shared' : '';
         return {
           content: [{
             type: 'text' as const,
-            text: `Elements written to ${filePath} (${result.showing} of ${result.total} elements, ${lines} lines, ${bytes} bytes)`,
+            text: `Elements written to ${filePath} (${result.showing} of ${result.total} elements, ${lines} lines, ${bytes} bytes${subdirNote})`,
           }],
         };
       }

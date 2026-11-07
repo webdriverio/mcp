@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +28,7 @@ const { getElementsTool } = await import('../../src/tools/get-elements.tool');
 const { getState } = await import('../../src/session/state');
 const { closeSession, registerSession } = await import('../../src/session/lifecycle');
 const { sessionContext, withSessionTarget } = await import('../../src/session/routing');
-const { parseOutputMode } = await import('../../src/utils/file-output');
+const { parseOutputMode, pruneStaleOutputFiles } = await import('../../src/utils/file-output');
 
 type Result = { content: { type: string; text: string }[]; isError?: boolean };
 const call = (tool: unknown, args: Record<string, unknown>) =>
@@ -296,5 +296,53 @@ describe('snapshot & get_elements file output mode (#178)', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('shared writable directories must have the sticky bit set');
+  });
+
+  it('creates a private 0700 subdirectory inside a shared 0755 outputDir and notes it in the result', async () => {
+    if (process.platform === 'win32') return;
+    chmodSync(tempDir, 0o755);
+    snapshotFn.mockResolvedValue({ text: '- main\n  - button "Go" [ref=e1]' });
+
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const result = await call(routedSnapshot, { outputMode: 'file', outputDir: tempDir });
+
+    expect(result.isError).toBeUndefined();
+    const message = result.content[0].text;
+    expect(message).toContain('written to private 0700 subdirectory because outputDir is shared');
+    const match = message.match(/Snapshot written to ([^\s]+) \(/);
+    expect(match).not.toBeNull();
+    const filePath = match![1];
+    expect(dirname(filePath)).not.toBe(tempDir);
+    expect(dirname(filePath).startsWith(join(tempDir, 'wdio-mcp-outputs-'))).toBe(true);
+    expect(statSync(tempDir).mode & 0o777).toBe(0o755);
+    expect(statSync(dirname(filePath)).mode & 0o777).toBe(0o700);
+    await closeSession('sess-11112222-3333', false, false);
+    expect(existsSync(dirname(filePath))).toBe(false);
+  });
+
+  it('prunes orphaned wdio-mcp-outputs-* directories and stale output files on startup while keeping active files', async () => {
+    const staleSubdir = join(tempDir, 'wdio-mcp-outputs-999999999-stale');
+    mkdirSync(staleSubdir, { mode: 0o700 });
+    chmodSync(staleSubdir, 0o700);
+    const staleSubdirFile = join(staleSubdir, 'old-sess-snapshot-1700000000000-999999999-deadbeef.txt');
+    writeFileSync(staleSubdirFile, 'orphaned snapshot', { mode: 0o600 });
+
+    const staleDirectFile = join(tempDir, 'old-sess-elements-1700000000000-999999999-cafebabe.toon');
+    writeFileSync(staleDirectFile, 'orphaned elements', { mode: 0o600 });
+    const unrelatedUserFile = join(tempDir, 'notes.txt');
+    writeFileSync(unrelatedUserFile, 'keep me');
+
+    snapshotFn.mockResolvedValue({ text: '- main\n  - button "Active" [ref=e1]' });
+    const routedSnapshot = withSessionTarget('snapshot', snapshotTool);
+    const activeResult = await call(routedSnapshot, { outputMode: 'file', outputDir: tempDir });
+    const activeFile = activeResult.content[0].text.match(/Snapshot written to ([^\s]+) \(/)![1];
+
+    pruneStaleOutputFiles(tempDir);
+
+    expect(existsSync(staleSubdirFile)).toBe(false);
+    expect(existsSync(staleSubdir)).toBe(false);
+    expect(existsSync(staleDirectFile)).toBe(false);
+    expect(existsSync(unrelatedUserFile)).toBe(true);
+    expect(existsSync(activeFile)).toBe(true);
   });
 });
