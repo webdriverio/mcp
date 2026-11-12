@@ -157,10 +157,26 @@ describe('state fields', () => {
 });
 
 describe('selector generation', () => {
-  it('uses unique text content selector', async () => {
+  it('uses explicit test hooks before accessible names', async () => {
+    document.body.innerHTML = '<button data-testid="add-button">Add to Basket</button>';
+    const nodes = await getBrowserAccessibilityTree(mockBrowser);
+    expect(nodes[0].selector).toBe('[data-testid="add-button"]');
+  });
+
+  it('supports data-test and data-qa hooks', async () => {
+    document.body.innerHTML = `
+      <button data-test="save">Save</button>
+      <button data-qa="cancel">Cancel</button>
+    `;
+    const nodes = await getBrowserAccessibilityTree(mockBrowser);
+    expect(nodes[0].selector).toBe('[data-test="save"]');
+    expect(nodes[1].selector).toBe('[data-qa="cancel"]');
+  });
+
+  it('uses accessible name selectors', async () => {
     document.body.innerHTML = '<button>Add to Basket</button>';
     const nodes = await getBrowserAccessibilityTree(mockBrowser);
-    expect(nodes[0].selector).toBe('button*=Add to Basket');
+    expect(nodes[0].selector).toBe('aria/Add to Basket');
   });
 
   it('uses aria label selector when text is not unique', async () => {
@@ -180,6 +196,33 @@ describe('selector generation', () => {
     `;
     const nodes = await getBrowserAccessibilityTree(mockBrowser);
     expect(nodes[0].selector).toBe('#submit-btn');
+  });
+
+  it('skips generated ids', async () => {
+    document.body.innerHTML = `
+      <input id="550e8400-e29b-41d4-a716-446655440000" name="email" aria-label="Email">
+      <input name="confirm-email" aria-label="Email">
+    `;
+    const nodes = await getBrowserAccessibilityTree(mockBrowser);
+    expect(nodes[0].selector).toBe('input[name="email"]');
+  });
+
+  it('does not use generated ids in CSS path fallback', async () => {
+    document.body.innerHTML = `
+      <section id="550e8400-e29b-41d4-a716-446655440000">
+        <button aria-label="Save"></button>
+      </section>
+      <button aria-label="Save"></button>
+    `;
+    const nodes = await getBrowserAccessibilityTree(mockBrowser);
+    expect(nodes[0].selector).not.toContain('550e8400-e29b-41d4-a716-446655440000');
+    expect(nodes[0].selector).toBe('body > section > button');
+  });
+
+  it('uses placeholder after name', async () => {
+    document.body.innerHTML = '<input placeholder="Search products">';
+    const nodes = await getBrowserAccessibilityTree(mockBrowser);
+    expect(nodes[0].selector).toBe('input[placeholder="Search\\ products"]');
   });
 
   it('uses unique class selector before CSS path', async () => {
@@ -204,6 +247,6 @@ describe('selector generation', () => {
     const nodes = await getBrowserAccessibilityTree(mockBrowser);
     // class "btn" is shared, text is shared — must fall back to structural path
     expect(nodes[0].selector).not.toBe('button.btn');
-    expect(nodes[0].selector).not.toBe('button*=Add to basket');
+    expect(nodes[0].selector).not.toBe('aria/Add to basket');
   });
 });
