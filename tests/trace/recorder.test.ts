@@ -164,7 +164,7 @@ describe('withTrace', () => {
     await (withTrace('switch_context', tool) as AnyToolFn)({ context: 'WEBVIEW_com.example.app' }, extra);
     await (withTrace('rotate_device', tool) as AnyToolFn)({ orientation: 'LANDSCAPE' }, extra);
     await (withTrace('hide_keyboard', tool) as AnyToolFn)({}, extra);
-    await (withTrace('press_key', tool) as AnyToolFn)({ keys: 'Enter' }, extra);
+    await (withTrace('set_geolocation', tool) as AnyToolFn)({ latitude: 37.7749, longitude: -122.4194 }, extra);
 
     const session = getTraceSession(sessionId)!;
     await session.screenshotChain;
@@ -173,8 +173,29 @@ describe('withTrace', () => {
     expect(befores[0].title).toBe('Context.switch("WEBVIEW_com.example.app")');
     expect(befores[1].title).toBe('Device.rotate("LANDSCAPE")');
     expect(befores[2].title).toBe('Device.hideKeyboard()');
-    expect(befores[3].title).toBe('Keyboard.press("Enter")');
+    expect(befores[3].title).toBe('Device.setGeolocation("37.7749")');
     expect(session.events.filter((e) => e.type === 'after')).toHaveLength(4);
+  });
+
+  it('traces select_option, press_key and perform_actions on browser sessions', async () => {
+    // press_key/select_option/perform_actions are rejected on mobile sessions by
+    // tool visibility, so they are proven here where they actually run.
+    const sessionId = 'sess-browser-actions';
+    setupTracedSession(sessionId);
+
+    const tool = vi.fn().mockResolvedValue(SUCCESS_RESULT) as unknown as ToolCallback;
+    await (withTrace('select_option', tool) as AnyToolFn)({ selector: '#size', value: 'Large' }, extra);
+    await (withTrace('press_key', tool) as AnyToolFn)({ keys: 'Enter' }, extra);
+    await (withTrace('perform_actions', tool) as AnyToolFn)({ actions: [{ action: 'click', selector: '#login' }] }, extra);
+
+    const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
+    const befores = session.events.filter((e) => e.type === 'before') as { title: string }[];
+    expect(befores).toHaveLength(3);
+    expect(befores[0].title).toBe('Element.selectOption("#size")');
+    expect(befores[1].title).toBe('Keyboard.press("Enter")');
+    expect(befores[2].title).toBe('Page.performActions("click #login")');
+    expect(session.events.filter((e) => e.type === 'after')).toHaveLength(3);
   });
 
 });
