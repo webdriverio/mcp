@@ -185,11 +185,11 @@ function createServer(): McpServer {
   registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
   registerTool(dragAndDropToolDefinition, instrument('drag_and_drop', dragAndDropTool));
 
-  registerTool(switchContextToolDefinition, switchContextTool);
+  registerTool(switchContextToolDefinition, instrument('switch_context', switchContextTool));
 
-  registerTool(rotateDeviceToolDefinition, rotateDeviceTool);
-  registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
-  registerTool(setGeolocationToolDefinition, setGeolocationTool);
+  registerTool(rotateDeviceToolDefinition, instrument('rotate_device', rotateDeviceTool));
+  registerTool(hideKeyboardToolDefinition, instrument('hide_keyboard', hideKeyboardTool));
+  registerTool(setGeolocationToolDefinition, instrument('set_geolocation', setGeolocationTool));
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
   registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));

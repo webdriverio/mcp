@@ -147,6 +147,36 @@ describe('withTrace', () => {
     expect(session.screenshots).toHaveLength(1);
   });
 
+  it('traces the newly mapped mobile-action tools', async () => {
+    const state = getState();
+    const sessionId = 'sess-mobile-actions';
+    const mockBrowser = {
+      takeScreenshot: vi.fn().mockResolvedValue(TINY_PNG),
+    } as unknown as WebdriverIO.Browser;
+
+    state.browsers.set(sessionId, mockBrowser);
+    state.currentSession = sessionId;
+    state.sessionMetadata.set(sessionId, { type: 'android', capabilities: {}, isAttached: false, trace: true });
+
+    createTraceSession(sessionId, 'chromium', { width: 412, height: 915 }, 'android - emulator-5554', 'android');
+
+    const tool = vi.fn().mockResolvedValue(SUCCESS_RESULT) as unknown as ToolCallback;
+    await (withTrace('switch_context', tool) as AnyToolFn)({ context: 'WEBVIEW_com.example.app' }, extra);
+    await (withTrace('rotate_device', tool) as AnyToolFn)({ orientation: 'LANDSCAPE' }, extra);
+    await (withTrace('hide_keyboard', tool) as AnyToolFn)({}, extra);
+    await (withTrace('press_key', tool) as AnyToolFn)({ keys: 'Enter' }, extra);
+
+    const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
+    const befores = session.events.filter((e) => e.type === 'before') as { title: string }[];
+    expect(befores).toHaveLength(4);
+    expect(befores[0].title).toBe('Context.switch("WEBVIEW_com.example.app")');
+    expect(befores[1].title).toBe('Device.rotate("LANDSCAPE")');
+    expect(befores[2].title).toBe('Device.hideKeyboard()');
+    expect(befores[3].title).toBe('Keyboard.press("Enter")');
+    expect(session.events.filter((e) => e.type === 'after')).toHaveLength(4);
+  });
+
 });
 
 describe('recordInitialNavigation', () => {
