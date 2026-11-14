@@ -107,9 +107,9 @@ describe('start_session with provider: browserstack', () => {
   });
 });
 
-describe('start_session with browserstackLocal: true', () => {
+describe('start_session with tunnel: true', () => {
   it('creates a BrowserstackTunnel instance and calls start() before remote()', async () => {
-    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', browserstackLocal: true });
+    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: true });
 
     const tunnelInstance = vi.mocked(BrowserstackTunnel).mock.instances[0] as unknown as { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
     expect(tunnelInstance.start).toHaveBeenCalledWith(
@@ -122,8 +122,8 @@ describe('start_session with browserstackLocal: true', () => {
     expect(startOrder).toBeLessThan(remoteOrder);
   });
 
-  it('does NOT call BrowserstackTunnel when browserstackLocal is false', async () => {
-    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', browserstackLocal: false });
+  it('does NOT call BrowserstackTunnel when tunnel is false', async () => {
+    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: false });
 
     expect(BrowserstackTunnel).not.toHaveBeenCalled();
   });
@@ -135,21 +135,21 @@ describe('start_session with browserstackLocal: true', () => {
       this.stop = vi.fn();
     });
 
-    const result = await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', browserstackLocal: true });
+    const result = await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: true });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('tunnel failed');
     expect(mockRemote).not.toHaveBeenCalled();
   });
 
-  it('does NOT call BrowserstackTunnel when browserstackLocal is "external"', async () => {
-    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', browserstackLocal: 'external' });
+  it('does NOT call BrowserstackTunnel when tunnel is "external"', async () => {
+    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: 'external' });
 
     expect(BrowserstackTunnel).not.toHaveBeenCalled();
   });
 
-  it('sets local: true in bstack:options when browserstackLocal is "external"', async () => {
-    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', browserstackLocal: 'external' });
+  it('sets local: true in bstack:options when tunnel is "external"', async () => {
+    await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: 'external' });
 
     const [call] = mockRemote.mock.calls;
     const bstackOpts = call[0].capabilities['bstack:options'];
@@ -162,7 +162,7 @@ describe('start_session with browserstackLocal: true', () => {
       platform: 'android',
       deviceName: 'Samsung Galaxy S23',
       app: 'bs://abc123',
-      browserstackLocal: true,
+      tunnel: true,
     });
 
     const tunnelInstance = vi.mocked(BrowserstackTunnel).mock.instances[0] as unknown as { start: ReturnType<typeof vi.fn> };

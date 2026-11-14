@@ -95,18 +95,18 @@ describe('BrowserStackProvider', () => {
       expect((caps['goog:chromeOptions'] as any)?.args).toContain('--custom-flag');
     });
 
-    it('sets local: true in bstack:options when browserstackLocal is true', () => {
+    it('sets local: true in bstack:options when tunnel is true', () => {
       const caps = provider.buildCapabilities({
         platform: 'browser',
         browser: 'chrome',
-        browserstackLocal: true,
+        tunnel: true,
       });
       const bstack = caps['bstack:options'] as Record<string, unknown>;
       expect(bstack.local).toBe(true);
     });
 
-    it('does not set local in bstack:options when browserstackLocal is false', () => {
-      const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome' });
+    it('does not set local in bstack:options when tunnel is false', () => {
+      const caps = provider.buildCapabilities({ platform: 'browser', browser: 'chrome', tunnel: false });
       const bstack = caps['bstack:options'] as Record<string, unknown>;
       expect(bstack.local).toBeUndefined();
     });
@@ -176,23 +176,23 @@ describe('BrowserStackProvider', () => {
       expect(caps['appium:newCommandTimeout']).toBe(300);
     });
 
-    it('sets local: true in bstack:options when browserstackLocal is true', () => {
+    it('sets local: true in bstack:options when tunnel is true', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
         app: 'bs://abc',
-        browserstackLocal: true,
+        tunnel: true,
       });
       const bstack = caps['bstack:options'] as Record<string, unknown>;
       expect(bstack.local).toBe(true);
     });
 
-    it('sets local: true in bstack:options when browserstackLocal is "external"', () => {
+    it('sets local: true in bstack:options when tunnel is "external"', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
         deviceName: 'Pixel 7',
         app: 'bs://abc',
-        browserstackLocal: 'external',
+        tunnel: 'external',
       });
       const bstack = caps['bstack:options'] as Record<string, unknown>;
       expect(bstack.local).toBe(true);
