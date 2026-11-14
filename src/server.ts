@@ -39,7 +39,7 @@ import {
   setGeolocationToolDefinition,
 } from './tools/device.tool';
 import { executeScriptTool, executeScriptToolDefinition } from './tools/execute-script.tool';
-import { getElementsTool, getElementsToolDefinition } from './tools/get-elements.tool';
+import { createGetElementsTool, getElementsToolDefinition } from './tools/get-elements.tool';
 import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chrome.tool';
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
@@ -84,7 +84,8 @@ import { switchFrameTool, switchFrameToolDefinition } from './tools/switch-frame
 import { listAppsTool, listAppsToolDefinition, uploadAppTool, uploadAppToolDefinition, } from './tools/cloud-provider.tool';
 import { queryDocsTool, queryDocsToolDefinition } from './tools/query-docs.tool';
 import { screenshotTool, screenshotToolDefinition } from './tools/screenshot.tool';
-import { snapshotTool, snapshotToolDefinition } from './tools/snapshot.tool';
+import { createSnapshotTool, snapshotToolDefinition } from './tools/snapshot.tool';
+import { cleanupAllOutputFiles, parseOutputMode, pruneStaleOutputFiles } from './utils/file-output';
 import { performActionsTool, performActionsToolDefinition, pressKeyTool, pressKeyToolDefinition, selectOptionTool, selectOptionToolDefinition } from './tools/page-input.tool';
 import { accessibilityTool, accessibilityToolDefinition } from './tools/accessibility.tool';
 import { getTabsTool, getTabsToolDefinition } from './tools/get-tabs.tool';
@@ -103,6 +104,7 @@ console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 
 const defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS);
+const defaultOutputMode = parseOutputMode(process.env.WDIO_MCP_OUTPUT_MODE);
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
 function createServer(): McpServer {
@@ -176,7 +178,7 @@ function createServer(): McpServer {
   registerTool(selectOptionToolDefinition, instrument('select_option', selectOptionTool));
   registerTool(pressKeyToolDefinition, instrument('press_key', pressKeyTool));
   registerTool(performActionsToolDefinition, instrument('perform_actions', performActionsTool));
-  registerTool(snapshotToolDefinition, snapshotTool);
+  registerTool(snapshotToolDefinition, createSnapshotTool(defaultOutputMode));
 
   registerTool(setCookieToolDefinition, setCookieTool);
   registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
@@ -197,7 +199,7 @@ function createServer(): McpServer {
   registerTool(getMockCallsToolDefinition, instrument('get_mock_calls', getMockCallsTool));
   registerTool(manageMockToolDefinition, instrument('manage_mock', manageMockTool));
   registerTool(triggerElectronDeeplinkToolDefinition, instrument('trigger_electron_deeplink', triggerElectronDeeplinkTool));
-  registerTool(getElementsToolDefinition, getElementsTool);
+  registerTool(getElementsToolDefinition, createGetElementsTool(defaultOutputMode));
   registerTool(openWebExtensionToolDefinition, instrument('open_web_extension', openWebExtensionTool));
 
   registerTool(listAppsToolDefinition, listAppsTool);
@@ -244,7 +246,9 @@ function createServer(): McpServer {
 
 async function main() {
   installCrashHandlers(process, console.error);
+  pruneStaleOutputFiles();
   process.on('exit', killAllDriverTrees);
+  process.on('exit', cleanupAllOutputFiles);
   let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
   try {
     args = parseArgs(process.argv.slice(2));
