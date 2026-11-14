@@ -294,6 +294,13 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
     case 'set_value':
       if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
+    // BiDi sessions reject browser.switchFrame; the agent's frame code is variable-based and back-to-top needs none
+    case 'switch_frame':
+      if (!p.selector) return '// switch_frame: back to the top document';
+      if (isSnapshotRef(p.selector)) return unreplayableRef(step);
+      return `// [not replayable: no recorded code] switch_frame: '${escapeStr(p.selector)}'`;
+    case 'set_geolocation':
+      return `await browser.setGeoLocation({ latitude: ${p.latitude}, longitude: ${p.longitude}${p.altitude !== undefined ? `, altitude: ${p.altitude}` : ''} });`;
     case 'scroll': {
       const scrollAmount = (p.direction as string) === 'down' ? (p.pixels as number) : -(p.pixels as number);
       return `await browser.execute(() => window.scrollBy(0, ${scrollAmount}));`;
@@ -706,5 +713,17 @@ export function generateCode(history: SessionHistory): string {
     ].join('\n');
   }
 
-  return `import { remote } from 'webdriverio';\n\ntry {\n${steps}\n} finally {\n  await browser.deleteSession();\n}`;
+  const localSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+  return [
+    "import { remote } from 'webdriverio';",
+    '',
+    'let browser;',
+    'try {',
+    localSteps,
+    '} finally {',
+    '  if (browser) {',
+    '    await browser.deleteSession();',
+    '  }',
+    '}',
+  ].join('\n');
 }
