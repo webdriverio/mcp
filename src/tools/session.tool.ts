@@ -17,6 +17,8 @@ import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.j
 import { SessionError } from '@wdio/session/agent';
 import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
 
+const TRACE_V5_NOTE = ' Format, location and player change in v5.';
+
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
 const browserEnum = z.enum(['chrome', 'firefox', 'edge', 'safari']);
@@ -62,7 +64,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     noReset: coerceBoolean.optional(),
     fullReset: coerceBoolean.optional(),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium, seconds'),
-    trace: coerceBoolean.optional().default(false).describe('Save a Playwright-compatible trace zip to .trace/ on close_session'),
+    trace: coerceBoolean.optional().default(false).describe('Save a Playwright-compatible trace zip to .trace/ on close_session' + TRACE_V5_NOTE),
     attach: coerceBoolean.optional().default(false).describe('Attach to a running Chrome (attachConfig, default localhost:9222)'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -115,7 +117,7 @@ export const attachSessionToolDefinition: ToolDefinition = {
       protocol: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1). Only used with provider: "saucelabs".'),
-    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.' + TRACE_V5_NOTE),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Capabilities used to register the correct browser or Appium command surface locally; they are not sent to the remote endpoint'),
   },
 };
