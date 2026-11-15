@@ -256,7 +256,7 @@ is answered).
 3. Open. Feasibility check of `collectScript()`, then devtools captures trace snapshots with it.
 4. Open. devtools deletes `core/locators` and `element-scripts`.
 
-**Chain B — engine (critical path), S1 and S2 prototyped, not yet submitted upstream; S3 not started:**
+**Chain B — engine (critical path), S1 and S2 in review upstream (webdriverio/webdriverio#16464, #16466); S3 not started:**
 
 1. Design session's `launch` API (against the parity matrix, including hook/service injection) and the action-event
    schema.

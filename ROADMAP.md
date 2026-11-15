@@ -58,7 +58,7 @@ See the [v5 plan](docs/architecture/v5-proposal.md), "Open decisions".
 
 | Item | Status |
 | --- | --- |
-| B1. In-process launch API with hook injection (S1) and the action-event schema (S2) | prototypes on local branches, no PR yet; upstream adoption blocked on decision 1 |
+| B1. In-process launch API with hook injection (S1) and the action-event schema (S2) | in review: webdriverio/webdriverio#16464 (S1), #16466 (S2) |
 | B2. `@wdio/session` release with `@wdio/session/launch` and the Digital.ai provider (S3) | not started; blocked on B1 |
 | B3. Devtools accepts session action events (D7) | blocked on decision 2 and B1 |
 | B4. Devtools release that meets the trace acceptance criteria (upstream issues D1-D6, D8) | blocked on devtools |

@@ -87,8 +87,8 @@ provider logic, as `@wdio/mcp` does today.
 MCP v5 plans to delete its provider table and call this API; the list is what would regress otherwise.
 ````
 
-**Prototype of the first item:** a local prototype exists, not yet submitted. Cut from upstream `main` at
-`4ef7adc33`, uncommitted.
+**Prototype of the first item:** webdriverio/webdriverio#16464. Cut from upstream `main` at
+`4ef7adc33`.
 - **Exports:** a new `@wdio/session/launch` entry re-exports `buildPlan`, `launch`, and the types `OpenArgs`,
   `PlanContext`, `OpenPlan`, `Launched`, `LaunchOptions` and `SessionResult`.
 - **`remoteOptions`:** `launch(plan, { remoteOptions })` merges extra `remote()` options. Hooks, services and timeouts
@@ -203,7 +203,7 @@ MCP v5 plans to drop its own trace recorder and feed one step per agent action t
 that feed.
 ````
 
-**Prototype:** a local prototype exists, not yet submitted. Cut from upstream `main` at `4ef7adc33`, uncommitted.
+**Prototype:** webdriverio/webdriverio#16466. Cut from upstream `main` at `4ef7adc33`.
 - **API:** `createAgentSession(browser, { onAction })`. Public `Session.dispatch` wraps the unchanged body, which is now private `#dispatch`. This covers early failures (unknown, unsupported or dialog-blocked actions, `limitPageLoad`) and abandoned timeouts.
 - **Skipped events:** none are emitted without a handler. Nested `$internal` snapshots inside `exec` are skipped.
 - **Event shape:**
