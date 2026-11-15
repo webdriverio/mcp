@@ -146,6 +146,31 @@ describe('BrowserStackProvider', () => {
       expect(caps['appium:app']).toBe('bs://opt');
     });
 
+    it('sets browserName from the browser option for a mobile browser session', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17', browser: 'safari' });
+      expect(caps.browserName).toBe('safari');
+    });
+
+    it('ignores the app option for a mobile browser session, as the other providers do', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17', browser: 'safari', app: 'bs://abc' });
+      expect(caps).not.toHaveProperty('appium:app');
+    });
+
+    it('omits browserName when neither the browser option nor a capability sets it', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17' });
+      expect(caps).not.toHaveProperty('browserName');
+    });
+
+    it('keeps a user-supplied browserName capability when the browser option is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'ios',
+        deviceName: 'iPhone 15',
+        platformVersion: '17',
+        capabilities: { browserName: 'safari' },
+      });
+      expect(caps.browserName).toBe('safari');
+    });
+
     it('sets deviceName and platformVersion inside bstack:options', () => {
       const caps = provider.buildCapabilities({
         platform: 'ios',
