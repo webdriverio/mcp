@@ -9,7 +9,6 @@ Date: 2026-11-14. Feasibility probe only; no design conclusions are drawn here.
 - webdriverio 10.2.0, @wdio/devtools-service 11.2.0, @wdio/elements 1.3.0, @wdio/devtools-backend 2.2.0, @wdio/devtools-script 1.9.0, @wdio/devtools-app 1.13.0, fluent-ffmpeg 2.1.3, typescript 6.0.3 (P7 only, installed after the footprint numbers were taken)
 - Scratch dir: `<scratch>/` (probes in `probes/`, per-probe stdout/stderr in `out/<probe>/stdout.txt|stderr.txt`, P7 in `p7/`)
 - Reference source (read only): `<devtools checkout>` at 5c7d21a6. The published dist behaves the same as that source on every point checked below.
-- Wall-clock minutes: about 7 (scratch dir created at epoch 1794658361, last probe finished about 1794658732, plus report writing).
 
 ## Install footprint
 
@@ -24,7 +23,7 @@ Delta: +43244 KB, +106 packages (npm: "added 106 packages, and audited 274 packa
 
 - Distinct `webdriverio` copies: 1. `npm ls webdriverio --all` shows `webdriverio@10.2.0` at the top level; `@wdio/devtools-service` and `@wdio/elements` both show it as `deduped`.
 - `@wdio/snapshot`: NOT installed (`node_modules/@wdio/snapshot` does not exist). `grep` finds a reference to the string only in `@wdio/elements/package.json`.
-- Native/binary deps: no `*.node` files in `node_modules`. `fluent-ffmpeg@2.1.3` is installed (a JS wrapper that shells out to a system ffmpeg; no ffmpeg binary is bundled, no `ffmpeg-static`). `/usr/bin/ffmpeg` and `/usr/bin/ffprobe` exist on this machine, so whether the wrapper needs a system ffmpeg was not tested. `node_modules/fluent-ffmpeg` is 12556 KB, `@wdio/devtools-app` 3572 KB. The `edgedriver` and `geckodriver` postinstall scripts come from the webdriverio-only install, not from devtools-service.
+- Native/binary deps: no `*.node` files in `node_modules`. `fluent-ffmpeg@2.1.3` is installed (a JS wrapper that shells out to a system ffmpeg; no ffmpeg binary is bundled, no `ffmpeg-static`). `/usr/bin/ffmpeg` and `/usr/bin/ffprobe` exist on the probe host (Linux, WSL2), so whether the wrapper needs a system ffmpeg was not tested. `node_modules/fluent-ffmpeg` is 12556 KB, `@wdio/devtools-app` 3572 KB. The `edgedriver` and `geckodriver` postinstall scripts come from the webdriverio-only install, not from devtools-service.
 - `@wdio/devtools-service` runtime deps include `@wdio/devtools-backend`, which pulls fastify and plugins (`@fastify/rate-limit`, `@fastify/static`, `@fastify/websocket`), `fflate`, `get-port`, `shell-quote` and `@wdio/devtools-app`.
 - npm output after the second install: no peer-dependency warnings. Only these lines: `npm warn deprecated fluent-ffmpeg@2.1.3: Package no longer supported...`, the `install-scripts` notice (edgedriver, geckodriver), and "4 moderate severity vulnerabilities". `@wdio/allure-reporter` (optional peer, `peerDependenciesMeta`) was not installed.
 - The package declares `engines.node` as `>=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1`; Node 24.22.1 is the exact lower bound of the 24 range.

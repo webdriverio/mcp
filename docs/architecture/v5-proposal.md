@@ -76,7 +76,7 @@ returns the collector as one self-contained JS expression string that any page-e
 Work MCP can do now, without waiting on other repos. It shrinks v5 to integration work.
 
 1. **Done (#177).** **Concurrent sessions** — PR #177 (issue #170 Phase 1). Additive, so it ships in v4.x, not v5.
-2. **Committed on `feature/v4-prep-10.2` (local, not pushed or merged).** **Deprecate in place.** A new
+2. **Prepared, not yet submitted.** **Deprecate in place.** A new
    `src/utils/deprecation.ts` (`warnDeprecated`, `src/utils/deprecation.ts:13-17`) writes
    `(@wdio/mcp) DeprecationWarning: …` to stderr once per entry, synchronously, and honours `process.noDeprecation`.
    It is synchronous because `process.emitWarning` is asynchronous and its output was lost when `wdio-show-trace`
@@ -98,7 +98,7 @@ Work MCP can do now, without waiting on other repos. It shrinks v5 to integratio
    collectors on a fixed page set (about 10 web pages, 1 Android app, 1 iOS app) and compare selector uniqueness
    (`$$(sel).length === 1`), uniqueness after reload, TOON tokens per page, and coverage (elements found by one but not
    the other). Switch only if the agent matches or beats the current collector within run-to-run noise. Not done: these
-   tools and resources are still on `src/scripts` on both `main` and `feature/v4-prep-10.2`.
+   tools and resources are still on `src/scripts` on both `main` and the prep change (not yet submitted).
 
    **Constraint:** `get_elements` is listed only for `ios`, `android` and `electron` sessions (`src/toolsets.ts:17`),
    and the router rejects it on other session types (`src/session/routing.ts:108`). A web-page A/B therefore measures
@@ -110,7 +110,7 @@ Work MCP can do now, without waiting on other repos. It shrinks v5 to integratio
    driven largely by MDN, where most snapshot selectors are unvalidated fallbacks) but is
    far slower (348-522 ms against 9-71 ms per page outside MDN). The mobile half was not run, and `get_elements` serves
    only mobile and Electron sessions, so there is no `get_elements` switch in v4.x; the numbers inform only the browser
-   `elements` and `accessibility` resources (`docs/architecture/collector-ab-results.md` on the prep branch).
+   `elements` and `accessibility` resources.
 4. **Done as a document: `provider-parity-matrix.md`.** **Provider parity matrix** as the acceptance spec for session's
    `launch`: tunnels, cloud result marking via `onSessionClose`, attach, the external provider
    (`src/providers/external.provider.ts`), local Appium (`src/providers/local-appium.provider.ts`), Electron, regions,
@@ -160,13 +160,13 @@ Work MCP can do now, without waiting on other repos. It shrinks v5 to integratio
      API, and `deleteSession()` finalizes a second time;
    - published types: the package's `.d.ts` files import `../packages/{shared,core,elements}/src/index.ts`, paths that
      are not in the tarball.
-6. **Done (#181 to `10.1.0`); `10.2.0` committed on `feature/v4-prep-10.2`, not merged.** **Bump `@wdio/session` and
+6. **Done (#181 to `10.1.0`); `10.2.0` prepared, not yet submitted.** **Bump `@wdio/session` and
    `webdriverio`**: `main` pins both at exact `10.1.0` (`package.json:63`, `:70`); the prep branch bumps both to exact
    `10.2.0`. Exact pinning is a decision taken on 2026-11-14, because `@wdio/session/agent` is still experimental, even
    though session and snapshot now peer on `webdriverio ^10.0.0`. The bump also fixes `set_cookie` with
    `sameSite`: on `main` (pinned 10.1.0) `'lax'` and `'strict'` throw `invalid argument: invalid 'sameSite'`, and 10.2.0
    accepts both (one machine, 3 repetitions per cell; `src/tools/cookies.tool.ts:36` passes the value through).
-7. **Committed on `feature/v4-prep-10.2` (local, not pushed or merged).** **Route non-agent tools through agent
+7. **Prepared, not yet submitted.** **Route non-agent tools through agent
    actions.** `execute_script` (`exec`), mocks (`mock`/`unmock`), cookies (`cookies`/`storage`) and device tools (`app`,
    `deeplink`, `rotate`, `keyboard`, `background`, `lock`, `unlock`) exist as actions in
    `packages/wdio-session/src/actions/index.ts:28`, `:59-65`, `:75-78`, but only some could be routed without changing
@@ -236,7 +236,7 @@ Two defects in generated scripts were found on 2026-11-14 (one machine). Neither
   `try { … } finally { await browser.deleteSession(); }` (`src/recording/code-generator.ts:709` at `982d6e7`), while the
   local `start_session` step emits `const browser = await remote({` inside that `try` (`:275`). In `finally`, `browser`
   is not defined, so cleanup throws `ReferenceError` and masks the real error. The cloud and Electron templates declare
-  `let browser` outside the `try`. MCP owns the fix; it is fixed on feature/v4-prep-10.2, not merged
+  `let browser` outside the `try`. MCP owns the fix; it is fixed in the prep change, not yet submitted
   (`src/recording/code-generator.ts:716`).
 
 ---
@@ -256,12 +256,12 @@ is answered).
 3. Open. Feasibility check of `collectScript()`, then devtools captures trace snapshots with it.
 4. Open. devtools deletes `core/locators` and `element-scripts`.
 
-**Chain B — engine (critical path), S1 and S2 prototyped on local branches (no PR yet); S3 not started:**
+**Chain B — engine (critical path), S1 and S2 prototyped, not yet submitted upstream; S3 not started:**
 
 1. Design session's `launch` API (against the parity matrix, including hook/service injection) and the action-event
    schema.
 2. Session release with `@wdio/session/launch` and the Digital.ai port.
-3. Devtools accepts session action events as a step source.
+3. Devtools accepts session action events as a step source, and the same call accepts steps from tools that stay outside the agent (see Trace swap acceptance criteria).
 4. Devtools release that meets the trace acceptance criteria. (Peering on webdriverio 10 is already met:
    `@wdio/devtools-service@11.2.0`, npm `latest`, peers `webdriverio ^9.19.1 || ^10.0.0`.)
 
@@ -301,6 +301,7 @@ The devtools release MCP v5 adopts must not regress these, relative to MCP's cur
 | Area | Today (MCP `src/trace`) |
 | --- | --- |
 | Granularity | One step per tool call — preserved by one step per agent action |
+| Direct-tool steps | `execute_script`, mocks, `scroll`, `swipe`, coordinate `tap_element`, offset `drag_and_drop` and Electron tools get a step today through `instrument()` in `src/server.ts`, but stay outside the agent in v5; devtools must accept a step for them too (D7), or they lose their step while their WebDriver commands are still captured |
 | Format and player | Playwright-compatible zip, vibium player — users must be told what replaces it |
 | Location | `.trace/` under cwd |
 | Coverage | Local browser, mobile, cloud, attach, Electron sessions |
@@ -367,11 +368,11 @@ only — not a merge or port candidate.
   comparison now exists (`devtools-trace-probe-results.md`, *Install footprint*).
 - **webdriverio fixes MCP needs — resolved by the bump.** #16244 (stale ref without selector), #16131 (BiDi selector
   attach), #16150 (Android UiSelector) and #16273 (scoped mock restore) are all in v10.2.0. MCP gets them with the
-  `10.2.0` pins of v4.x item 6, which are committed on `feature/v4-prep-10.2` and not yet merged. The general cost stays: with
+  `10.2.0` pins of v4.x item 6, which are prepared and not yet submitted. The general cost stays: with
   exact pins, every later fix needs a release plus a manual bump.
 - **`getCookies()` under-reports on BiDi sessions (worked around in MCP; upstream draft W1).** In `webdriverio` 10.1.0
   and 10.2.0, BiDi `getCookies()` reads the page-origin `storageKey` partition, which Chrome fills only with Secure
-  cookies, and falls back to classic only on an empty result. MCP's `readCookies` on `feature/v4-prep-10.2` passes
+  cookies, and falls back to classic only on an empty result. MCP's `readCookies` in the prep change passes
   `sourceOrigin: null`, which reads the whole jar across domains. Cause and repro are in `v5-upstream-issue-drafts.md`
   (W1), unfiled.
 

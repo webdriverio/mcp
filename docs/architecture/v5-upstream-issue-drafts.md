@@ -1,6 +1,6 @@
 # `@wdio/mcp` v5 — upstream issue drafts
 
-**Status: unposted drafts, written 2026-11-14.** Nothing here has been filed. Each section is meant to be copied by hand
+**Status: unposted drafts, written 2026-11-14.** Nothing here has been filed. These are proposals for discussion; nothing is filed. Each section is meant to be copied by hand
 into the named repository, so that the cross-repo work `@wdio/mcp` v5 depends on (see `v5-proposal.md`) becomes tracked
 release criteria.
 
@@ -87,7 +87,7 @@ provider logic, as `@wdio/mcp` does today.
 MCP v5 plans to delete its provider table and call this API; the list is what would regress otherwise.
 ````
 
-**Prototype of the first item (local, not pushed):** branch `feat/session-launch-api`, cut from upstream `main` at
+**Prototype of the first item:** a local prototype exists, not yet submitted. Cut from upstream `main` at
 `4ef7adc33`, uncommitted.
 - **Exports:** a new `@wdio/session/launch` entry re-exports `buildPlan`, `launch`, and the types `OpenArgs`,
   `PlanContext`, `OpenPlan`, `Launched`, `LaunchOptions` and `SessionResult`.
@@ -104,7 +104,7 @@ MCP v5 plans to delete its provider table and call this API; the list is what wo
 - **Covered by this slice:** rows 15a-15c. The second slice below adds 7b and settles 7a; the third adds 11b-11e, with 11a caller-side and 11f blocked on 9e; every other item is still open.
 - **Found while testing:** a single-function hook fails in `remote()` itself (W2).
 
-**Second slice, attach (rows 7a-7c, same branch, local only):**
+**Second slice, attach (rows 7a-7c, same prototype, local only):**
 
 - **7b, debugger wait in `launch()`.** On a plan with `debuggerAddress`, `launch()` polls
   `http://<address>/json/version` for up to 10 s before calling `remote()`. Each request is bounded by the remaining
@@ -128,7 +128,7 @@ MCP v5 plans to delete its provider table and call this API; the list is what wo
 - **Out of scope:** 7c (spawning Chrome with a debugging port) is a launcher of its own. MCP's stale BiDi mapper cleanup
   and tab restore are MCP heuristics with no recurrence evidence outside MCP.
 
-**Third slice, cloud result marking (rows 11b-11e, same branch, local only):**
+**Third slice, cloud result marking (rows 11b-11e, same prototype, local only):**
 
 - **Added:** `launch()` result gains `markResult({ passed, reason? })`, implemented by `markCloudResult` in
   `packages/wdio-session/src/targets/cloud.ts`, with one entry per provider in the PROVIDERS table. No-op for non-cloud
@@ -203,7 +203,7 @@ MCP v5 plans to drop its own trace recorder and feed one step per agent action t
 that feed.
 ````
 
-**Prototype (local, not pushed):** branch `feat/session-action-events`, cut from upstream `main` at `4ef7adc33`, uncommitted.
+**Prototype:** a local prototype exists, not yet submitted. Cut from upstream `main` at `4ef7adc33`, uncommitted.
 - **API:** `createAgentSession(browser, { onAction })`. Public `Session.dispatch` wraps the unchanged body, which is now private `#dispatch`. This covers early failures (unknown, unsupported or dialog-blocked actions, `limitPageLoad`) and abandoned timeouts.
 - **Skipped events:** none are emitted without a handler. Nested `$internal` snapshots inside `exec` are skipped.
 - **Event shape:**
@@ -636,6 +636,8 @@ arguments or its generated code.
 - [ ] The step keeps the action name, arguments, generated code and error in `trace.trace` and `transcript.md`.
 - [ ] Snapshot and screenshot capture can be tied to action boundaries.
 - [ ] The accepted event shape is versioned and agreed with `@wdio/session`.
+- [ ] The same call accepts steps from a caller that is not `@wdio/session` (for example MCP's `execute_script` or `mock`
+      tools, which call WebdriverIO directly), so those calls keep a step of their own.
 
 **Why it matters to @wdio/mcp**
 
@@ -821,8 +823,6 @@ Everything below is marked **unverified** as of 2026-11-14, unless an item gives
   (`src/targets/cloud.ts:13`) and the contents of `src/index.ts` and `src/agent.ts`. The specific drift values quoted in
   S1 (`LT_*`, `LT:Options`, `us-west-1`, 1280x720, single BrowserStack hub, `autoAcceptAlerts`) are taken from the
   matrix as given.
-- **Matrix link target — unverified.** S1 and S3 link `docs/architecture/provider-parity-matrix.md` in `webdriverio/mcp`.
-  That file is untracked in this checkout (`feature/v5`), so the link resolves only after it is committed and pushed.
 - **All devtools measurements — single machine, mostly single run.** Node 24.22.1, headless Chrome 149 with
   `--no-sandbox`, Linux/WSL2. Not examined: Firefox, Safari, native mobile, a long-lived process over many sessions.
 - **D2 — unverified** whether an existing option suppresses the `DevTools trace saved to` line (the probe did not
