@@ -265,6 +265,7 @@ catch (e) {
 Unimplemented proposals only; shipped work is not listed here. See `docs/architecture/`:
 
 - `interaction-sequencing-proposal.md` — sequencing model for tool interactions
-- `trace-extraction-proposal.md` — extracting trace data to a standalone package
+- `trace-extraction-proposal.md` — extracting trace data to a standalone package; superseded by `v5-proposal.md`
+- `v5-proposal.md` — engine consolidation onto `@wdio/session` and devtools trace
 
 `providers/registry.ts` + `providers/cloud/` is the extension point for new cloud providers.
