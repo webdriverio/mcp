@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const { mockTunnel } = vi.hoisted(() => ({
   mockTunnel: { start: vi.fn(), stop: vi.fn() },
@@ -11,6 +11,7 @@ vi.mock('browserstack-local', () => ({
   },
 }));
 
+import type { Browser as WdioBrowser } from 'webdriverio';
 import { BrowserStackProvider } from '../../src/providers/cloud/browserstack.provider';
 
 describe('BrowserStackProvider', () => {
@@ -281,6 +282,95 @@ describe('BrowserStackProvider', () => {
       );
 
       await expect(provider.startTunnel({})).rejects.toEqual({ message: 'some other fatal error' });
+    });
+  });
+
+  describe('onSessionClose', () => {
+    const AUTOMATE_URL = 'https://api.browserstack.com/automate/sessions/abc.json';
+    const APP_AUTOMATE_URL = 'https://api-cloud.browserstack.com/app-automate/sessions/abc.json';
+    const passed = { status: 'passed' as const };
+    const withRequested = (requestedCapabilities: Record<string, unknown>, capabilities: Record<string, unknown> = {}) =>
+      ({ requestedCapabilities, capabilities }) as unknown as WdioBrowser;
+
+    beforeEach(() => {
+      vi.stubEnv('BROWSERSTACK_USERNAME', 'myuser');
+      vi.stubEnv('BROWSERSTACK_ACCESS_KEY', 'mykey');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it('marks an iOS mobile-browser session on the automate API', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', capabilities: { browserName: 'safari' } });
+
+      await provider.onSessionClose('abc', 'ios', passed, undefined, withRequested(requested, { browserName: 'safari' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks an Android mobile-browser session on the automate API', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', capabilities: { browserName: 'chrome' } });
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested(requested, { browserName: 'chrome' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks a native app session on the app-automate API even when live browserName is set', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', app: 'bs://app123' });
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested(requested, { browserName: 'Android' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('marks a native app session on the app-automate API when the app is only in appium:options', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:options': { app: 'bs://app123' } }, { browserName: 'Android' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('marks a browser session on the automate API without a browser handle', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'browser', passed);
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks an iOS session on the app-automate API without a browser handle', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'ios', passed);
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('PUTs the status and reason as JSON with Basic auth', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', app: 'bs://app123' });
+
+      await provider.onSessionClose('abc', 'android', { status: 'failed', reason: 'boom' }, undefined, withRequested(requested));
+
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(APP_AUTOMATE_URL);
+      expect(init.method).toBe('PUT');
+      expect(init.headers).toEqual({ Authorization: `Basic ${Buffer.from('myuser:mykey').toString('base64')}`, 'Content-Type': 'application/json' });
+      expect(JSON.parse(init.body as string)).toEqual({ status: 'failed', reason: 'boom' });
+    });
+
+    it('rejects with the HTTP status when BrowserStack responds non-ok', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 404');
     });
   });
 });

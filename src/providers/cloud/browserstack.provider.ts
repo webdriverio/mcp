@@ -2,6 +2,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Local as BrowserstackTunnel } from 'browserstack-local';
+import type { Browser as WdioBrowser } from 'webdriverio';
 import { basicAuth } from '../../utils/auth';
 import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
 
@@ -110,6 +111,7 @@ export class BrowserStackProvider implements SessionProvider {
     sessionType: 'browser' | 'ios' | 'android',
     result: SessionResult,
     tunnelHandle?: unknown,
+    browser?: WdioBrowser,
   ): Promise<void> {
     if (tunnelHandle) {
       const tunnel = tunnelHandle as InstanceType<typeof BrowserstackTunnel>;
@@ -121,17 +123,21 @@ export class BrowserStackProvider implements SessionProvider {
     const key = process.env.BROWSERSTACK_ACCESS_KEY;
     if (!user || !key) return;
 
-    const baseUrl = sessionType === 'browser'
-      ? 'https://api.browserstack.com/automate/sessions'
-      : 'https://api-cloud.browserstack.com/app-automate/sessions';
+    const requested = (browser as { requestedCapabilities?: Record<string, unknown> } | undefined)?.requestedCapabilities;
+    const hasApp = !!(requested?.['appium:app'] || requested?.app || (requested?.['appium:options'] as { app?: unknown } | undefined)?.app);
+    const isAppSession = sessionType !== 'browser' && (requested === undefined || hasApp);
+    const baseUrl = isAppSession
+      ? 'https://api-cloud.browserstack.com/app-automate/sessions'
+      : 'https://api.browserstack.com/automate/sessions';
 
     const auth = basicAuth(user, key);
     const body: Record<string, string> = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
-    await fetch(`${baseUrl}/${sessionId}.json`, {
+    const res = await fetch(`${baseUrl}/${sessionId}.json`, {
       method: 'PUT',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`BrowserStack result marking failed: HTTP ${res.status}`);
   }
 }
 
