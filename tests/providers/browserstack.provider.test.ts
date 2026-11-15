@@ -125,6 +125,27 @@ describe('BrowserStackProvider', () => {
       expect(caps['appium:app']).toBe('bs://abc123');
     });
 
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'bs://x' },
+      });
+      expect(caps['appium:app']).toBe('bs://x');
+    });
+
+    it('prefers the app option over a user-supplied appium:app capability', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        app: 'bs://opt',
+        capabilities: { 'appium:app': 'bs://x' },
+      });
+      expect(caps['appium:app']).toBe('bs://opt');
+    });
+
     it('sets deviceName and platformVersion inside bstack:options', () => {
       const caps = provider.buildCapabilities({
         platform: 'ios',

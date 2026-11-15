@@ -192,6 +192,16 @@ describe('SauceLabsProvider', () => {
       expect(caps['appium:app']).toBe('storage:filename=myapp.apk');
     });
 
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'storage:filename=myapp.apk' },
+      });
+      expect(caps['appium:app']).toBe('storage:filename=myapp.apk');
+    });
+
     it('sets appiumVersion to latest for native app mode', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',

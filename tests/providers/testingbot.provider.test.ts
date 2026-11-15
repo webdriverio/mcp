@@ -122,6 +122,16 @@ describe('TestingBotProvider', () => {
       expect(caps['tb:options']).toBeDefined();
     });
 
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'tb://abc123' },
+      });
+      expect(caps['appium:app']).toBe('tb://abc123');
+    });
+
     it('defaults autoGrantPermissions and autoAcceptAlerts to true', () => {
       const caps = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 7', app: 'tb://abc' });
       expect(caps['appium:autoGrantPermissions']).toBe(true);

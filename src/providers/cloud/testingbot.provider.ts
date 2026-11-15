@@ -70,7 +70,7 @@ export class TestingBotProvider implements SessionProvider {
 
     const caps: Record<string, unknown> = {
       platformName: platform,
-      'appium:app': options.app,
+      'appium:app': options.app ?? userCapabilities['appium:app'],
       'appium:deviceName': options.deviceName,
       'appium:platformVersion': options.platformVersion,
       'appium:automationName': (options.automationName as string | undefined) ?? (platform === 'ios' ? 'XCUITest' : 'UiAutomator2'),
