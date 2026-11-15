@@ -340,5 +340,15 @@ describe('SauceLabsProvider', () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+
+    it('logs the HTTP status instead of success when the REST API rejects the result', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 401, text: async () => 'Unauthorized' } as Response);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await provider.onSessionClose('session-123', 'browser', { status: 'passed' });
+
+      expect(errorSpy).toHaveBeenCalledWith('[SauceLabs] Failed to set job result: HTTP 401 — Unauthorized');
+      expect(errorSpy).not.toHaveBeenCalledWith('[SauceLabs] Job result set successfully via REST API');
+    });
   });
 });
