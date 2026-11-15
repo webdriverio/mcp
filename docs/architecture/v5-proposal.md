@@ -261,7 +261,7 @@ is answered).
 1. Design session's `launch` API (against the parity matrix, including hook/service injection) and the action-event
    schema.
 2. Session release with `@wdio/session/launch` and the Digital.ai port.
-3. Devtools accepts session action events as a step source.
+3. Devtools accepts session action events as a step source, and the same call accepts steps from tools that stay outside the agent (see Trace swap acceptance criteria).
 4. Devtools release that meets the trace acceptance criteria. (Peering on webdriverio 10 is already met:
    `@wdio/devtools-service@11.2.0`, npm `latest`, peers `webdriverio ^9.19.1 || ^10.0.0`.)
 
@@ -301,6 +301,7 @@ The devtools release MCP v5 adopts must not regress these, relative to MCP's cur
 | Area | Today (MCP `src/trace`) |
 | --- | --- |
 | Granularity | One step per tool call — preserved by one step per agent action |
+| Direct-tool steps | `execute_script`, mocks, `scroll`, `swipe`, coordinate `tap_element`, offset `drag_and_drop` and Electron tools get a step today through `instrument()` in `src/server.ts`, but stay outside the agent in v5; devtools must accept a step for them too (D7), or they lose their step while their WebDriver commands are still captured |
 | Format and player | Playwright-compatible zip, vibium player — users must be told what replaces it |
 | Location | `.trace/` under cwd |
 | Coverage | Local browser, mobile, cloud, attach, Electron sessions |

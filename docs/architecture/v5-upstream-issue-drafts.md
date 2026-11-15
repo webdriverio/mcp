@@ -636,6 +636,8 @@ arguments or its generated code.
 - [ ] The step keeps the action name, arguments, generated code and error in `trace.trace` and `transcript.md`.
 - [ ] Snapshot and screenshot capture can be tied to action boundaries.
 - [ ] The accepted event shape is versioned and agreed with `@wdio/session`.
+- [ ] The same call accepts steps from a caller that is not `@wdio/session` (for example MCP's `execute_script` or `mock`
+      tools, which call WebdriverIO directly), so those calls keep a step of their own.
 
 **Why it matters to @wdio/mcp**
 
