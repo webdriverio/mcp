@@ -25,10 +25,10 @@ The v5 plan, provider parity matrix and upstream issue list are in `docs/archite
 
 | Item | Status | Owner of detail |
 | --- | --- | --- |
-| BrowserStack: mark mobile browser sessions on the Automate API | fix ready, PR pending | `src/providers/cloud/browserstack.provider.ts` |
-| BrowserStack mobile: the `browser` option is ignored; a mobile browser session needs `browserName` in capabilities | open | `src/providers/cloud/browserstack.provider.ts` |
-| BrowserStack mobile without `app` overwrites a user-supplied `appium:app` | open | `src/providers/cloud/browserstack.provider.ts` |
-| Sauce Labs: result marking may fail silently on an unchecked response | open (confirmed: unchecked in Sauce Labs; TestMu and TestingBot check `res.ok`) | `src/providers/cloud/saucelabs.provider.ts` |
+| BrowserStack: mark mobile browser sessions on the Automate API | fix in PR #193 | `src/providers/cloud/browserstack.provider.ts` |
+| BrowserStack mobile: the `browser` option is ignored; a mobile browser session needs `browserName` in capabilities | fix in PR #193 | `src/providers/cloud/browserstack.provider.ts` |
+| Mobile without `app` overwrites a user-supplied `appium:app` (BrowserStack, Sauce Labs, TestMu, TestingBot) | fix in PR #193 | `src/providers/cloud/browserstack.provider.ts` |
+| Sauce Labs: result marking may fail silently on an unchecked response | fix in PR #193 | `src/providers/cloud/saucelabs.provider.ts` |
 | Generated local script declares `browser` inside `try` and uses it in `finally` | fixed, not yet submitted | `src/recording/code-generator.ts` |
 | Trace remaining Appium mobile tools (PR #191, fixes #190; also fixes `select_option`, `press_key` and `perform_actions` emitting no trace events) | open PR; belongs in v4 as a fix to code v5 deletes | PR #191 (branch `feature/appium-trace`) |
 
