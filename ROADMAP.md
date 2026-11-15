@@ -1,140 +1,97 @@
-# Roadmap
+# Roadmap: @wdio/mcp v5
 
-> This roadmap reflects current thinking and priorities. It is not a commitment to deliver specific features by specific
-> dates. Priorities may shift based on community feedback, contributor interest, and real-world usage patterns.
+Unshipped work only. Not a commitment to dates.
 
-## Current
+## What v5 is
 
-What's shipped and stable today.
+Consolidation. MCP becomes a protocol layer (transport, toolsets, tool descriptions, resources, docs search, multiple sessions) over `@wdio/session` (launch, page model, actions, generated code) and devtools (trace). Success means deleting MCP's own launch, trace and element-collection code without regressing what the [provider parity matrix](docs/architecture/provider-parity-matrix.md) and the trace acceptance criteria in the [v5 plan](docs/architecture/v5-proposal.md) describe.
 
-| Area                  | Capabilities                                                                                  |
-|-----------------------|-----------------------------------------------------------------------------------------------|
-| Browser automation    | Chrome, Firefox, Edge, Safari; headed/headless; navigation, clicks, form filling, screenshots |
-| Mobile automation     | iOS (XCUITest) and Android (UiAutomator2) via Appium; native + hybrid app support             |
-| Element detection     | Platform-aware classification, multi-strategy locator generation, viewport filtering          |
-| Session model         | Single active session (browser or mobile), state preservation, detach mode                    |
-| Cloud providers       | BrowserStack, Sauce Labs, LambdaTest (TestMu), TestingBot, and Digital.ai Testing — browser + native app, local tunnel support |
-| Test infrastructure   | Vitest unit tests, ESLint + TypeScript checks, CI pipeline on every PR                        |
-| Trace recording (v1)  | Synchronous Playwright-compatible trace zip; screenshot per action; auto-saved on session close; playable at player.vibium.dev |
+Decided: one launch path for session-backed targets, with no fallback to v4 launch code. Kept outside it: `attach_session`, `provider: 'external'`, and Digital.ai only if its port misses the gating `@wdio/session` release.
 
----
+v5 is a coordinated release. It ships only when every upstream change it depends on is merged and published at a named version. Until then, work goes to the v4 line.
 
-## Next
+## What v5 is not
 
-High-value features actively being designed or in early implementation.
+- Not a feature release. New tools wait for the investment decision (open decision 4).
+- Not trace feature work. Trace capability is whatever devtools ships.
+- No launch logic of MCP's own.
 
-### Trace: Mobile / Appium Support
+## Breaking changes to announce
 
-**Goal:** Extend trace recording to iOS and Android sessions.
+- The `trace` parameter: format, location and player change.
+- The `./snapshot` and `./trace` exports and the `wdio-show-trace` bin are removed, after the v4 deprecation window.
+- `start_session` input moves to target, config or provider.
+- Launch defaults and names that differ between MCP and `@wdio/session`. Each is decided in upstream issue S1; see the parity matrix.
 
-The current synchronous model (capture screenshot after each traced tool call) maps cleanly to Appium — no architectural change needed. Mobile sessions just need to opt in via `trace: true` in `start_session` and have their tools wrapped with `withTrace`.
+## Gates, in dependency order
 
-| What                           | Why it matters                                                    |
-|--------------------------------|-------------------------------------------------------------------|
-| `trace: true` for ios/android  | Same flag, same zip output, same player — no new concepts         |
-| Screenshot capture via Appium  | `browser.takeScreenshot()` works identically on mobile            |
-| Mobile-aware tool mapping      | `tap_element`, `swipe`, `scroll` already in `TOOL_MAP`; just enable the guard |
+Every upstream step counts only when merged and published at a named version.
 
-**Dependency:** None — the synchronous model works without BiDi.
+### Owner decisions
 
-### Interaction Sequencing
+See the [v5 plan](docs/architecture/v5-proposal.md), "Open decisions".
 
-**Goal:** Reduce round-trips for multi-action workflows with automatic state change detection.
+| Decision | Status |
+| --- | --- |
+| 1. `@wdio/session` is the engine, MCP the adapter | open, session owner |
+| 2. Devtools accepts session action events as a step source | open, devtools owners |
+| 4. MCP investment after v5 | open; decides the "After v5" list |
+| 5. Who connects action events to the devtools recorder | open |
+| 6. Cutoff date for parking v5 | open |
+| 7. Fate of `@wdio/session`'s own `trace` action | open |
 
-Today, a simple login flow requires 4+ tool calls. With `execute_sequence`, the AI sends all actions in one call and
-gets back a state delta showing what changed.
+### Publish the evidence
 
-| What                    | Why it matters                                                                   |
-|-------------------------|----------------------------------------------------------------------------------|
-| `execute_sequence` tool | Batch multiple actions (click, type, navigate) in a single round-trip            |
-| State delta detection   | Automatically report what appeared, disappeared, or changed after actions        |
-| Stability detection     | Wait for page to settle (loading spinners, async renders) before capturing state |
-| Fail-fast with context  | Stop on first error, report partial progress and what changed up to that point   |
+| Item | Status |
+| --- | --- |
+| Make the v5 plan, parity matrix and probe results reachable on the default branch | ready, needs approval |
+| File the [upstream issues](docs/architecture/v5-upstream-issues-to-file.md) | ready once the matrix resolves |
 
-See: [`docs/architecture/interaction-sequencing-proposal.md`](docs/architecture/interaction-sequencing-proposal.md)
+### Chain A: collector
 
----
+| Item | Status |
+| --- | --- |
+| A3. `collectScript()` feasibility; devtools captures trace snapshots with it | open |
+| A4. Devtools deletes its collector copies | blocked on A3 |
 
-## Later
+### Chain B: engine (critical path)
 
-Features with clear use cases and initial designs, but dependent on foundational work landing first.
+| Item | Status |
+| --- | --- |
+| B1. In-process launch API with hook injection (S1) and the action-event schema (S2) | prototypes on local branches, no PR yet; upstream adoption blocked on decision 1 |
+| B2. `@wdio/session` release with `@wdio/session/launch` and the Digital.ai provider (S3) | not started; blocked on B1 |
+| B3. Devtools accepts session action events (D7) | blocked on decision 2 and B1 |
+| B4. Devtools release that meets the trace acceptance criteria (upstream issues D1-D6, D8) | blocked on devtools |
 
-### Trace: WebDriver BiDi Mode
+### MCP-side gates
 
-**Goal:** Opt-in async trace recording driven by WebDriver BiDi events instead of synchronous post-action capture.
+| Item | Status |
+| --- | --- |
+| v4.x with the deprecations published, window elapsed | blocked on pushing and merging feature/v4-prep-10.2 (no PR yet) |
+| Collector comparison on a mobile app and an Electron app | blocked on a device run; no owner |
 
-The v1 trace records a screenshot after each tool call completes. This is simple and works, but it misses events that happen between tool calls (network requests, console errors, intermediate renders) and adds latency on every action.
+## MCP v5 changes
 
-BiDi mode subscribes to browser events asynchronously — screenshots, network activity, and console output arrive as they happen, decoupled from the tool call cycle.
+Detail: the [v5 plan](docs/architecture/v5-proposal.md), section "v5".
 
-| What                          | Why it matters                                                          |
-|-------------------------------|-------------------------------------------------------------------------|
-| Async screenshot capture      | Screenshots taken on page state changes, not on tool boundaries — more accurate filmstrip |
-| `trace.network` population    | Real HAR-format network log from BiDi `network.*` events                |
-| Console event recording       | Browser console errors/warnings captured as trace events               |
-| Lower per-action latency      | No synchronous `takeScreenshot()` blocking each tool call               |
-| Graceful fallback             | Sessions on browsers without BiDi support fall back to v1 synchronous mode |
+| Change | Status |
+| --- | --- |
+| `start_session` through session's plan, launch and agent; delete `src/providers/` except attach and external | blocked on B2 |
+| Trace through devtools from action events; delete `src/trace/` | blocked on Chain A, B3, B4 |
+| Delete `src/scripts/` and `src/locators/` | blocked on the collector comparison |
+| Remove `./snapshot`, `./trace`, `wdio-show-trace` | blocked on the deprecation window |
+| Reduce the code generator to what session cannot generate | blocked on S5 for the full reduction |
+| Launch and configuration design ([session configuration proposal](docs/architecture/session-configuration-proposal.md)) | folds into upstream S1 (`@wdio/session` launch); no MCP-side work of its own |
+| Pin policy: exact pins | decided; revisit when the agent contract is declared stable |
 
-**Dependency:** Requires Chrome/Edge with BiDi enabled (WebdriverIO `webSocketUrl: true`). Safari and Firefox BiDi support is partial — fallback needed. Not applicable to mobile/Appium sessions (which keep the synchronous model).
+## Upstream defects, not blocking
 
-### Multi-Session Support
+S4 (`exec` code and arguments), S6 (TypeScript in generated frame code), W1-W3 (webdriverio). See the [upstream issue list](docs/architecture/v5-upstream-issues-to-file.md).
 
-Phase 1 shipped: session targeting (optional `session` on session-bound tools), named sessions (`name`, `onExisting: "keep"`) and a per-session call queue. Remaining work:
+## After v5
 
-| What                                                          | Why it matters                                                       |
-|---------------------------------------------------------------|----------------------------------------------------------------------|
-| `list_sessions` tool/resource                                 | Visibility into live sessions and their names                        |
-| Idle timeout and max live sessions cap, failing loudly        | Prevent leaked or runaway sessions                                   |
-| Shutdown/cleanup policy for cloud sessions                    | Avoid billed cloud sessions left running                             |
-| Cross-process session registry                                | Names are currently scoped to one server process                     |
+Depends on open decision 4.
 
----
-
-## Ideas
-
-Not committed. Exploring feasibility and demand.
-
-| Idea                 | Description                                                       |
-|----------------------|-------------------------------------------------------------------|
-| Visual regression    | Screenshot comparison with diff highlighting                      |
-| Record and replay    | Capture interaction sequences for deterministic re-execution      |
-| File upload/download | Handle file dialogs and download verification                     |
-| iframe support       | Navigate and interact within nested frames                        |
-| Assertion helpers    | Built-in verification tools (element visible, text matches, etc.) |
-
----
-
-## How to Influence This Roadmap
-
-- **Open an issue** to request a feature or describe a use case
-- **Comment on architecture proposals** in `docs/architecture/` — the open questions sections are specifically looking
-  for input
-- **Contribute** — PRs welcome, especially for items in the "Next" tier
-
----
-
-## Dependency Map
-
-```
-┌─────────────────────────────────────────────────┐
-│             Trace Recording (v1) ✓               │
-│   synchronous, screenshot-per-action, browser    │
-└──────────┬──────────────────────┬───────────────┘
-           │                      │
-           ▼                      ▼
-┌──────────────────┐   ┌─────────────────────────┐
-│  Mobile Tracing  │   │   Trace: BiDi Mode       │
-│  (Appium, easy)  │   │   (async, browser only)  │
-└──────────────────┘   └─────────────────────────┘
-
-┌─────────────────────────┐
-│  Interaction Sequencing  │
-│   (execute_sequence)     │
-└────────────┬────────────┘
-             │ enhances
-             ▼
-┌──────────────────────┐
-│  Multi-Session       │
-│  (sessionId)         │
-└──────────────────────┘
-```
+- [Interaction sequencing](docs/architecture/interaction-sequencing-proposal.md): stale draft; re-scope against the agent first.
+- Cross-process session registry.
+- Visual regression, file upload/download, assertion helpers.

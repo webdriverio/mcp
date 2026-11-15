@@ -236,7 +236,7 @@ Two defects in generated scripts were found on 2026-11-14 (one machine). Neither
   `try { … } finally { await browser.deleteSession(); }` (`src/recording/code-generator.ts:709` at `982d6e7`), while the
   local `start_session` step emits `const browser = await remote({` inside that `try` (`:275`). In `finally`, `browser`
   is not defined, so cleanup throws `ReferenceError` and masks the real error. The cloud and Electron templates declare
-  `let browser` outside the `try`. MCP owns the fix; it is not fixed on the prep branch
+  `let browser` outside the `try`. MCP owns the fix; it is fixed on feature/v4-prep-10.2, not merged
   (`src/recording/code-generator.ts:716`).
 
 ---
@@ -256,7 +256,7 @@ is answered).
 3. Open. Feasibility check of `collectScript()`, then devtools captures trace snapshots with it.
 4. Open. devtools deletes `core/locators` and `element-scripts`.
 
-**Chain B — engine (critical path), not started:**
+**Chain B — engine (critical path), S1 and S2 prototyped on local branches (no PR yet); S3 not started:**
 
 1. Design session's `launch` API (against the parity matrix, including hook/service injection) and the action-event
    schema.
