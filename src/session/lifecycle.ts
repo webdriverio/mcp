@@ -13,6 +13,7 @@ import { cleanupSessionRuntime } from '../electron/runtime.js';
 import { releaseSessionMocks } from '../tools/mock.tool.js';
 import { withTimeout } from '../utils/with-timeout';
 import { driverTree, killPids, type ProcessIdentity } from './driver-tree';
+import { cleanupSessionOutputFiles } from '../utils/file-output';
 
 // A hung driver must not block close_session (it skips the per-session queue and its 90s deadline); state cleanup in the outer finally still runs.
 const DELETE_SESSION_TIMEOUT_MS = 90_000;
@@ -130,6 +131,7 @@ export function registerSession(
       });
       state.browsers.delete(oldSessionId);
       state.sessionMetadata.delete(oldSessionId);
+      cleanupSessionOutputFiles(oldSessionId);
     }
   }
   notifySessionsChanged(metadata);
@@ -212,6 +214,7 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
     state.browsers.delete(sessionId);
     state.sessionMetadata.delete(sessionId);
     capturedTrees.delete(sessionId);
+    cleanupSessionOutputFiles(sessionId);
 
     // Only clear currentSession if it matches the session being closed
     if (state.currentSession === sessionId) {
