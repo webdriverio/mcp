@@ -23,7 +23,7 @@ describe('mapToolToTraceAction', () => {
   });
 
   it('maps all expected tools without returning null', () => {
-    const mapped = ['navigate', 'click_element', 'set_value', 'scroll', 'tap_element', 'swipe', 'drag_and_drop', 'execute_script', 'execute_electron_script', 'trigger_electron_deeplink', 'mock', 'get_mock_calls', 'manage_mock', 'launch_chrome'];
+    const mapped = ['navigate', 'click_element', 'set_value', 'scroll', 'tap_element', 'swipe', 'drag_and_drop', 'execute_script', 'execute_electron_script', 'trigger_electron_deeplink', 'mock', 'get_mock_calls', 'manage_mock', 'launch_chrome', 'hide_keyboard', 'rotate_device', 'switch_context', 'press_key', 'select_option', 'set_geolocation', 'perform_actions'];
     for (const tool of mapped) {
       expect(mapToolToTraceAction(tool), `expected ${tool} to be mapped`).not.toBeNull();
     }
@@ -52,5 +52,36 @@ describe('formatActionTitle', () => {
   it('omits parens content when no params', () => {
     const action = { class: 'Browser', method: 'launch' };
     expect(formatActionTitle(action, {})).toBe('Browser.launch()');
+  });
+
+  it('maps the mobile-action tools to Device/Context/Keyboard actions', () => {
+    expect(mapToolToTraceAction('hide_keyboard')).toEqual({ class: 'Device', method: 'hideKeyboard' });
+    expect(mapToolToTraceAction('rotate_device')).toEqual({ class: 'Device', method: 'rotate' });
+    expect(mapToolToTraceAction('switch_context')).toEqual({ class: 'Context', method: 'switch' });
+    expect(mapToolToTraceAction('press_key')).toEqual({ class: 'Keyboard', method: 'press' });
+    expect(mapToolToTraceAction('select_option')).toEqual({ class: 'Element', method: 'selectOption' });
+    expect(mapToolToTraceAction('set_geolocation')).toEqual({ class: 'Device', method: 'setGeolocation' });
+    expect(mapToolToTraceAction('perform_actions')).toEqual({ class: 'Page', method: 'performActions' });
+  });
+
+  it('summarizes perform_actions steps instead of printing [object Object]', () => {
+    const action = { class: 'Page', method: 'performActions' };
+    const title = formatActionTitle(action, {
+      actions: [
+        { action: 'click', selector: '#login' },
+        { action: 'fill', selector: '#name', value: 'Ada' },
+        { action: 'press', value: 'Enter' },
+      ],
+    });
+    expect(title).toBe('Page.performActions("click #login, fill #name, press Enter")');
+  });
+
+  it('extracts a label from mobile selectors', () => {
+    expect(formatActionTitle({ class: 'Element', method: 'tap' }, { selector: '~loginButton' })).toBe(
+      'Element.tap("loginButton")',
+    );
+    expect(formatActionTitle({ class: 'Element', method: 'tap' }, { selector: 'android=new UiSelector().text("Login")' })).toBe(
+      'Element.tap("Login")',
+    );
   });
 });
