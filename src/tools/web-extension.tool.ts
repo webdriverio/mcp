@@ -5,6 +5,7 @@ import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
 import type { ToolDefinition } from '../types/tool';
 import { errorResult } from '../session/agent';
+import { BIDI_REQUIRED_HINT } from '../utils/bidi';
 
 type WebExtensionData =
   | { type: 'path'; path: string }
@@ -67,7 +68,7 @@ function getBrowserSession(): BrowserSession | CallToolResult {
       isError: true,
       content: [{
         type: 'text',
-        text: 'Error: web extension tools require a BiDi-enabled browser session. Start a browser session with capabilities: { webSocketUrl: true }.',
+        text: `Error: web extension tools require a BiDi-enabled browser session. ${BIDI_REQUIRED_HINT}`,
       }],
     };
   }
