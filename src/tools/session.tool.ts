@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { NetworkLogsMode, SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
-import { captureDriverRoots } from '../session/driver-tree';
+import { captureDriverRoots, driverTree, killPids } from '../session/driver-tree';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
@@ -474,13 +474,23 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
   const metadata: SessionMetadata = {
     type: 'browser', runtime: 'electron', capabilities: recordedCapabilities, isAttached: false,
     provider: 'local', trace: args.trace ?? false,
+    driverRoots: captureDriverRoots((browser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined),
     ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
   await registerOrDispose(sessionId, () => registerSession(sessionId, browser, metadata, {
     sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities: recordedCapabilities, steps: [],
   }, { keep: args.onExisting === 'keep', name: args.name }), [
-    () => cleanupSessionRuntime('electron', browser),
-    () => browser.deleteSession(),
+    async () => {
+      const ended = await cleanupSessionRuntime('electron', browser).catch((e) => {
+        console.error('[WARN] Failed to clean up session runtime:', e);
+        return false;
+      });
+      if (ended) {
+        killPids(driverTree(metadata.driverRoots));
+      } else {
+        await browser.deleteSession();
+      }
+    },
   ]);
   if (args.trace) startTrace(sessionId, recordedCapabilities, 'browser', { width: args.windowWidth ?? 1280, height: args.windowHeight ?? 800 });
 
@@ -660,8 +670,6 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
 
   const capabilities = {
     browserName: 'chrome',
-    unhandledPromptBehavior: 'dismiss',
-    webSocketUrl: false,
     'goog:chromeOptions': {
       debuggerAddress: `${host}:${port}`,
     },
