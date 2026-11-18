@@ -746,8 +746,8 @@ navigate({ url: "https://example.com", session: "bob" })
 | Tool                     | Description                                                                                                                                                                                            |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
-| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen. Works for apps too (the screen's accessibility tree). |
-| `get_elements`           | Get visible, interactable elements with bounds. Supports `inViewportOnly` (default: true) and `includeContainers` (default: false). Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
+| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen, `selectors: true` ends each ref with a selector for test code. Works for apps too (the screen's accessibility tree). |
+| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
 | `get_accessibility_tree` | Deprecated, removed in v5; use `snapshot`. Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
@@ -826,7 +826,7 @@ Recommended workflow (also sent to clients as server instructions):
 | `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the default session |
 | `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
 | `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
-| `wdio://session/current/elements`             | Interactable elements (viewport-only by default)         |
+| `wdio://session/current/elements`             | Accessibility tree with selectors (viewport-only by default, capped at 12000 characters) |
 | `wdio://session/current/accessibility`        | Accessibility tree (deprecated, removed in v5; use `snapshot`) |
 | `wdio://session/current/screenshot`           | Screenshot (base64)                                      |
 | `wdio://session/current/cookies`              | Browser cookies                                          |
@@ -1162,7 +1162,7 @@ Test my iOS app on my physical iPhone:
 ```
 Test my Android app /path/to/app.apk on the Pixel_6_API_34 emulator:
 1. Start the app with auto-grant permissions
-2. Get visible elements (use inViewportOnly: false to see all elements)
+2. Get elements to see the whole screen
 3. Swipe up to scroll
 4. Tap on the "Settings" button using text matching
 5. Verify the settings screen is displayed
@@ -1173,9 +1173,7 @@ Test my Android app /path/to/app.apk on the Pixel_6_API_34 emulator:
 ```
 Test my app and debug layout issues:
 1. Start the app session
-2. Get visible elements with includeContainers: true to see the layout hierarchy
-3. Analyze ViewGroup, FrameLayout, and ScrollView containers
-4. Use inViewportOnly: false to find off-screen elements that need scrolling
+2. Get elements to see the whole screen, including off-screen elements that need scrolling
 ```
 
 **Hybrid app testing (switching contexts):**
@@ -1287,13 +1285,11 @@ This is particularly useful when:
 
 ### Smart Element Detection
 
-- **Platform-specific element classification**: Automatically identifies interactable elements vs layout containers
-    - Android: Button, EditText, CheckBox vs ViewGroup, FrameLayout, ScrollView
-    - iOS: Button, TextField, Switch vs View, StackView, CollectionView
-- **Multiple locator strategies**: Each element provides accessibility ID, resource ID, text, XPath, and
-  platform-specific selectors
+- **Actionable elements only**: Only interactable elements get a ref and selector; layout containers (e.g. Android ViewGroup, FrameLayout) are not listed as targets
+- **Best locator per element**: Each actionable line ends with its most stable selector (accessibility ID, resource ID,
+  text, XPath, or a platform-specific strategy)
 - **Viewport filtering**: Control whether to get only visible elements or all elements including off-screen
-- **Layout debugging**: Optionally include container elements to understand UI hierarchy
+- **UI hierarchy**: Output is an accessibility tree, so lists, tab bars and sections keep their structure
 
 ### Automatic Permission & Alert Handling
 

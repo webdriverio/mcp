@@ -117,7 +117,7 @@ MCP resources expose live session data. Fixed URIs appear in ListResources; temp
 `screenshot`, `cookies`, `tabs`, `contexts`, `context`, `geolocation`, `capabilities`, `logs`, and the
 template `app-state/{bundleId}`.
 
-- `elements` is viewport-only — use the `get_elements` tool with `inViewportOnly: false` for all
+- `elements` is viewport-only; `get_elements` covers the whole page unless `inViewportOnly: true`
 - `capabilities` are the *resolved* values the driver accepted, including provider defaults
 - `logs` mixes crash logs with console output for the current session
 - `contexts` / `context` / `app-state` are mobile-only
@@ -181,7 +181,7 @@ Only files whose purpose is not evident from the tree above.
 | `src/providers/cloud/testingbot.provider.ts` | `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
 | `src/providers/cloud/digitalai.provider.ts` | `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<name>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts` | `start_session` (browser + mobile), `close_session` |
-| `src/tools/get-elements.tool.ts` | `get_elements` — all elements with filtering + pagination |
+| `src/tools/get-elements.tool.ts` | `get_elements` — `getSnapshot` accessibility tree text with selectors |
 | `src/tools/cloud-provider.tool.ts` | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Bearer auth) |
 | `src/tools/query-docs.tool.ts` | `query_docs` — BM25 search over the WebdriverIO docs corpus |
 | `src/utils/docs-index.ts` | Docs corpus fetch/cache, fence-aware chunking, path alignment, 3-field BM25 index + search |
