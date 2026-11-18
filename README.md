@@ -688,7 +688,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 - **Session Management**: Start and close browser sessions (Chrome, Firefox, Edge, Safari) with headless/headed modes
 - **Navigation & Interaction**: Navigate URLs, click elements, fill forms, and retrieve content
-- **Page Analysis**: Get visible elements, accessibility trees, take screenshots
+- **Page Analysis**: Accessibility snapshots with refs and selectors (`snapshot`), take screenshots
 - **Cookie Management**: Get, set, and delete cookies
 - **Scrolling**: Smooth scrolling with configurable distances
 - **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing
@@ -747,7 +747,7 @@ navigate({ url: "https://example.com", session: "bob" })
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
 | `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen, `selectors: true` ends each ref with a selector for test code. Works for apps too (the screen's accessibility tree). |
-| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
+| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile and Electron sessions only (on web, `snapshot` with `selectors: true`); listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
 | `get_accessibility_tree` | Deprecated, removed in v5; use `snapshot`. Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
@@ -826,7 +826,7 @@ Recommended workflow (also sent to clients as server instructions):
 | `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the default session |
 | `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
 | `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
-| `wdio://session/current/elements`             | Accessibility tree with selectors (viewport-only by default, capped at 12000 characters) |
+| `wdio://session/current/elements`             | Accessibility tree with selectors (viewport-only, capped at 12000 characters) |
 | `wdio://session/current/accessibility`        | Accessibility tree (deprecated, removed in v5; use `snapshot`) |
 | `wdio://session/current/screenshot`           | Screenshot (base64)                                      |
 | `wdio://session/current/cookies`              | Browser cookies                                          |
@@ -864,7 +864,7 @@ Test the Demo Android app at C:\Users\demo-liveApiGbRegionNonMinifiedRelease-301
 ```
 You are a Testing expert, and want to assess the basic workflows of worldofbooks.com:
 - Open World of Books (accept all cookies)
-- Get visible elements to see navigation structure
+- Snapshot the page to see navigation structure
 - Search for a fiction book
 - Choose one and validate if there are NEW and used book options
 - Report your findings at the end
@@ -1110,7 +1110,7 @@ open_web_extension({
 })
 
 // Drive the extension UI with the normal page tools.
-get_elements()
+snapshot({selectors: true})
 click_element({selector: '#save'})
 
 // For remote/cloud sessions, send a packaged extension archive as base64.

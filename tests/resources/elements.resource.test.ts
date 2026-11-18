@@ -49,7 +49,7 @@ describe('elements resource', () => {
     const [content] = result.contents as { text: string }[];
 
     expect(content.text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
-    expect(content.text).toContain('… truncated (');
+    expect(content.text).toContain('… truncated: showing');
   });
 
   it('returns an error text when getSnapshot fails', async () => {

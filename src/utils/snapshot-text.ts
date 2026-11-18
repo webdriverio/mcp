@@ -2,7 +2,7 @@
 export const SNAPSHOT_MAX_CHARS = 12000;
 
 const truncationNote = (kept: number, total: number) =>
-  `\n… truncated (${kept} of ${total} chars). Narrow it with the snapshot tool's scope parameter.`;
+  `\n… truncated: showing ${kept} of ${total} chars; the rest is NOT in this output and there is no paging, so do not call again. Next: snapshot find:"<text>" to locate it, then snapshot selectors:true scope:"<ref or css>" for its selector.`;
 
 export function truncateSnapshot(text: string): string {
   if (text.length <= SNAPSHOT_MAX_CHARS) return text;

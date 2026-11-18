@@ -57,7 +57,7 @@ describe('get_elements tool', () => {
     mockGetSnapshot.mockResolvedValue({ format: 'legacy', text, elements: {} });
     const result = await callTool({});
     expect(result.content[0].text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
-    expect(result.content[0].text).toContain('… truncated (');
+    expect(result.content[0].text).toContain('… truncated: showing');
   });
 
   it('returns isError true on failure', async () => {

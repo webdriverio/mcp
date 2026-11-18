@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SNAPSHOT_MAX_CHARS, truncateSnapshot } from '../../src/utils/snapshot-text';
 
-const NOTE_PATTERN = /\n… truncated \((\d+) of (\d+) chars\)\. Narrow it with the snapshot tool's scope parameter\.$/;
+const NOTE_PATTERN = /\n… truncated: showing (\d+) of (\d+) chars; the rest is NOT in this output and there is no paging, so do not call again\. Next: snapshot find:"<text>" to locate it, then snapshot selectors:true scope:"<ref or css>" for its selector\.$/;
 
 const lines = (count: number) => Array.from({ length: count }, (_, i) => `  e${i}  button "Item ${i}"  →  #item-${i}`).join('\n');
 
@@ -39,7 +39,7 @@ describe('truncateSnapshot', () => {
     const text = lines(1000);
     const result = truncateSnapshot(text);
     const [, kept, total] = result.match(NOTE_PATTERN) ?? [];
-    expect(result).toBe(text.slice(0, Number(kept)) + `\n… truncated (${kept} of ${text.length} chars). Narrow it with the snapshot tool's scope parameter.`);
+    expect(result).toBe(text.slice(0, Number(kept)) + `\n… truncated: showing ${kept} of ${text.length} chars; the rest is NOT in this output and there is no paging, so do not call again. Next: snapshot find:"<text>" to locate it, then snapshot selectors:true scope:"<ref or css>" for its selector.`);
     expect(Number(total)).toBe(text.length);
   });
 });

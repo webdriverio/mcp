@@ -4,11 +4,11 @@ import { getBrowser } from '../session/state';
 import { getSnapshot } from '@wdio/elements';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { errorResult } from '../session/agent';
-import { truncateSnapshot } from '../utils/snapshot-text';
+import { SNAPSHOT_MAX_CHARS, truncateSnapshot } from '../utils/snapshot-text';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
-  description: 'Accessibility tree of the current page or screen with an eN ref and a ready-to-use selector on each actionable line. Use the selectors when writing test code; use the snapshot tool to act (its refs). inViewportOnly: false covers the whole page.',
+  description: `Mobile and Electron sessions; on web use snapshot with selectors:true. Accessibility tree of the current page or screen with an eN ref and a ready-to-use selector on each actionable line. Use the selectors when writing test code; use the snapshot tool to act (its refs). inViewportOnly: false covers the whole page up to ${SNAPSHOT_MAX_CHARS} chars; longer pages are cut at the end.`,
   annotations: { title: 'Get Elements With Selectors', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     inViewportOnly: coerceBoolean.optional().default(false).describe('Only include elements visible in the current viewport (default: false).'),
