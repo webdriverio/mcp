@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getElements } from '../../src/scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { getBrowser } from '../../src/session/state';
 import { getElementsTool } from '../../src/tools/get-elements.tool';
 
-vi.mock('../../src/scripts/get-elements', () => ({
+vi.mock('@wdio/elements', () => ({
   getElements: vi.fn(),
 }));
 
@@ -54,6 +54,12 @@ describe('get_elements tool', () => {
     const result = await callTool({});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('browser disconnected');
+  });
+
+  it('omits the raw element tree from output', async () => {
+    mockGetVisible.mockResolvedValue({ ...defaultResult, tree: { tagName: 'hierarchy' } });
+    const result = await callTool({});
+    expect(result.content[0].text).not.toContain('hierarchy');
   });
 
   it('passes limit and offset to getElements', async () => {

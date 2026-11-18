@@ -6,12 +6,10 @@
  */
 
 import { warnDeprecated } from './utils/deprecation';
-import { getInteractableBrowserElements as getInteractableBrowserElementsImpl } from './scripts/get-interactable-browser-elements';
-import type { BrowserElementInfo as BrowserElementInfoImpl, GetBrowserElementsOptions as GetBrowserElementsOptionsImpl } from './scripts/get-interactable-browser-elements';
+import { getInteractableBrowserElements as getInteractableBrowserElementsImpl, getMobileVisibleElements as getMobileVisibleElementsImpl } from '@wdio/elements';
+import type { BrowserElementInfo as BrowserElementInfoImpl, GetBrowserElementsOptions as GetBrowserElementsOptionsImpl, MobileElementInfo as MobileElementInfoImpl, GetMobileElementsOptions as GetMobileElementsOptionsImpl } from '@wdio/elements';
 import { getBrowserAccessibilityTree as getBrowserAccessibilityTreeImpl } from './scripts/get-browser-accessibility-tree';
 import type { AccessibilityNode as AccessibilityNodeImpl } from './scripts/get-browser-accessibility-tree';
-import { getMobileVisibleElements as getMobileVisibleElementsImpl } from './scripts/get-visible-mobile-elements';
-import type { MobileElementInfo as MobileElementInfoImpl, GetMobileElementsOptions as GetMobileElementsOptionsImpl } from './scripts/get-visible-mobile-elements';
 
 warnDeprecated('snapshot');
 
@@ -29,7 +27,7 @@ export const getBrowserAccessibilityTree = getBrowserAccessibilityTreeImpl;
 /** @deprecated Removed in @wdio/mcp v5. Use @wdio/snapshot. */
 export type AccessibilityNode = AccessibilityNodeImpl;
 
-// Mobile element detection (requires xmldom + xpath)
+// Mobile element detection
 /** @deprecated Removed in @wdio/mcp v5. Use @wdio/snapshot. */
 export const getMobileVisibleElements = getMobileVisibleElementsImpl;
 /** @deprecated Removed in @wdio/mcp v5. Use @wdio/snapshot. */

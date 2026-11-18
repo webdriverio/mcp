@@ -2,12 +2,14 @@ import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
 import { getBrowserAccessibilityTree } from '../scripts/get-browser-accessibility-tree';
 import { encode } from '@toon-format/toon';
+import { ACCESSIBILITY_DEPRECATED_PREFIX, DEPRECATION_MESSAGES, warnDeprecated } from '../utils/deprecation';
 
 export async function readAccessibilityTree(params: {
   limit?: number;
   offset?: number;
   roles?: string[];
 }): Promise<{ mimeType: string; text: string }> {
+  warnDeprecated('accessibility');
   try {
     const browser = getBrowser();
 
@@ -23,7 +25,7 @@ export async function readAccessibilityTree(params: {
     let nodes = await getBrowserAccessibilityTree(browser);
 
     if (nodes.length === 0) {
-      return { mimeType: 'text/plain', text: 'No accessibility tree available' };
+      return { mimeType: 'text/plain', text: `${DEPRECATION_MESSAGES.accessibility}\nNo accessibility tree available` };
     }
 
     nodes = nodes.filter((n) => n.name && n.name.trim() !== '');
@@ -59,7 +61,7 @@ export async function readAccessibilityTree(params: {
 
     const toon = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
 
-    return { mimeType: 'text/plain', text: toon };
+    return { mimeType: 'text/plain', text: `${DEPRECATION_MESSAGES.accessibility}\n${toon}` };
   } catch (e) {
     return { mimeType: 'text/plain', text: `Error getting accessibility tree: ${e}` };
   }
@@ -68,7 +70,7 @@ export async function readAccessibilityTree(params: {
 export const accessibilityResource: ResourceDefinition = {
   name: 'session-current-accessibility',
   uri: 'wdio://session/current/accessibility',
-  description: 'Accessibility tree for the current page. Returns all elements by default.',
+  description: `${ACCESSIBILITY_DEPRECATED_PREFIX} Accessibility tree for the current page. Returns all elements by default.`,
   handler: async () => {
     const result = await readAccessibilityTree({});
     return { contents: [{ uri: 'wdio://session/current/accessibility', mimeType: result.mimeType, text: result.text }] };

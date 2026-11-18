@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { getBrowser } from '../session/state';
-import { getElements } from '../scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { errorResult } from '../session/agent';
@@ -35,8 +35,8 @@ export const getElementsTool: ToolCallback = async ({
 }) => {
   try {
     const browser = getBrowser();
-    const result = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset });
-    const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
+    const { total, showing, hasMore, elements } = await getElements(browser, { inViewportOnly, includeContainers, includeBounds, limit, offset });
+    const text = encode({ total, showing, hasMore, elements }).replace(/,""/g, ',').replace(/"",/g, ',');
     return { content: [{ type: 'text' as const, text }] };
   } catch (e) {
     return errorResult(e, 'Error getting elements');

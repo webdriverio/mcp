@@ -3,10 +3,11 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { readAccessibilityTree } from '../resources';
+import { ACCESSIBILITY_DEPRECATED_PREFIX } from '../utils/deprecation';
 
 export const accessibilityToolDefinition: ToolDefinition = {
   name: 'get_accessibility_tree',
-  description: 'Returns the page accessibility tree with roles, names, and selectors. Web contexts only (browser, Electron), not native mobile. Listed by default for Electron sessions; on web pages prefer snapshot. Supports filtering by ARIA roles and pagination via limit/offset.',
+  description: `${ACCESSIBILITY_DEPRECATED_PREFIX} Returns the page accessibility tree with roles, names, and selectors. Web contexts only (browser, Electron), not native mobile. Listed by default for Electron sessions; on web pages prefer snapshot. Supports filtering by ARIA roles and pagination via limit/offset.`,
   annotations: { title: 'Get Accessibility Tree', readOnlyHint: true, idempotentHint: true },
   inputSchema: {
     limit: z.number().optional().default(0).describe('Maximum number of nodes to return (0 = no limit)'),

@@ -748,7 +748,7 @@ navigate({ url: "https://example.com", session: "bob" })
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
 | `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen. Works for apps too (the screen's accessibility tree). |
 | `get_elements`           | Get visible, interactable elements with bounds. Supports `inViewportOnly` (default: true) and `includeContainers` (default: false). Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
-| `get_accessibility_tree` | Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
+| `get_accessibility_tree` | Deprecated, removed in v5; use `snapshot`. Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
@@ -827,7 +827,7 @@ Recommended workflow (also sent to clients as server instructions):
 | `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
 | `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
 | `wdio://session/current/elements`             | Interactable elements (viewport-only by default)         |
-| `wdio://session/current/accessibility`        | Accessibility tree                                       |
+| `wdio://session/current/accessibility`        | Accessibility tree (deprecated, removed in v5; use `snapshot`) |
 | `wdio://session/current/screenshot`           | Screenshot (base64)                                      |
 | `wdio://session/current/cookies`              | Browser cookies                                          |
 | `wdio://session/current/tabs`                 | Open browser tabs                                        |
@@ -936,7 +936,7 @@ Electron `behavior` defaults to `mockReturnValue`; `mockResolvedValue` and `mock
 Browser mocks intercept network requests matching a `url` glob (for example `**/api/todos`) with an optional `method` filter. `behavior` is optional: omit it to passively record matching requests without altering them — the mock still continues every request. `respond` and `respondOnce` require `value` (the JSON response body) and accept optional `statusCode` and `headers`; `abort`/`abortOnce` fail the request, and `redirect`/`redirectOnce` send it to the URL in `value`. `get_mock_calls` returns `{ calls, callCount }` for the intercepted requests, and `manage_mock` takes `clear`, `reset`, or `restore`.
 
 ```js
-start_session({ platform: 'browser', browser: 'chrome', capabilities: { webSocketUrl: true } })
+start_session({ platform: 'browser', browser: 'chrome' })
 
 // Observe-only: record every request to /api/todos without changing responses.
 mock({ mockType: 'browser', url: '**/api/todos' })
@@ -951,7 +951,7 @@ get_mock_calls({ mockType: 'browser', url: '**/api/todos', method: 'GET' })
 manage_mock({ mockType: 'browser', url: '**/api/todos', method: 'GET', action: 'restore' })
 ```
 
-Browser mocks require a BiDi-enabled session — start it with `capabilities: { webSocketUrl: true }`. Attached sessions default to BiDi off, so browser mocks do not work there unless the attached session negotiated BiDi; in Electron sessions browser mocks additionally require BiDi. Handles belong to the active browser session and cannot be reused after it closes or is replaced. All three tools participate in tracing and generated replay.
+Browser mocks require a BiDi session. Browser sessions negotiate BiDi by default, except Safari and sessions with `wdio:enforceWebDriverClassic: true`; attached Chrome sessions negotiate BiDi too. In Electron sessions browser mocks additionally require BiDi. Handles belong to the active browser session and cannot be reused after it closes or is replaced. All three tools participate in tracing and generated replay.
 
 ### Electron applications
 
@@ -1092,7 +1092,7 @@ so keep the original tunnel process alive for as long as the session needs it.
 
 ```
 // Device emulation (requires BiDi session)
-start_session({capabilities: {webSocketUrl: true}})
+start_session({platform: 'browser', browser: 'chrome'})
 emulate_device()                         // list available presets
 emulate_device({device: 'iPhone 15'})    // activate emulation
 emulate_device({device: 'Pixel 7'})      // switch device
@@ -1102,7 +1102,7 @@ emulate_device({device: 'reset'})        // restore desktop defaults
 **Web extensions (requires BiDi session):**
 
 ```javascript
-start_session({platform: 'browser', browser: 'chrome', capabilities: {webSocketUrl: true}})
+start_session({platform: 'browser', browser: 'chrome'})
 
 open_web_extension({
     extensionData: {type: 'path', path: '/path/to/unpacked-extension'},

@@ -30,15 +30,15 @@ importers:
       '@wdio/electron-service':
         specifier: 10.4.1
         version: 10.4.1(tsx@4.23.15)(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0)
+      '@wdio/elements':
+        specifier: ^1.3.0
+        version: 1.3.0(@wdio/snapshot@10.2.0(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))
       '@wdio/protocols':
         specifier: 10.0.2
         version: 10.0.2
       '@wdio/session':
         specifier: 10.2.0
         version: 10.2.0(@wdio/electron-service@10.4.1(tsx@4.23.15)(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0))(tsx@4.23.15)(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0)
-      '@xmldom/xmldom':
-        specifier: ^0.9.10
-        version: 0.9.12
       browserstack-local:
         specifier: ^1.5.12
         version: 1.5.16
@@ -57,9 +57,6 @@ importers:
       webdriverio:
         specifier: 10.2.0
         version: 10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)
-      xpath:
-        specifier: ^0.0.36
-        version: 0.0.36
       yazl:
         specifier: ^3.3.1
         version: 3.3.1
@@ -1463,6 +1460,15 @@ packages:
       webdriverio: '>9.0.0'
     peerDependenciesMeta:
       electron:
+        optional: true
+
+  '@wdio/elements@1.3.0':
+    resolution: {integrity: sha512-9XkQsEs8LR8wZitdphQgRYDWjFd05Yxh5CtY/bVrcTVaD6PEylcqZLduRE5riumUTr5tTzhd/CM+qJ1Eayahxg==}
+    peerDependencies:
+      '@wdio/snapshot': ^10.2.0
+      webdriverio: ^9.0.0 || ^10.0.0
+    peerDependenciesMeta:
+      '@wdio/snapshot':
         optional: true
 
   '@wdio/eslint@0.1.3':
@@ -5497,6 +5503,14 @@ snapshots:
       - tsx
       - utf-8-validate
       - yauzl
+
+  '@wdio/elements@1.3.0(@wdio/snapshot@10.2.0(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))':
+    dependencies:
+      '@xmldom/xmldom': 0.9.12
+      webdriverio: 10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)
+      xpath: 0.0.36
+    optionalDependencies:
+      '@wdio/snapshot': 10.2.0(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0)
 
   '@wdio/eslint@0.1.3(@typescript-eslint/eslint-plugin@8.57.2(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:

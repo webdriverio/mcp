@@ -1,6 +1,6 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
-import { getElements } from '../scripts/get-elements';
+import { getElements } from '@wdio/elements';
 import { encode } from '@toon-format/toon';
 
 export const elementsResource: ResourceDefinition = {
@@ -10,8 +10,8 @@ export const elementsResource: ResourceDefinition = {
   handler: async () => {
     try {
       const browser = getBrowser();
-      const result = await getElements(browser, {});
-      const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
+      const { total, showing, hasMore, elements } = await getElements(browser, {});
+      const text = encode({ total, showing, hasMore, elements }).replace(/,""/g, ',').replace(/"",/g, ',');
       return { contents: [{ uri: 'wdio://session/current/elements', mimeType: 'text/plain', text }] };
     } catch (e) {
       return {

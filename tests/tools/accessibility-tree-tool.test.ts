@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEPRECATION_MESSAGES } from '../../src/utils/deprecation';
 import type { AccessibilityNode } from '../../src/scripts/get-browser-accessibility-tree';
 
 vi.mock('../../src/scripts/get-browser-accessibility-tree', () => ({
@@ -18,9 +19,14 @@ vi.mock('../../src/session/state', () => ({
 }));
 
 import { readAccessibilityTree } from '../../src/resources/accessibility.resource';
+import { accessibilityTool } from '../../src/tools/accessibility.tool';
+import { getBrowser } from '../../src/session/state';
 
 type ReadFn = (args: Record<string, unknown>) => Promise<{ mimeType: string; text: string }>;
 const callRead = readAccessibilityTree as unknown as ReadFn;
+
+type ToolFn = (args: Record<string, unknown>) => Promise<{ isError?: boolean; content: { type: string; text: string }[] }>;
+const callTool = accessibilityTool as unknown as ToolFn;
 
 const mockGetTree = getBrowserAccessibilityTree as ReturnType<typeof vi.fn>;
 
@@ -115,5 +121,27 @@ describe('pagination', () => {
     const text = result.text;
     expect(text).toMatch(/showing: 1/);
     expect(text).toContain('B');
+  });
+});
+
+describe('deprecation notice', () => {
+  it('prefixes the resource result with the deprecation message', async () => {
+    mockGetTree.mockResolvedValue([makeNode({})]);
+    const result = await callRead({});
+    expect(result.text.split('\n')[0]).toBe(DEPRECATION_MESSAGES.accessibility);
+  });
+
+  it('prefixes the tool result and does not flag it as an error', async () => {
+    mockGetTree.mockResolvedValue([makeNode({})]);
+    const result = await callTool({});
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text.split('\n')[0]).toBe(DEPRECATION_MESSAGES.accessibility);
+  });
+
+  it('leaves error results without the notice', async () => {
+    vi.mocked(getBrowser).mockReturnValueOnce({ isAndroid: true, isIOS: false } as ReturnType<typeof getBrowser>);
+    const result = await callTool({});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).not.toContain(DEPRECATION_MESSAGES.accessibility);
   });
 });
