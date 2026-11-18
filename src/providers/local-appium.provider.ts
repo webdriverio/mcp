@@ -1,5 +1,5 @@
 import type { SessionProvider, ConnectionConfig } from './types';
-import { buildIOSCapabilities, buildAndroidCapabilities, getAppiumServerConfig } from '../config/appium.config';
+import { buildIOSCapabilities, buildAndroidCapabilities, getAppiumServerConfig, hasAppCapability } from '../config/appium.config';
 
 export type LocalAppiumOptions = {
   platform: 'ios' | 'android';
@@ -93,7 +93,7 @@ export class LocalAppiumProvider implements SessionProvider {
   }
 
   shouldAutoDetach(options: Record<string, unknown>): boolean {
-    return options.noReset === true || !options.appPath;
+    return options.noReset === true || (!options.appPath && !hasAppCapability(options.capabilities as Record<string, unknown> | undefined));
   }
 }
 

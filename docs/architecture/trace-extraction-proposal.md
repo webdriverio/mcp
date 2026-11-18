@@ -1,6 +1,7 @@
 # `@wdio/trace` — Extracting Trace Recording into a Standalone Package
 
 **Status:** Proposal — not yet implemented.
+**Superseded by** [`v5-proposal.md`](v5-proposal.md): devtools owns trace; the standalone `@wdio/trace` package is not planned.
 
 ---
 

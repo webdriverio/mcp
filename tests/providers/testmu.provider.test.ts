@@ -147,6 +147,16 @@ describe('TestMuProvider', () => {
       expect(caps['appium:app']).toBe('lt://abc123');
     });
 
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'lt://abc123' },
+      });
+      expect(caps['appium:app']).toBe('lt://abc123');
+    });
+
     it('sets isRealMobile: true for native app mode', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',

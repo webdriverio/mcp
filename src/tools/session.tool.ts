@@ -10,6 +10,7 @@ import { captureDriverRoots, driverTree, killPids } from '../session/driver-tree
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
+import { hasAppCapability } from '../config/appium.config';
 import { matchHeadedUserAgent, tracksDriverTree } from '../providers/local-browser.provider';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
@@ -507,11 +508,11 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   // Mobile browser/emulator mode (e.g. Chrome on Android emulator) — no app required
   const isMobileBrowser = args.browser !== undefined;
 
-  if (!isMobileBrowser && !appPath && !app && noReset !== true) {
+  if (!isMobileBrowser && !appPath && !app && noReset !== true && !hasAppCapability(args.capabilities)) {
     return {
       content: [{
         type: 'text',
-        text: 'Error: Either "appPath" must be provided to install an app, or "noReset: true" must be set to connect to an already-running app.',
+        text: 'Error: Provide "appPath" or "app" (or capabilities["appium:app"]) to install an app, or set "noReset: true" to connect to an already-running app.',
       }],
     };
   }
@@ -563,11 +564,10 @@ async function startMobileSession(args: StartSessionArgs): Promise<CallToolResul
   }
 
   const sessionKind = isMobileBrowser ? 'mobile browser' : 'app';
+  const appSource = appPath ?? app ?? args.capabilities?.['appium:app'] ?? args.capabilities?.app ?? (args.capabilities?.['appium:options'] as { app?: unknown } | undefined)?.app;
   const appInfo = isMobileBrowser
     ? `\nBrowser: ${args.browser}`
-    : appPath
-      ? `\nApp: ${appPath}`
-      : '\nApp: (connected to running app)';
+    : `\nApp: ${appSource ?? '(connected to running app)'}`;
   const detachNote = noReset === true
     ? '\n\n(noReset: app data is kept. close_session ends the Appium session; close_session({ detach: true }) leaves it running.)'
     : '';

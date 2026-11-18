@@ -158,6 +158,22 @@ describe('registerSession', () => {
     expect(mockOnSessionClose).toHaveBeenCalledWith('s1', 'browser', { status: 'passed' }, tunnel, expect.any(Object), undefined);
   });
 
+  it('logs a warning when onSessionClose fails for the orphaned previous session', async () => {
+    const state = getState();
+    const error = new Error('mark failed');
+    mockOnSessionClose.mockRejectedValueOnce(error);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    state.browsers.set('s1', makeBrowser());
+    state.sessionMetadata.set('s1', { type: 'browser', capabilities: {}, isAttached: false, provider: 'browserstack' });
+    state.sessionHistory.set('s1', { sessionId: 's1', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 's1';
+
+    void registerSession('s2', makeBrowser(), { type: 'browser', capabilities: {}, isAttached: false }, { sessionId: 's2', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+
+    await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('[WARN] Failed to run provider onSessionClose:', error));
+    errorSpy.mockRestore();
+  });
+
   it('stops an orphaned managed tunnel when WebDriver deletion fails', async () => {
     const state = getState();
     const tunnel = makeTunnel();

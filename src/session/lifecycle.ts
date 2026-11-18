@@ -107,7 +107,9 @@ export function registerSession(
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {});
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch((e) => {
+            console.error('[WARN] Failed to run provider onSessionClose:', e);
+          });
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
           const oldTree = driverTree(oldMetadata?.driverRoots);

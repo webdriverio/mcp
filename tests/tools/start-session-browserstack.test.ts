@@ -107,6 +107,22 @@ describe('start_session with provider: browserstack', () => {
   });
 });
 
+describe('start_session with an app supplied only as capability', () => {
+  it('reaches remote() with appium:app from capabilities', async () => {
+    const result = await callTool({
+      provider: 'browserstack',
+      platform: 'android',
+      deviceName: 'Samsung Galaxy S23',
+      capabilities: { 'appium:app': 'bs://cap123' },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockRemote).toHaveBeenCalledWith(expect.objectContaining({
+      capabilities: expect.objectContaining({ 'appium:app': 'bs://cap123' }),
+    }));
+  });
+});
+
 describe('start_session with tunnel: true', () => {
   it('creates a BrowserstackTunnel instance and calls start() before remote()', async () => {
     await callTool({ provider: 'browserstack', platform: 'browser', browser: 'chrome', tunnel: true });

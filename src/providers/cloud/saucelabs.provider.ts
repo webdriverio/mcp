@@ -83,7 +83,7 @@ export class SauceLabsProvider implements SessionProvider {
     return {
       ...userCapabilities,
       platformName: platform,
-      'appium:app': options.app,
+      'appium:app': options.app ?? userCapabilities['appium:app'],
       'appium:deviceName': options.deviceName,
       'appium:platformVersion': options.platformVersion,
       'appium:automationName': (options.automationName as string | undefined) ?? (platform === 'ios' ? 'XCUITest' : 'UiAutomator2'),
@@ -144,7 +144,7 @@ export class SauceLabsProvider implements SessionProvider {
         const body: Record<string, boolean> = { passed: result.status === 'passed' };
         const apiUrl = `https://api.${effectiveRegion}.saucelabs.com/rest/v1/${user}/jobs/${sessionId}`;
         console.error(`[SauceLabs] Setting job status for ${sessionId}: ${result.status}`);
-        await fetch(apiUrl, {
+        const res = await fetch(apiUrl, {
           method: 'PUT',
           headers: {
             Authorization: `Basic ${auth}`,
@@ -152,7 +152,12 @@ export class SauceLabsProvider implements SessionProvider {
           },
           body: JSON.stringify(body),
         });
-        console.error('[SauceLabs] Job result set successfully via REST API');
+        if (res.ok) {
+          console.error('[SauceLabs] Job result set successfully via REST API');
+        } else {
+          const resBody = await res.text();
+          console.error(`[SauceLabs] Failed to set job result: HTTP ${res.status} — ${resBody}`);
+        }
       } catch (e) {
         console.error('[SauceLabs] Failed to set job result via REST API:', e);
       }

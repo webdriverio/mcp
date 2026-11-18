@@ -39,6 +39,10 @@ export interface AndroidCapabilityOptions {
   [key: string]: any;
 }
 
+export function hasAppCapability(caps?: Record<string, unknown>): boolean {
+  return Boolean(caps?.['appium:app'] || caps?.app || (caps?.['appium:options'] as { app?: unknown } | undefined)?.app);
+}
+
 /**
  * Get Appium server configuration from environment variables or defaults
  */

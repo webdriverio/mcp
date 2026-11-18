@@ -147,6 +147,57 @@ describe('withTrace', () => {
     expect(session.screenshots).toHaveLength(1);
   });
 
+  it('traces the newly mapped mobile-action tools', async () => {
+    const state = getState();
+    const sessionId = 'sess-mobile-actions';
+    const mockBrowser = {
+      takeScreenshot: vi.fn().mockResolvedValue(TINY_PNG),
+    } as unknown as WebdriverIO.Browser;
+
+    state.browsers.set(sessionId, mockBrowser);
+    state.currentSession = sessionId;
+    state.sessionMetadata.set(sessionId, { type: 'android', capabilities: {}, isAttached: false, trace: true });
+
+    createTraceSession(sessionId, 'chromium', { width: 412, height: 915 }, 'android - emulator-5554', 'android');
+
+    const tool = vi.fn().mockResolvedValue(SUCCESS_RESULT) as unknown as ToolCallback;
+    await (withTrace('switch_context', tool) as AnyToolFn)({ context: 'WEBVIEW_com.example.app' }, extra);
+    await (withTrace('rotate_device', tool) as AnyToolFn)({ orientation: 'LANDSCAPE' }, extra);
+    await (withTrace('hide_keyboard', tool) as AnyToolFn)({}, extra);
+    await (withTrace('set_geolocation', tool) as AnyToolFn)({ latitude: 37.7749, longitude: -122.4194 }, extra);
+
+    const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
+    const befores = session.events.filter((e) => e.type === 'before') as { title: string }[];
+    expect(befores).toHaveLength(4);
+    expect(befores[0].title).toBe('Context.switch("WEBVIEW_com.example.app")');
+    expect(befores[1].title).toBe('Device.rotate("LANDSCAPE")');
+    expect(befores[2].title).toBe('Device.hideKeyboard()');
+    expect(befores[3].title).toBe('Device.setGeolocation("37.7749")');
+    expect(session.events.filter((e) => e.type === 'after')).toHaveLength(4);
+  });
+
+  it('traces select_option, press_key and perform_actions on browser sessions', async () => {
+    // press_key/select_option/perform_actions are rejected on mobile sessions by
+    // tool visibility, so they are proven here where they actually run.
+    const sessionId = 'sess-browser-actions';
+    setupTracedSession(sessionId);
+
+    const tool = vi.fn().mockResolvedValue(SUCCESS_RESULT) as unknown as ToolCallback;
+    await (withTrace('select_option', tool) as AnyToolFn)({ selector: '#size', value: 'Large' }, extra);
+    await (withTrace('press_key', tool) as AnyToolFn)({ keys: 'Enter' }, extra);
+    await (withTrace('perform_actions', tool) as AnyToolFn)({ actions: [{ action: 'click', selector: '#login' }] }, extra);
+
+    const session = getTraceSession(sessionId)!;
+    await session.screenshotChain;
+    const befores = session.events.filter((e) => e.type === 'before') as { title: string }[];
+    expect(befores).toHaveLength(3);
+    expect(befores[0].title).toBe('Element.selectOption("#size")');
+    expect(befores[1].title).toBe('Keyboard.press("Enter")');
+    expect(befores[2].title).toBe('Page.performActions("click #login")');
+    expect(session.events.filter((e) => e.type === 'after')).toHaveLength(3);
+  });
+
 });
 
 describe('recordInitialNavigation', () => {
