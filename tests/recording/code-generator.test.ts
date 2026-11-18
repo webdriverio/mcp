@@ -53,6 +53,13 @@ describe('generateCode - header', () => {
     expect(code).not.toContain('const browser');
   });
 
+  it('leaves recorded script text that mentions the session declaration unchanged', () => {
+    const script = "editor.setValue('const browser = await remote({})')";
+    const code = generateCode(makeHistory([{ tool: 'execute_script', params: { script } }]));
+    expect(code).toContain('const browser = await remote({})');
+    expect(code.match(/^ {2}browser = await remote\(/gm)).toHaveLength(1);
+  });
+
   it('generates start_session (browser) using history.capabilities', () => {
     const history: SessionHistory = {
       sessionId: 'caps-123',

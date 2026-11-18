@@ -33,6 +33,9 @@ function getElectronDeeplinkScheme(history: SessionHistory): string | undefined 
 
 const MOCK_TOOLS = new Set(['mock', 'get_mock_calls', 'manage_mock']);
 
+// Only the leading session-start declaration; recorded script text may contain the same string.
+const assignSessionStart = (steps: string): string => steps.replace('const browser = await remote(', 'browser = await remote(');
+
 export function browserMockKey(p: Record<string, unknown>): string {
   return JSON.stringify(JSON.stringify([p.url, normalizeBrowserMethod(p.method)]));
 }
@@ -462,7 +465,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isBrowserStack) {
-    const bsSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const bsSteps = assignSessionStart(steps);
     const statusUpdate = bsStatusUpdateLines(history.type).join('\n');
     const preamble = 'let browser;\nlet bsStatus = \'passed\';\nlet bsReason;';
     const catchBlock = '} catch (e) {\n  bsStatus = \'failed\';\n  bsReason = String(e);\n  throw e;';
@@ -508,7 +511,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isSauceLabs) {
-    const slSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const slSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet slStatus = \'passed\';\nlet slReason;';
     const catchBlock = '} catch (e) {\n  slStatus = \'failed\';\n  slReason = String(e);\n  throw e;';
     const slRegion = (sauceOptions?.region as string) ?? 'eu-central-1';
@@ -570,7 +573,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isLambdaTest) {
-    const ltSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const ltSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet ltStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  ltStatus = \'failed\';\n  throw e;';
     const isMobile = history.type !== 'browser';
@@ -631,7 +634,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isTestingBot) {
-    const tbSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const tbSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet tbStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  tbStatus = \'failed\';\n  throw e;';
     const statusUpdate = [
@@ -688,7 +691,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isDigitalAi) {
-    const daiSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const daiSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet daiStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  daiStatus = \'failed\';\n  throw e;';
     // seetest:client.setReportStatus(status, message) — marks the cloud report pass/fail.
@@ -713,7 +716,7 @@ export function generateCode(history: SessionHistory): string {
     ].join('\n');
   }
 
-  const localSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+  const localSteps = assignSessionStart(steps);
   return [
     "import { remote } from 'webdriverio';",
     '',
