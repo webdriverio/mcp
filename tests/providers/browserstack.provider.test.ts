@@ -383,6 +383,53 @@ describe('BrowserStackProvider', () => {
       expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
     });
 
+    it('falls back to the App Automate API when the Automate API returns 404 for an attached native session', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15' });
+
+      await expect(provider.onSessionClose('abc', 'ios', passed, undefined, withRequested(requested))).resolves.toBeUndefined();
+
+      expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([AUTOMATE_URL, APP_AUTOMATE_URL]);
+    });
+
+    it('falls back from App Automate 404 to Automate for a native app session', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: true } as Response);
+
+      await expect(provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:app': 'bs://app123' })))
+        .resolves.toBeUndefined();
+
+      expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([APP_AUTOMATE_URL, AUTOMATE_URL]);
+    });
+
+    it('does not mask a non-404 error after the App Automate 404 fallback', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:app': 'bs://app123' })))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws when neither the Automate nor the App Automate API knows the session', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('session not found on Automate or App Automate');
+    });
+
+    it('does not fall back on a non-404 error', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('marks a browser session on the automate API without a browser handle', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
 
@@ -413,10 +460,10 @@ describe('BrowserStackProvider', () => {
     });
 
     it('rejects with the HTTP status when BrowserStack responds non-ok', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
 
       await expect(provider.onSessionClose('abc', 'ios', passed))
-        .rejects.toThrow('BrowserStack result marking failed: HTTP 404');
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
     });
   });
 });

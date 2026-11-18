@@ -3,8 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Local as BrowserstackTunnel } from 'browserstack-local';
 import type { Browser as WdioBrowser } from 'webdriverio';
+import { hasAppCapability } from '../../config/appium.config';
 import { basicAuth } from '../../utils/auth';
 import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
+
+const APP_AUTOMATE_SESSIONS_URL = 'https://api-cloud.browserstack.com/app-automate/sessions';
+const AUTOMATE_SESSIONS_URL = 'https://api.browserstack.com/automate/sessions';
 
 export class BrowserStackProvider implements SessionProvider {
   name = 'browserstack';
@@ -125,20 +129,24 @@ export class BrowserStackProvider implements SessionProvider {
     if (!user || !key) return;
 
     const requested = (browser as { requestedCapabilities?: Record<string, unknown> } | undefined)?.requestedCapabilities;
-    const hasApp = !!(requested?.['appium:app'] || requested?.app || (requested?.['appium:options'] as { app?: unknown } | undefined)?.app);
-    const isAppSession = sessionType !== 'browser' && (requested === undefined || hasApp);
-    const baseUrl = isAppSession
-      ? 'https://api-cloud.browserstack.com/app-automate/sessions'
-      : 'https://api.browserstack.com/automate/sessions';
+    const isAppSession = sessionType !== 'browser' && (requested === undefined || hasAppCapability(requested));
+    const endpoints = isAppSession
+      ? [APP_AUTOMATE_SESSIONS_URL, AUTOMATE_SESSIONS_URL]
+      : [AUTOMATE_SESSIONS_URL, APP_AUTOMATE_SESSIONS_URL];
 
     const auth = basicAuth(user, key);
     const body: Record<string, string> = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
-    const res = await fetch(`${baseUrl}/${sessionId}.json`, {
+    const init: RequestInit = {
       method: 'PUT',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`BrowserStack result marking failed: HTTP ${res.status}`);
+    };
+    for (const baseUrl of endpoints) {
+      const res = await fetch(`${baseUrl}/${sessionId}.json`, init);
+      if (res.ok) return;
+      if (res.status !== 404) throw new Error(`BrowserStack result marking failed: HTTP ${res.status}`);
+    }
+    throw new Error('BrowserStack result marking failed: session not found on Automate or App Automate');
   }
 }
 
