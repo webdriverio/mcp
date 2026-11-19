@@ -70,10 +70,10 @@ describe('attach_browser', () => {
       connectionRetryCount: 3,
       capabilities: expect.objectContaining({
         browserName: 'chrome',
-        unhandledPromptBehavior: 'dismiss',
         'goog:chromeOptions': { debuggerAddress: 'localhost:9222' },
       }),
     });
+    expect(mockRemote.mock.calls[0][0].capabilities).not.toHaveProperty('webSocketUrl');
   });
 
   it('uses provided host and port', async () => {

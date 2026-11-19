@@ -167,7 +167,7 @@ function createServer(): McpServer {
   registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
-  registerTool(switchFrameToolDefinition, switchFrameTool);
+  registerTool(switchFrameToolDefinition, instrument('switch_frame', switchFrameTool));
 
   registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
 
@@ -178,8 +178,8 @@ function createServer(): McpServer {
   registerTool(performActionsToolDefinition, instrument('perform_actions', performActionsTool));
   registerTool(snapshotToolDefinition, snapshotTool);
 
-  registerTool(setCookieToolDefinition, setCookieTool);
-  registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
+  registerTool(setCookieToolDefinition, instrument('set_cookie', setCookieTool));
+  registerTool(deleteCookiesToolDefinition, instrument('delete_cookies', deleteCookiesTool));
 
   registerTool(tapElementToolDefinition, instrument('tap_element', tapElementTool));
   registerTool(swipeToolDefinition, instrument('swipe', swipeTool));

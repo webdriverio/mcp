@@ -5,6 +5,7 @@ import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
 import { errorResult } from '../session/agent';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
+import { BIDI_REQUIRED_HINT } from '../utils/bidi';
 
 const electronTargetSchema = {
   apiName: z.string().regex(/^[A-Za-z][A-Za-z0-9]*$/).describe('Electron API module, such as dialog, app, or clipboard.'),
@@ -88,7 +89,7 @@ const browserAdapter: MockAdapter = {
     const behavior = args.behavior as z.infer<typeof browserBehaviorSchema>;
     assertBehavior(behavior, browserBehaviorSchema.options, 'browser');
     if (behavior === 'respond' || behavior === 'respondOnce') {
-      // respond(undefined/null) makes wdio send an invalid network.provideResponse body; the rejected BiDi command throws inside the interception event handler and kills the process.
+      // Clear tool error instead of wdio's serialization failure; null is rejected too because a mocked "null" body is almost never intended.
       if (args.value === undefined || args.value === null) throw new Error('respond behaviors require value: the response body, such as "" for an empty body.');
       (mock[behavior] as (value: unknown, params?: unknown) => unknown)(args.value, respondParams(args));
       return;
@@ -129,7 +130,7 @@ function context(target: Target) {
     key = JSON.stringify(['electron', electronTarget.apiName, electronTarget.funcName]);
   } else {
     if (!target.url) throw new Error('Browser mocks require url; pass a URL glob such as **/api/todos.');
-    if (!browser.isBidi) throw new Error('Browser mocking requires a BiDi-enabled session. Start a browser session with capabilities: { webSocketUrl: true }.');
+    if (!browser.isBidi) throw new Error(`Browser mocking requires a BiDi-enabled session. ${BIDI_REQUIRED_HINT}`);
     kindTarget = { ...target, method: normalizeBrowserMethod(target.method) };
     key = JSON.stringify(['browser', kindTarget.url, kindTarget.method]);
   }
@@ -166,7 +167,7 @@ export async function releaseSessionMocks(browser: WebdriverIO.Browser): Promise
 
 export const mockToolDefinition: ToolDefinition = {
   name: 'mock',
-  description: 'Configure a session-scoped mock. mockType defaults to browser in WebDriver sessions and is required in Electron sessions. Browser mocks intercept network requests matched by a url glob and require a BiDi-enabled session (start_session with capabilities: { webSocketUrl: true }); in Electron sessions they additionally require the session to have negotiated BiDi. Electron mocks require apiName and funcName. Appium sessions are unsupported. Omit behavior to observe: record matching requests (e.g. url \'**/*\') without altering them, then read them with get_mock_calls. Repeated calls preserve call history; queued once values survive further Once calls but a later sticky behavior (respond/abort/redirect) replaces the queue.',
+  description: 'Configure a session-scoped mock. mockType defaults to browser in WebDriver sessions and is required in Electron sessions. Browser mocks intercept network requests matched by a url glob and require a BiDi session (the default for browser sessions; not Safari or wdio:enforceWebDriverClassic); in Electron sessions they additionally require the session to have negotiated BiDi. Electron mocks require apiName and funcName. Appium sessions are unsupported. Omit behavior to observe: record matching requests (e.g. url \'**/*\') without altering them, then read them with get_mock_calls. Repeated calls preserve call history; queued once values survive further Once calls but a later sticky behavior (respond/abort/redirect) replaces the queue.',
   annotations: { title: 'Configure Mock', destructiveHint: true },
   inputSchema: {
     ...targetSchema,

@@ -94,14 +94,14 @@ describe('Electron mocks', () => {
     ['manage', manage, { action: 'restore' }],
   ] as const)('%s routing', (_name, tool, extra) => {
     it.each([
-      ['webdriver', undefined, 'webSocketUrl: true'],
-      [undefined, undefined, 'webSocketUrl: true'],
-      ['webdriver', 'browser', 'webSocketUrl: true'],
-      [undefined, 'browser', 'webSocketUrl: true'],
+      ['webdriver', undefined, 'BiDi-enabled session'],
+      [undefined, undefined, 'BiDi-enabled session'],
+      ['webdriver', 'browser', 'BiDi-enabled session'],
+      [undefined, 'browser', 'BiDi-enabled session'],
       ['webdriver', 'electron', 'requires an active Electron session'],
       [undefined, 'electron', 'requires an active Electron session'],
       ['electron', undefined, 'mockType is required'],
-      ['electron', 'browser', 'webSocketUrl: true'],
+      ['electron', 'browser', 'BiDi-enabled session'],
     ] as const)('routes runtime %s and selector %s', async (runtime, mockType, text) => {
       const { create, createBrowserMock } = session();
       getState().sessionMetadata.get('electron')!.runtime = runtime;
@@ -356,7 +356,7 @@ describe('Browser mocks', () => {
     const result = await configure(browserTarget);
     expect(result.isError).toBe(true);
     expect(message(result)).toContain('BiDi-enabled session');
-    expect(message(result)).toContain('capabilities: { webSocketUrl: true }');
+    expect(message(result)).toContain('wdio:enforceWebDriverClassic');
     expect(createBrowserMock).not.toHaveBeenCalled();
   });
 

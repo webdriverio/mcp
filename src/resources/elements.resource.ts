@@ -1,24 +1,25 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
-import { getElements } from '../scripts/get-elements';
-import { encode } from '@toon-format/toon';
+import { getSnapshot } from '@wdio/elements';
+import { truncateSnapshot } from '../utils/snapshot-text';
+
+const ELEMENTS_URI = 'wdio://session/current/elements';
 
 export const elementsResource: ResourceDefinition = {
   name: 'session-current-elements',
-  uri: 'wdio://session/current/elements',
-  description: 'Interactable elements on the current page. Prefer this over screenshot — returns ready-to-use selectors, faster, and far fewer tokens. Only use screenshot for visual verification or debugging.',
+  uri: ELEMENTS_URI,
+  description: 'Accessibility tree of the current page or screen (viewport only) with an eN ref and a ready-to-use selector on each actionable line. Prefer this over screenshot — faster, and far fewer tokens. Only use screenshot for visual verification or debugging.',
   handler: async () => {
     try {
       const browser = getBrowser();
-      const result = await getElements(browser, {});
-      const text = encode(result).replace(/,""/g, ',').replace(/"",/g, ',');
-      return { contents: [{ uri: 'wdio://session/current/elements', mimeType: 'text/plain', text }] };
+      const { text } = await getSnapshot(browser, { inViewportOnly: true });
+      return { contents: [{ uri: ELEMENTS_URI, mimeType: 'text/plain', text: truncateSnapshot(text) }] };
     } catch (e) {
       return {
         contents: [{
-          uri: 'wdio://session/current/elements',
+          uri: ELEMENTS_URI,
           mimeType: 'text/plain',
-          text: `Error getting visible elements: ${e}`
+          text: `Error getting elements: ${e}`
         }]
       };
     }

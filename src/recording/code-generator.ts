@@ -33,6 +33,9 @@ function getElectronDeeplinkScheme(history: SessionHistory): string | undefined 
 
 const MOCK_TOOLS = new Set(['mock', 'get_mock_calls', 'manage_mock']);
 
+// Only the leading session-start declaration; recorded script text may contain the same string.
+const assignSessionStart = (steps: string): string => steps.replace('const browser = await remote(', 'browser = await remote(');
+
 export function browserMockKey(p: Record<string, unknown>): string {
   return JSON.stringify(JSON.stringify([p.url, normalizeBrowserMethod(p.method)]));
 }
@@ -294,6 +297,13 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
     case 'set_value':
       if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
+    // BiDi sessions reject browser.switchFrame; the agent's frame code is variable-based and back-to-top needs none
+    case 'switch_frame':
+      if (!p.selector) return '// switch_frame: back to the top document';
+      if (isSnapshotRef(p.selector)) return unreplayableRef(step);
+      return `// [not replayable: no recorded code] switch_frame: '${escapeStr(p.selector)}'`;
+    case 'set_geolocation':
+      return `await browser.setGeoLocation({ latitude: ${p.latitude}, longitude: ${p.longitude}${p.altitude !== undefined ? `, altitude: ${p.altitude}` : ''} });`;
     case 'scroll': {
       const scrollAmount = (p.direction as string) === 'down' ? (p.pixels as number) : -(p.pixels as number);
       return `await browser.execute(() => window.scrollBy(0, ${scrollAmount}));`;
@@ -455,7 +465,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isBrowserStack) {
-    const bsSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const bsSteps = assignSessionStart(steps);
     const statusUpdate = bsStatusUpdateLines(history.type).join('\n');
     const preamble = 'let browser;\nlet bsStatus = \'passed\';\nlet bsReason;';
     const catchBlock = '} catch (e) {\n  bsStatus = \'failed\';\n  bsReason = String(e);\n  throw e;';
@@ -501,7 +511,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isSauceLabs) {
-    const slSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const slSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet slStatus = \'passed\';\nlet slReason;';
     const catchBlock = '} catch (e) {\n  slStatus = \'failed\';\n  slReason = String(e);\n  throw e;';
     const slRegion = (sauceOptions?.region as string) ?? 'eu-central-1';
@@ -563,7 +573,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isLambdaTest) {
-    const ltSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const ltSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet ltStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  ltStatus = \'failed\';\n  throw e;';
     const isMobile = history.type !== 'browser';
@@ -624,7 +634,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isTestingBot) {
-    const tbSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const tbSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet tbStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  tbStatus = \'failed\';\n  throw e;';
     const statusUpdate = [
@@ -681,7 +691,7 @@ export function generateCode(history: SessionHistory): string {
   }
 
   if (isDigitalAi) {
-    const daiSteps = steps.replace(/const browser = await remote\(/g, 'browser = await remote(');
+    const daiSteps = assignSessionStart(steps);
     const preamble = 'let browser;\nlet daiStatus = \'passed\';';
     const catchBlock = '} catch (e) {\n  daiStatus = \'failed\';\n  throw e;';
     // seetest:client.setReportStatus(status, message) — marks the cloud report pass/fail.
@@ -706,5 +716,17 @@ export function generateCode(history: SessionHistory): string {
     ].join('\n');
   }
 
-  return `import { remote } from 'webdriverio';\n\ntry {\n${steps}\n} finally {\n  await browser.deleteSession();\n}`;
+  const localSteps = assignSessionStart(steps);
+  return [
+    "import { remote } from 'webdriverio';",
+    '',
+    'let browser;',
+    'try {',
+    localSteps,
+    '} finally {',
+    '  if (browser) {',
+    '    await browser.deleteSession();',
+    '  }',
+    '}',
+  ].join('\n');
 }

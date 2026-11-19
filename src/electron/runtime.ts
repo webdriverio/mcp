@@ -12,12 +12,15 @@ export async function getElectronService(): Promise<ElectronServiceModule> {
   }
 }
 
+// Returns true when cleanupWdioSession resolved: it deletes the session and kills the driver via its launcher, but also resolves (log only) with no launcher, which startWdioSession sessions always have.
 export async function cleanupSessionRuntime(
   runtime: 'webdriver' | 'electron' | undefined,
   browser: WebdriverIO.Browser,
-): Promise<void> {
+): Promise<boolean> {
   if (runtime === 'electron') {
     const { cleanupWdioSession } = await getElectronService();
     await cleanupWdioSession(browser);
+    return true;
   }
+  return false;
 }

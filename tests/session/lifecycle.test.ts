@@ -15,7 +15,7 @@ import { createTraceSession, getTraceSession } from '../../src/trace/state';
 const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime } = vi.hoisted(() => ({
   mockOnSessionClose: vi.fn().mockResolvedValue(undefined),
   mockStopTunnel: vi.fn().mockResolvedValue(undefined),
-  mockCleanupSessionRuntime: vi.fn().mockResolvedValue(undefined),
+  mockCleanupSessionRuntime: vi.fn().mockResolvedValue(false),
 }));
 vi.mock('../../src/providers/registry', () => ({
   getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose, stopTunnel: mockStopTunnel })),
@@ -68,7 +68,7 @@ beforeEach(() => {
   state.currentSession = null;
   mockOnSessionClose.mockResolvedValue(undefined);
   mockStopTunnel.mockResolvedValue(undefined);
-  mockCleanupSessionRuntime.mockResolvedValue(undefined);
+  mockCleanupSessionRuntime.mockResolvedValue(false);
   vi.mocked(driverTree).mockImplementation((roots) => roots ?? []);
 });
 
@@ -88,6 +88,29 @@ describe('registerSession', () => {
     expect(state.sessionMetadata.get('s2')?.name).toBe('b');
     expect(b1.deleteSession).not.toHaveBeenCalled();
     expect(state.sessionHistory.get('s1')?.steps).toHaveLength(0);
+  });
+
+  it('kills the replaced Electron session tree when its runtime cleanup ends it', async () => {
+    const old = makeBrowser();
+    registerSession('old', old, { ...meta(), runtime: 'electron', driverRoots: DRIVER_ROOTS }, hist('old'));
+    vi.mocked(driverTree).mockReturnValueOnce(CHILD_TREE);
+    mockCleanupSessionRuntime.mockResolvedValueOnce(true);
+
+    registerSession('new', makeBrowser(), meta(), hist('new'));
+
+    await vi.waitFor(() => expect(killPids).toHaveBeenCalledWith(CHILD_TREE));
+    expect(old.deleteSession).not.toHaveBeenCalled();
+  });
+
+  it('deletes the replaced Electron session when its runtime cleanup rejects', async () => {
+    const old = makeBrowser();
+    registerSession('old', old, { ...meta(), runtime: 'electron', driverRoots: DRIVER_ROOTS }, hist('old'));
+    mockCleanupSessionRuntime.mockRejectedValueOnce(new Error('cleanup failed'));
+
+    registerSession('new', makeBrowser(), meta(), hist('new'));
+
+    await vi.waitFor(() => expect(old.deleteSession).toHaveBeenCalled());
+    expect(killPids).not.toHaveBeenCalled();
   });
 
   it('keep becomes the default when none exists', () => {
@@ -477,6 +500,38 @@ describe('closeSession', () => {
 
     await closeSession('clean', false, false);
     expect(metadata.driverRoots).toBeUndefined();
+    expect(killPids).not.toHaveBeenCalled();
+  });
+
+  it('skips deleteSession and kills the captured tree when the Electron runtime cleanup ends the session', async () => {
+    const browser = makeBrowser();
+    const state = getState();
+    state.browsers.set('electron', browser);
+    state.sessionMetadata.set('electron', { type: 'browser', runtime: 'electron', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS });
+    state.sessionHistory.set('electron', { sessionId: 'electron', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'electron';
+    vi.mocked(driverTree).mockReturnValueOnce(CHILD_TREE);
+    mockCleanupSessionRuntime.mockResolvedValueOnce(true);
+
+    await closeSession('electron', false, false);
+
+    expect(mockCleanupSessionRuntime).toHaveBeenCalledWith('electron', browser);
+    expect(browser.deleteSession).not.toHaveBeenCalled();
+    expect(killPids).toHaveBeenCalledWith(CHILD_TREE);
+  });
+
+  it('falls back to deleteSession when the Electron runtime cleanup rejects', async () => {
+    const browser = makeBrowser();
+    const state = getState();
+    state.browsers.set('electron-fail', browser);
+    state.sessionMetadata.set('electron-fail', { type: 'browser', runtime: 'electron', capabilities: {}, isAttached: false, driverRoots: DRIVER_ROOTS });
+    state.sessionHistory.set('electron-fail', { sessionId: 'electron-fail', type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
+    state.currentSession = 'electron-fail';
+    mockCleanupSessionRuntime.mockRejectedValueOnce(new Error('cleanup failed'));
+
+    await closeSession('electron-fail', false, false);
+
+    expect(browser.deleteSession).toHaveBeenCalled();
     expect(killPids).not.toHaveBeenCalled();
   });
 

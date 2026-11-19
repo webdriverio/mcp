@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { NetworkLogsMode, SessionMetadata } from '../session/state';
 import { getBrowser, getState } from '../session/state';
 import { closeSession, registerSession } from '../session/lifecycle';
-import { captureDriverRoots } from '../session/driver-tree';
+import { captureDriverRoots, driverTree, killPids } from '../session/driver-tree';
 import { activeSessionId, assertNameAvailable, resolveSession, runInSessionQueue, sessionLabel } from '../session/routing';
 import { withRecording } from '../recording/step-recorder';
 import { getProvider } from '../providers/registry';
@@ -17,6 +17,8 @@ import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
 import { SessionError } from '@wdio/session/agent';
 import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
+
+const TRACE_V5_NOTE = ' Format, location and player change in v5.';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -63,7 +65,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     noReset: coerceBoolean.optional(),
     fullReset: coerceBoolean.optional(),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium, seconds'),
-    trace: coerceBoolean.optional().default(false).describe('Save a Playwright-compatible trace zip to .trace/ on close_session'),
+    trace: coerceBoolean.optional().default(false).describe('Save a Playwright-compatible trace zip to .trace/ on close_session' + TRACE_V5_NOTE),
     attach: coerceBoolean.optional().default(false).describe('Attach to a running Chrome (attachConfig, default localhost:9222)'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -116,7 +118,7 @@ export const attachSessionToolDefinition: ToolDefinition = {
       protocol: z.string().optional(),
     }).optional().describe('Appium server connection (local provider only)'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs region (default: eu-central-1). Only used with provider: "saucelabs".'),
-    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.'),
+    trace: coerceBoolean.optional().default(false).describe('Enable trace recording for subsequent commands — produces a Playwright-compatible zip saved to .trace/ on close_session.' + TRACE_V5_NOTE),
     capabilities: z.record(z.string(), z.unknown()).optional().describe('Capabilities used to register the correct browser or Appium command surface locally; they are not sent to the remote endpoint'),
   },
 };
@@ -473,13 +475,23 @@ async function startElectronSession(args: StartSessionArgs): Promise<CallToolRes
   const metadata: SessionMetadata = {
     type: 'browser', runtime: 'electron', capabilities: recordedCapabilities, isAttached: false,
     provider: 'local', trace: args.trace ?? false,
+    driverRoots: captureDriverRoots((browser.capabilities as Record<string, unknown>)['wdio:driverPID'] as number | undefined),
     ...(args.electronDeeplinkScheme ? { electronDeeplinkScheme: args.electronDeeplinkScheme } : {}),
   };
   await registerOrDispose(sessionId, () => registerSession(sessionId, browser, metadata, {
     sessionId, type: 'browser', runtime: 'electron', startedAt: new Date().toISOString(), capabilities: recordedCapabilities, steps: [],
   }, { keep: args.onExisting === 'keep', name: args.name }), [
-    () => cleanupSessionRuntime('electron', browser),
-    () => browser.deleteSession(),
+    async () => {
+      const ended = await cleanupSessionRuntime('electron', browser).catch((e) => {
+        console.error('[WARN] Failed to clean up session runtime:', e);
+        return false;
+      });
+      if (ended) {
+        killPids(driverTree(metadata.driverRoots));
+      } else {
+        await browser.deleteSession();
+      }
+    },
   ]);
   if (args.trace) startTrace(sessionId, recordedCapabilities, 'browser', { width: args.windowWidth ?? 1280, height: args.windowHeight ?? 800 });
 
@@ -658,8 +670,6 @@ async function attachBrowserSession(args: StartSessionArgs): Promise<CallToolRes
 
   const capabilities = {
     browserName: 'chrome',
-    unhandledPromptBehavior: 'dismiss',
-    webSocketUrl: false,
     'goog:chromeOptions': {
       debuggerAddress: `${host}:${port}`,
     },

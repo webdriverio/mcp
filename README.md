@@ -688,7 +688,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 - **Session Management**: Start and close browser sessions (Chrome, Firefox, Edge, Safari) with headless/headed modes
 - **Navigation & Interaction**: Navigate URLs, click elements, fill forms, and retrieve content
-- **Page Analysis**: Get visible elements, accessibility trees, take screenshots
+- **Page Analysis**: Accessibility snapshots with refs and selectors (`snapshot`), take screenshots
 - **Cookie Management**: Get, set, and delete cookies
 - **Scrolling**: Smooth scrolling with configurable distances
 - **Attach to running Chrome**: Connect to an existing Chrome window via `--remote-debugging-port` — ideal for testing
@@ -746,9 +746,9 @@ navigate({ url: "https://example.com", session: "bob" })
 | Tool                     | Description                                                                                                                                                                                            |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
-| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen. Works for apps too (the screen's accessibility tree). |
-| `get_elements`           | Get visible, interactable elements with bounds. Supports `inViewportOnly` (default: true) and `includeContainers` (default: false). Mobile and Electron; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
-| `get_accessibility_tree` | Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
+| `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen, `selectors: true` ends each ref with a selector for test code. Works for apps too (the screen's accessibility tree). |
+| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile and Electron sessions only (on web, `snapshot` with `selectors: true`); listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
+| `get_accessibility_tree` | Deprecated, removed in v5; use `snapshot`. Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
@@ -826,8 +826,8 @@ Recommended workflow (also sent to clients as server instructions):
 | `wdio://session/current/code`                 | Generated runnable WebdriverIO JS for the default session |
 | `wdio://session/{id}/steps`                   | Step log for any past session by ID                      |
 | `wdio://session/{id}/code`                    | Generated JS for any past session by ID                  |
-| `wdio://session/current/elements`             | Interactable elements (viewport-only by default)         |
-| `wdio://session/current/accessibility`        | Accessibility tree                                       |
+| `wdio://session/current/elements`             | Accessibility tree with selectors (viewport-only, capped at 12000 characters) |
+| `wdio://session/current/accessibility`        | Accessibility tree (deprecated, removed in v5; use `snapshot`) |
 | `wdio://session/current/screenshot`           | Screenshot (base64)                                      |
 | `wdio://session/current/cookies`              | Browser cookies                                          |
 | `wdio://session/current/tabs`                 | Open browser tabs                                        |
@@ -864,7 +864,7 @@ Test the Demo Android app at C:\Users\demo-liveApiGbRegionNonMinifiedRelease-301
 ```
 You are a Testing expert, and want to assess the basic workflows of worldofbooks.com:
 - Open World of Books (accept all cookies)
-- Get visible elements to see navigation structure
+- Snapshot the page to see navigation structure
 - Search for a fiction book
 - Choose one and validate if there are NEW and used book options
 - Report your findings at the end
@@ -936,7 +936,7 @@ Electron `behavior` defaults to `mockReturnValue`; `mockResolvedValue` and `mock
 Browser mocks intercept network requests matching a `url` glob (for example `**/api/todos`) with an optional `method` filter. `behavior` is optional: omit it to passively record matching requests without altering them — the mock still continues every request. `respond` and `respondOnce` require `value` (the JSON response body) and accept optional `statusCode` and `headers`; `abort`/`abortOnce` fail the request, and `redirect`/`redirectOnce` send it to the URL in `value`. `get_mock_calls` returns `{ calls, callCount }` for the intercepted requests, and `manage_mock` takes `clear`, `reset`, or `restore`.
 
 ```js
-start_session({ platform: 'browser', browser: 'chrome', capabilities: { webSocketUrl: true } })
+start_session({ platform: 'browser', browser: 'chrome' })
 
 // Observe-only: record every request to /api/todos without changing responses.
 mock({ mockType: 'browser', url: '**/api/todos' })
@@ -951,7 +951,7 @@ get_mock_calls({ mockType: 'browser', url: '**/api/todos', method: 'GET' })
 manage_mock({ mockType: 'browser', url: '**/api/todos', method: 'GET', action: 'restore' })
 ```
 
-Browser mocks require a BiDi-enabled session — start it with `capabilities: { webSocketUrl: true }`. Attached sessions default to BiDi off, so browser mocks do not work there unless the attached session negotiated BiDi; in Electron sessions browser mocks additionally require BiDi. Handles belong to the active browser session and cannot be reused after it closes or is replaced. All three tools participate in tracing and generated replay.
+Browser mocks require a BiDi session. Browser sessions negotiate BiDi by default, except Safari and sessions with `wdio:enforceWebDriverClassic: true`; attached Chrome sessions negotiate BiDi too. In Electron sessions browser mocks additionally require BiDi. Handles belong to the active browser session and cannot be reused after it closes or is replaced. All three tools participate in tracing and generated replay.
 
 ### Electron applications
 
@@ -1092,7 +1092,7 @@ so keep the original tunnel process alive for as long as the session needs it.
 
 ```
 // Device emulation (requires BiDi session)
-start_session({capabilities: {webSocketUrl: true}})
+start_session({platform: 'browser', browser: 'chrome'})
 emulate_device()                         // list available presets
 emulate_device({device: 'iPhone 15'})    // activate emulation
 emulate_device({device: 'Pixel 7'})      // switch device
@@ -1102,7 +1102,7 @@ emulate_device({device: 'reset'})        // restore desktop defaults
 **Web extensions (requires BiDi session):**
 
 ```javascript
-start_session({platform: 'browser', browser: 'chrome', capabilities: {webSocketUrl: true}})
+start_session({platform: 'browser', browser: 'chrome'})
 
 open_web_extension({
     extensionData: {type: 'path', path: '/path/to/unpacked-extension'},
@@ -1110,7 +1110,7 @@ open_web_extension({
 })
 
 // Drive the extension UI with the normal page tools.
-get_elements()
+snapshot({selectors: true})
 click_element({selector: '#save'})
 
 // For remote/cloud sessions, send a packaged extension archive as base64.
@@ -1162,7 +1162,7 @@ Test my iOS app on my physical iPhone:
 ```
 Test my Android app /path/to/app.apk on the Pixel_6_API_34 emulator:
 1. Start the app with auto-grant permissions
-2. Get visible elements (use inViewportOnly: false to see all elements)
+2. Get elements to see the whole screen
 3. Swipe up to scroll
 4. Tap on the "Settings" button using text matching
 5. Verify the settings screen is displayed
@@ -1173,9 +1173,7 @@ Test my Android app /path/to/app.apk on the Pixel_6_API_34 emulator:
 ```
 Test my app and debug layout issues:
 1. Start the app session
-2. Get visible elements with includeContainers: true to see the layout hierarchy
-3. Analyze ViewGroup, FrameLayout, and ScrollView containers
-4. Use inViewportOnly: false to find off-screen elements that need scrolling
+2. Get elements to see the whole screen, including off-screen elements that need scrolling
 ```
 
 **Hybrid app testing (switching contexts):**
@@ -1287,13 +1285,11 @@ This is particularly useful when:
 
 ### Smart Element Detection
 
-- **Platform-specific element classification**: Automatically identifies interactable elements vs layout containers
-    - Android: Button, EditText, CheckBox vs ViewGroup, FrameLayout, ScrollView
-    - iOS: Button, TextField, Switch vs View, StackView, CollectionView
-- **Multiple locator strategies**: Each element provides accessibility ID, resource ID, text, XPath, and
-  platform-specific selectors
+- **Actionable elements only**: Only interactable elements get a ref and selector; layout containers (e.g. Android ViewGroup, FrameLayout) are not listed as targets
+- **Best locator per element**: Each actionable line ends with its most stable selector (accessibility ID, resource ID,
+  text, XPath, or a platform-specific strategy)
 - **Viewport filtering**: Control whether to get only visible elements or all elements including off-screen
-- **Layout debugging**: Optionally include container elements to understand UI hierarchy
+- **UI hierarchy**: Output is an accessibility tree, so lists, tab bars and sections keep their structure
 
 ### Automatic Permission & Alert Handling
 
