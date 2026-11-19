@@ -45,6 +45,21 @@ describe('generateCode - header', () => {
     expect(code).toContain('}');
   });
 
+  it('declares browser before try so the local finally can tear it down', () => {
+    const code = generateCode(makeHistory([]));
+    const tryIdx = code.indexOf('try {');
+    expect(code.indexOf('let browser;')).toBeLessThan(tryIdx);
+    expect(code.indexOf('  browser = await remote(')).toBeGreaterThan(tryIdx);
+    expect(code).not.toContain('const browser');
+  });
+
+  it('leaves recorded script text that mentions the session declaration unchanged', () => {
+    const script = "editor.setValue('const browser = await remote({})')";
+    const code = generateCode(makeHistory([{ tool: 'execute_script', params: { script } }]));
+    expect(code).toContain('const browser = await remote({})');
+    expect(code.match(/^ {2}browser = await remote\(/gm)).toHaveLength(1);
+  });
+
   it('generates start_session (browser) using history.capabilities', () => {
     const history: SessionHistory = {
       sessionId: 'caps-123',
@@ -65,7 +80,7 @@ describe('generateCode - header', () => {
       }],
     };
     const code = generateCode(history);
-    expect(code).toContain('const browser = await remote(');
+    expect(code).toContain('  browser = await remote(');
     expect(code).toContain('"browserName": "chrome"');
     expect(code).toContain('--custom-flag');
   });
@@ -89,7 +104,7 @@ describe('generateCode - header', () => {
       }],
     };
     const code = generateCode(history);
-    expect(code).toContain('const browser = await remote(');
+    expect(code).toContain('  browser = await remote(');
     expect(code).toContain('"debuggerAddress": "localhost:9222"');
     expect(code).toContain('--user-data-dir=/tmp/chrome-debug');
   });
@@ -218,6 +233,34 @@ describe('generateCode - tool mappings', () => {
   it('set_value → $().setValue()', () => {
     const code = generateCode(makeHistory([{ tool: 'set_value', params: { selector: '#input', value: 'hello' } }]));
     expect(code).toContain("await browser.$('#input').setValue('hello');");
+  });
+
+  it('switch_frame with a selector and no recorded code → not-replayable comment, no switchFrame call', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_frame', params: { selector: '#frame' } }]));
+    expect(code).toContain("// [not replayable: no recorded code] switch_frame: '#frame'");
+    expect(code).not.toContain('browser.switchFrame(');
+  });
+
+  it('switch_frame without a selector → back-to-top comment, no switchFrame call', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_frame', params: {} }]));
+    expect(code).toContain('// switch_frame: back to the top document');
+    expect(code).not.toContain('browser.switchFrame(');
+  });
+
+  it('switch_frame with a snapshot ref and no recorded code → unreplayable-ref comment', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_frame', params: { selector: 'e12' } }]));
+    expect(code).toContain('[not replayable: snapshot ref] switch_frame');
+    expect(code).not.toContain('browser.switchFrame(');
+  });
+
+  it('set_geolocation → setGeoLocation() without altitude', () => {
+    const code = generateCode(makeHistory([{ tool: 'set_geolocation', params: { latitude: 52.5, longitude: 13.4 } }]));
+    expect(code).toContain('await browser.setGeoLocation({ latitude: 52.5, longitude: 13.4 });');
+  });
+
+  it('set_geolocation → setGeoLocation() with altitude', () => {
+    const code = generateCode(makeHistory([{ tool: 'set_geolocation', params: { latitude: 52.5, longitude: 13.4, altitude: 35 } }]));
+    expect(code).toContain('await browser.setGeoLocation({ latitude: 52.5, longitude: 13.4, altitude: 35 });');
   });
 
   it('scroll down → positive scrollBy', () => {
@@ -717,5 +760,26 @@ describe('generateCode - recorded agent code', () => {
     const code = generateCode(makeHistory([{ tool: 'click_element', params: { selector: '#btn' } }]));
     expect(code).toContain("await browser.$('#btn').click();");
     expect(code).not.toContain('const $ =');
+  });
+
+  it('emits recorded switch_frame code verbatim and skips the fallback comment', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'switch_frame',
+      params: { selector: '#f' },
+      code: ["const frame = await page.frame(page.$('#f'))"],
+    }]));
+    expect(code).toContain("const frame = await page.frame(page.$('#f'))");
+    expect(code).not.toContain('[not replayable');
+    expect(code).not.toContain('switch_frame:');
+  });
+
+  it('emits recorded set_geolocation code verbatim and skips the generated call', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'set_geolocation',
+      params: { latitude: 52.5, longitude: 13.4 },
+      code: ['await browser.setGeoLocation({ latitude: 52.5, longitude: 13.4 })'],
+    }]));
+    expect(code).toContain('await browser.setGeoLocation({ latitude: 52.5, longitude: 13.4 })');
+    expect(code.match(/setGeoLocation/g)).toHaveLength(1);
   });
 });

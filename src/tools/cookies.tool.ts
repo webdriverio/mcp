@@ -4,7 +4,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import type { Cookie } from '@wdio/protocols';
 import { coerceBoolean } from '../utils/zod-helpers';
-import { errorResult } from '../session/agent';
+import { agentFor, runActionWithChanges, errorResult, noSession } from '../session/agent';
 
 export const setCookieToolDefinition: ToolDefinition = {
   name: 'set_cookie',
@@ -33,14 +33,9 @@ export const setCookieTool: ToolCallback = async ({
   sameSite,
 }: Cookie): Promise<CallToolResult> => {
   try {
-    const cookie: Cookie = { name, value, path, domain, expiry, httpOnly, secure, sameSite };
-    const { getBrowser } = await import('../session/state');
-    const browser = getBrowser();
-    await browser.setCookies(cookie);
-
-    return {
-      content: [{ type: 'text', text: `Cookie "${name}" set successfully` }],
-    };
+    const agent = await agentFor();
+    if (!agent) return noSession();
+    return (await runActionWithChanges(agent, 'cookies', { sub: 'set', name, value, domain, path, expiry, httpOnly, secure, sameSite }, `Cookie "${name}" set successfully`, false)).result;
   } catch (e) {
     return errorResult(e, 'Error setting cookie');
   }
@@ -57,19 +52,9 @@ export const deleteCookiesToolDefinition: ToolDefinition = {
 
 export const deleteCookiesTool: ToolCallback = async ({ name }: { name?: string }): Promise<CallToolResult> => {
   try {
-    const { getBrowser } = await import('../session/state');
-    const browser = getBrowser();
-
-    if (name) {
-      await browser.deleteCookies([name]);
-      return {
-        content: [{ type: 'text', text: `Cookie "${name}" deleted successfully` }],
-      };
-    }
-    await browser.deleteCookies();
-    return {
-      content: [{ type: 'text', text: 'All cookies deleted successfully' }],
-    };
+    const agent = await agentFor();
+    if (!agent) return noSession();
+    return (await runActionWithChanges(agent, 'cookies', { sub: 'clear', name: name || undefined }, name ? `Cookie "${name}" deleted successfully` : 'All cookies deleted successfully', false)).result;
   } catch (e) {
     return errorResult(e, 'Error deleting cookies');
   }

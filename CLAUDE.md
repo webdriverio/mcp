@@ -48,8 +48,7 @@ src/
 │                       #   surface (electron-execute, electron-deeplink), mocking, and web extensions
 ├── resources/         # One file per resource family (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
-├── scripts/           # Browser/mobile scripts executed via browser.execute() — no try/catch, raw data only
-├── locators/          # Element detection, selector generation, XML parsing (mobile)
+├── scripts/           # Browser script run via browser.execute() (get-browser-accessibility-tree.ts) — no try/catch, raw data only; element collection comes from @wdio/elements
 ├── config/            # appium.config.ts — iOS/Android capability builders
 ├── utils/             # auth.ts, parse-args.ts, http-helpers.ts, zod-helpers.ts (coerceBoolean),
 │                       #   docs-index.ts + docs-client.ts (docs corpus)
@@ -114,11 +113,11 @@ MCP resources expose live session data. Fixed URIs appear in ListResources; temp
 - `wdio://session/{sessionId}/steps` — step log for any session (URI template)
 - `wdio://session/{sessionId}/code` — generated JS for any session (URI template)
 
-**Live page state (current session):** `wdio://session/current/` + `elements`, `accessibility`,
+**Live page state (current session):** `wdio://session/current/` + `elements`, `accessibility` (deprecated, removed in v5; use the snapshot tool),
 `screenshot`, `cookies`, `tabs`, `contexts`, `context`, `geolocation`, `capabilities`, `logs`, and the
 template `app-state/{bundleId}`.
 
-- `elements` is viewport-only — use the `get_elements` tool with `inViewportOnly: false` for all
+- `elements` is viewport-only; `get_elements` (mobile and Electron sessions only; on web use `snapshot` with `selectors: true`) covers the whole page unless `inViewportOnly: true`; both cut output past `SNAPSHOT_MAX_CHARS` (`src/utils/snapshot-text.ts`)
 - `capabilities` are the *resolved* values the driver accepted, including provider defaults
 - `logs` mixes crash logs with console output for the current session
 - `contexts` / `context` / `app-state` are mobile-only
@@ -182,13 +181,12 @@ Only files whose purpose is not evident from the tree above.
 | `src/providers/cloud/testingbot.provider.ts` | `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
 | `src/providers/cloud/digitalai.provider.ts` | `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<name>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts` | `start_session` (browser + mobile), `close_session` |
-| `src/tools/get-elements.tool.ts` | `get_elements` — all elements with filtering + pagination |
+| `src/tools/get-elements.tool.ts` | `get_elements` (mobile and Electron only) — `getSnapshot` accessibility tree text with selectors |
 | `src/tools/cloud-provider.tool.ts` | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Bearer auth) |
 | `src/tools/query-docs.tool.ts` | `query_docs` — BM25 search over the WebdriverIO docs corpus |
 | `src/utils/docs-index.ts` | Docs corpus fetch/cache, fence-aware chunking, path alignment, 3-field BM25 index + search |
 | `src/utils/docs-client.ts` | Boundary layer for the docs corpus — resolves the cache dir and loads the index |
 | `src/resources/docs.resource.ts` | `wdio://docs/index` + `wdio://docs/page/{slug}` |
-| `src/scripts/get-interactable-browser-elements.ts` | Browser-context element detection |
 | `src/recording/code-generator.ts` | Generates runnable WebdriverIO JS from `SessionHistory` |
 
 ## Gotchas
@@ -209,7 +207,7 @@ stdout, which corrupts the MCP stdio protocol. Do not remove those reassignments
 
 ### Browser Scripts Must Be Self-Contained
 
-`get-interactable-browser-elements.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
+`get-browser-accessibility-tree.ts` executes in browser context via `browser.execute()`. Cannot use Node.js APIs or
 external imports.
 
 ### Close vs Detach

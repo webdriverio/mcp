@@ -317,6 +317,13 @@ describe('app tools', () => {
     expect(snapshot).toHaveBeenCalledWith({ interactive: true, scope: undefined, viewport: true, maxChars: 12000 });
   });
 
+  it('snapshot passes selectors to agent.snapshot', async () => {
+    startSession('android');
+    snapshot.mockResolvedValue({ text: 'button "Go" [ref=e1]  →  #go', tooBig: false });
+    await call(snapshotTool, { selectors: true });
+    expect(snapshot).toHaveBeenCalledWith(expect.objectContaining({ selectors: true }));
+  });
+
   it('snapshot returns the summary of a big screen', async () => {
     startSession('android');
     snapshot.mockResolvedValue({ text: 'Snapshot: 900 lines, too big to return.', tooBig: true });

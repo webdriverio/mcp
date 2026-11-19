@@ -13,6 +13,7 @@ const { withRecording } = await import('../../src/recording/step-recorder');
 const { generateCode } = await import('../../src/recording/code-generator');
 const { clickTool } = await import('../../src/tools/click.tool');
 const { performActionsTool, selectOptionTool, pressKeyTool } = await import('../../src/tools/page-input.tool');
+const { setCookieTool, deleteCookiesTool } = await import('../../src/tools/cookies.tool');
 
 const extra = {} as Parameters<ToolCallback>[1];
 const record = (name: string, tool: unknown, params: Record<string, unknown>) => (withRecording(name, tool as ToolCallback) as unknown as (p: unknown, e: unknown) => Promise<unknown>)(params, extra);
@@ -63,5 +64,17 @@ describe('recording the code the agent ran', () => {
     expect(script).toContain("selectByVisibleText('Red')");
     expect(script).toContain("browser.keys('Enter')");
     expect(script).not.toContain('[unknown tool]');
+  });
+
+  it('set_cookie and delete_cookies record the agent cookie code', async () => {
+    run
+      .mockResolvedValueOnce({ text: '', code: "await browser.setCookies({ name: 'session', value: 'abc', path: '/' })" })
+      .mockResolvedValueOnce({ text: '', code: "await browser.deleteCookies('session')" });
+    await record('set_cookie', setCookieTool, { name: 'session', value: 'abc' });
+    await record('delete_cookies', deleteCookiesTool, { name: 'session' });
+    expect(history.steps.map(step => step.code)).toEqual([
+      ["await browser.setCookies({ name: 'session', value: 'abc', path: '/' })"],
+      ["await browser.deleteCookies('session')"],
+    ]);
   });
 });

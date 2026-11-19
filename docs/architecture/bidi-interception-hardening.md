@@ -6,6 +6,8 @@ re-check against the installed `webdriverio` before acting.
 
 ## 1. Upstream bug: `respond(undefined)` sends an invalid BiDi `network.provideResponse`
 
+**Status:** resolved upstream in webdriverio 10.2.0 (verified 2026-11-18, local Chrome): `respond(undefined)` throws at configure time with no crash, and `respond(null)` is accepted with no crash. The respond-value guard in `src/tools/mock.tool.ts` stays.
+
 **What:** calling `mock.respond(undefined)` (or `null`) on a real BiDi session makes webdriverio
 emit `network.provideResponse` with body `{"type":"string"}` and no value. The BiDi endpoint
 rejects it (`invalid argument - Invalid input in "body"`), and because
@@ -19,10 +21,7 @@ during live verification of the mock tools.
 rejected at `respond()` time (argument validation), not surface as a process-killing throw at
 request-interception time. A fix there deletes the class for every consumer.
 
-**Action:** file a webdriverio issue with the standalone repro
-(mock `'**/*'` → `respond(undefined)` → `browser.url(...)` → process dies). Meanwhile the
-guard at the tool boundary (`respond behaviors require value` in `src/tools/mock.tool.ts`)
-keeps MCP clients away from it.
+**Action:** none for 10.2.0. Re-check `respond(undefined)` on webdriverio upgrades; the guard stays.
 
 **Adjacent, same guard class:** `WebDriverInterception` also exposes `request`/`requestOnce`
 overwrites (deliberately unexposed by the MCP tools today). If they are ever added to the
@@ -32,21 +31,16 @@ overwrite payload reaches the same synchronous-throw path.
 ## 2. Process-level containment for throws inside BiDi event handlers
 
 **What:** any uncaught throw inside a BiDi event handler (the class above is one instance)
-terminates the MCP server process. There is no containment at the server level today. The
+reaches the process. `src/utils/crash-handlers.ts` (installed in `src/server.ts`) logs `unhandledRejection` and keeps running, and logs `uncaughtException` and exits 1. webdriverio 10.2.0's `RequestArbiter` wraps its own network handlers in try/catch, so throws there do not reach the process; that catch does not cover other BiDi listeners. The
 respond-value guard closes the one known reachable path; unknown webdriverio bugs in
 interception, or any other BiDi subsystem emitting through the same handler chain, remain
 process-fatal.
 
-**Why deferred:** cross-cutting — a guard would cover every BiDi-backed feature
-(navigation, elements, screenshots), not mocks, so it is its own change and review. The
-containment semantics are also a real design decision, not a one-liner: continuing after an
-uncaught throw risks a corrupted BiDi socket and zombie sessions that look alive; "log and
-exit" forfeits the session but keeps state honest; swallowing server-wide can mask exactly
-the class of upstream bug item 1 describes.
+**Status:** containment exists (`src/utils/crash-handlers.ts`, installed at `src/server.ts`). Only BiDi listeners outside the arbiter can still reach it.
 
-**Action:** design pass on where containment belongs (per-handler try/catch in the
-wdio event subscription vs. a top-level handler in `src/server.ts` with session-invalidation
-semantics), then implement behind that decision.
+**Open:** where containment belongs for those listeners: per-handler try/catch in the wdio event subscription, or session invalidation from a top-level handler. Continuing after an uncaught throw risks a corrupted BiDi socket and zombie sessions that look alive; "log and exit" forfeits the session but keeps state honest.
+
+**Action:** decide that model, then implement behind it. Until then the exit-on-uncaught behavior stands.
 
 ## Related, lower priority
 

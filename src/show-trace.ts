@@ -3,6 +3,9 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
 import { exec } from 'node:child_process';
+import { warnDeprecated } from './utils/deprecation';
+
+warnDeprecated('show-trace');
 
 function openBrowser(url: string): void {
   const cmd =

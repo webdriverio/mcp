@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const { mockTunnel } = vi.hoisted(() => ({
   mockTunnel: { start: vi.fn(), stop: vi.fn() },
@@ -11,6 +11,7 @@ vi.mock('browserstack-local', () => ({
   },
 }));
 
+import type { Browser as WdioBrowser } from 'webdriverio';
 import { BrowserStackProvider } from '../../src/providers/cloud/browserstack.provider';
 
 describe('BrowserStackProvider', () => {
@@ -122,6 +123,52 @@ describe('BrowserStackProvider', () => {
       });
       expect(caps.platformName).toBe('android');
       expect(caps['appium:app']).toBe('bs://abc123');
+    });
+
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'bs://x' },
+      });
+      expect(caps['appium:app']).toBe('bs://x');
+    });
+
+    it('prefers the app option over a user-supplied appium:app capability', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        app: 'bs://opt',
+        capabilities: { 'appium:app': 'bs://x' },
+      });
+      expect(caps['appium:app']).toBe('bs://opt');
+    });
+
+    it('sets browserName from the browser option for a mobile browser session', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17', browser: 'safari' });
+      expect(caps.browserName).toBe('safari');
+    });
+
+    it('ignores the app option for a mobile browser session, as the other providers do', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17', browser: 'safari', app: 'bs://abc' });
+      expect(caps).not.toHaveProperty('appium:app');
+    });
+
+    it('omits browserName when neither the browser option nor a capability sets it', () => {
+      const caps = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', platformVersion: '17' });
+      expect(caps).not.toHaveProperty('browserName');
+    });
+
+    it('keeps a user-supplied browserName capability when the browser option is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'ios',
+        deviceName: 'iPhone 15',
+        platformVersion: '17',
+        capabilities: { browserName: 'safari' },
+      });
+      expect(caps.browserName).toBe('safari');
     });
 
     it('sets deviceName and platformVersion inside bstack:options', () => {
@@ -281,6 +328,142 @@ describe('BrowserStackProvider', () => {
       );
 
       await expect(provider.startTunnel({})).rejects.toEqual({ message: 'some other fatal error' });
+    });
+  });
+
+  describe('onSessionClose', () => {
+    const AUTOMATE_URL = 'https://api.browserstack.com/automate/sessions/abc.json';
+    const APP_AUTOMATE_URL = 'https://api-cloud.browserstack.com/app-automate/sessions/abc.json';
+    const passed = { status: 'passed' as const };
+    const withRequested = (requestedCapabilities: Record<string, unknown>, capabilities: Record<string, unknown> = {}) =>
+      ({ requestedCapabilities, capabilities }) as unknown as WdioBrowser;
+
+    beforeEach(() => {
+      vi.stubEnv('BROWSERSTACK_USERNAME', 'myuser');
+      vi.stubEnv('BROWSERSTACK_ACCESS_KEY', 'mykey');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it('marks an iOS mobile-browser session on the automate API', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15', capabilities: { browserName: 'safari' } });
+
+      await provider.onSessionClose('abc', 'ios', passed, undefined, withRequested(requested, { browserName: 'safari' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks an Android mobile-browser session on the automate API', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', capabilities: { browserName: 'chrome' } });
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested(requested, { browserName: 'chrome' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks a native app session on the app-automate API even when live browserName is set', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', app: 'bs://app123' });
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested(requested, { browserName: 'Android' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('marks a native app session on the app-automate API when the app is only in appium:options', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:options': { app: 'bs://app123' } }, { browserName: 'Android' }));
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('falls back to the App Automate API when the Automate API returns 404 for an attached native session', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'ios', deviceName: 'iPhone 15' });
+
+      await expect(provider.onSessionClose('abc', 'ios', passed, undefined, withRequested(requested))).resolves.toBeUndefined();
+
+      expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([AUTOMATE_URL, APP_AUTOMATE_URL]);
+    });
+
+    it('falls back from App Automate 404 to Automate for a native app session', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: true } as Response);
+
+      await expect(provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:app': 'bs://app123' })))
+        .resolves.toBeUndefined();
+
+      expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([APP_AUTOMATE_URL, AUTOMATE_URL]);
+    });
+
+    it('does not mask a non-404 error after the App Automate 404 fallback', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'android', passed, undefined, withRequested({ 'appium:app': 'bs://app123' })))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws when neither the Automate nor the App Automate API knows the session', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('session not found on Automate or App Automate');
+    });
+
+    it('does not fall back on a non-404 error', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks a browser session on the automate API without a browser handle', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'browser', passed);
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(AUTOMATE_URL);
+    });
+
+    it('marks an iOS session on the app-automate API without a browser handle', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+
+      await provider.onSessionClose('abc', 'ios', passed);
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(APP_AUTOMATE_URL);
+    });
+
+    it('PUTs the status and reason as JSON with Basic auth', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
+      const requested = provider.buildCapabilities({ platform: 'android', deviceName: 'Pixel 8', app: 'bs://app123' });
+
+      await provider.onSessionClose('abc', 'android', { status: 'failed', reason: 'boom' }, undefined, withRequested(requested));
+
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(APP_AUTOMATE_URL);
+      expect(init.method).toBe('PUT');
+      expect(init.headers).toEqual({ Authorization: `Basic ${Buffer.from('myuser:mykey').toString('base64')}`, 'Content-Type': 'application/json' });
+      expect(JSON.parse(init.body as string)).toEqual({ status: 'failed', reason: 'boom' });
+    });
+
+    it('rejects with the HTTP status when BrowserStack responds non-ok', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
+
+      await expect(provider.onSessionClose('abc', 'ios', passed))
+        .rejects.toThrow('BrowserStack result marking failed: HTTP 500');
     });
   });
 });

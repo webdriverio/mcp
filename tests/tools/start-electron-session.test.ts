@@ -5,11 +5,19 @@ const mocks = vi.hoisted(() => ({
   registerSession: vi.fn(),
   closeSession: vi.fn(),
   cleanupSessionRuntime: vi.fn(),
+  captureDriverRoots: vi.fn(),
+  driverTree: vi.fn(),
+  killPids: vi.fn(),
 }));
 
 vi.mock('../../src/electron/runtime', () => ({
   getElectronService: vi.fn(async () => ({ startWdioSession: mocks.startWdioSession })),
   cleanupSessionRuntime: mocks.cleanupSessionRuntime,
+}));
+vi.mock('../../src/session/driver-tree', () => ({
+  captureDriverRoots: mocks.captureDriverRoots,
+  driverTree: mocks.driverTree,
+  killPids: mocks.killPids,
 }));
 vi.mock('../../src/session/lifecycle', () => ({ closeSession: mocks.closeSession, registerSession: mocks.registerSession }));
 
@@ -25,7 +33,7 @@ describe('start_session Electron', () => {
     vi.clearAllMocks();
     const state = getState();
     state.browsers.clear(); state.sessionMetadata.clear(); state.sessionHistory.clear(); state.currentSession = null;
-    mocks.startWdioSession.mockResolvedValue({ sessionId: 'electron-session' });
+    mocks.startWdioSession.mockResolvedValue({ sessionId: 'electron-session', capabilities: {} });
   });
 
   it('starts an Electron session with official standalone helpers and browser-like metadata', async () => {
@@ -57,7 +65,7 @@ describe('start_session Electron', () => {
 
   it('still deletes the Electron browser when runtime cleanup rejects after a failed registration', async () => {
     const deleteSession = vi.fn().mockResolvedValue(undefined);
-    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', deleteSession });
+    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', capabilities: {}, deleteSession });
     mocks.registerSession.mockImplementationOnce(() => { throw new Error('boom'); });
     mocks.cleanupSessionRuntime.mockRejectedValueOnce(new Error('cleanup failed'));
     const result = await callStart({
@@ -68,13 +76,64 @@ describe('start_session Electron', () => {
     expect(deleteSession).toHaveBeenCalledOnce();
   });
 
+  it('kills the driver tree instead of deleting the session when cleanup ended it and registration fails', async () => {
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const roots = [{ pid: 4242, started: 'start' }];
+    const tree = [{ pid: 4243, started: 'child' }];
+    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', capabilities: { 'wdio:driverPID': 4242 }, deleteSession });
+    mocks.captureDriverRoots.mockReturnValueOnce(roots);
+    mocks.driverTree.mockReturnValueOnce(tree);
+    mocks.registerSession.mockImplementationOnce(() => { throw new Error('boom'); });
+    mocks.cleanupSessionRuntime.mockResolvedValueOnce(true);
+
+    const result = await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/app' } },
+    }, {});
+
+    expect(result.isError).toBe(true);
+    expect(deleteSession).not.toHaveBeenCalled();
+    expect(mocks.driverTree).toHaveBeenCalledWith(roots);
+    expect(mocks.killPids).toHaveBeenCalledWith(tree);
+  });
+
+  it('deletes the Electron browser instead of killing the driver tree when cleanup did not end it', async () => {
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', capabilities: {}, deleteSession });
+    mocks.registerSession.mockImplementationOnce(() => { throw new Error('boom'); });
+    mocks.cleanupSessionRuntime.mockResolvedValueOnce(false);
+
+    const result = await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/app' } },
+    }, {});
+
+    expect(result.isError).toBe(true);
+    expect(deleteSession).toHaveBeenCalledOnce();
+    expect(mocks.killPids).not.toHaveBeenCalled();
+  });
+
+  it('records the driver tree roots captured from wdio:driverPID', async () => {
+    const roots = [{ pid: 4242, started: 'start' }];
+    mocks.startWdioSession.mockResolvedValueOnce({ sessionId: 'electron-session', capabilities: { 'wdio:driverPID': 4242 } });
+    mocks.captureDriverRoots.mockReturnValueOnce(roots);
+
+    await callStart({
+      platform: 'electron',
+      capabilities: { 'wdio:electronServiceOptions': { appBinaryPath: '/app' } },
+    }, {});
+
+    expect(mocks.captureDriverRoots).toHaveBeenCalledWith(4242);
+    expect(mocks.registerSession).toHaveBeenCalledWith('electron-session', expect.any(Object), expect.objectContaining({ driverRoots: roots }), expect.any(Object), { keep: false, name: undefined });
+  });
+
   it('records immutable Electron capabilities when the standalone service mutates launch capabilities', async () => {
     mocks.startWdioSession.mockImplementation(async (capabilities: Record<string, unknown>[]) => {
       const launchCapabilities = capabilities[0];
       launchCapabilities.browserName = 'chrome';
       const options = launchCapabilities['wdio:electronServiceOptions'] as Record<string, unknown>;
       options.appArgs = ['--mutated-by-service'];
-      return { sessionId: 'electron-session' };
+      return { sessionId: 'electron-session', capabilities: {} };
     });
 
     await callStart({

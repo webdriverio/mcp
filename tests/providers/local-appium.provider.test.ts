@@ -54,4 +54,8 @@ describe('LocalAppiumProvider', () => {
   it('shouldAutoDetach false when appPath provided', () => {
     expect(localAppiumProvider.shouldAutoDetach({ appPath: '/app.apk' })).toBe(false);
   });
+
+  it('shouldAutoDetach false when app comes from capabilities', () => {
+    expect(localAppiumProvider.shouldAutoDetach({ capabilities: { 'appium:app': 'x' } })).toBe(false);
+  });
 });

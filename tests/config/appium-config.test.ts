@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { buildAndroidCapabilities, buildIOSCapabilities } from '../../src/config/appium.config';
+import { buildAndroidCapabilities, buildIOSCapabilities, hasAppCapability } from '../../src/config/appium.config';
+
+describe('hasAppCapability', () => {
+  it('detects appium:app', () => {
+    expect(hasAppCapability({ 'appium:app': 'bs://abc' })).toBe(true);
+  });
+
+  it('detects app', () => {
+    expect(hasAppCapability({ app: 'bs://abc' })).toBe(true);
+  });
+
+  it('detects appium:options.app', () => {
+    expect(hasAppCapability({ 'appium:options': { app: 'bs://abc' } })).toBe(true);
+  });
+
+  it('returns false for empty capabilities', () => {
+    expect(hasAppCapability({})).toBe(false);
+  });
+
+  it('returns false when capabilities are undefined', () => {
+    expect(hasAppCapability(undefined)).toBe(false);
+  });
+});
 
 describe('buildAndroidCapabilities', () => {
   // Simulate how app-session.tool.ts calls this — all params destructured, unset ones are undefined

@@ -7,13 +7,14 @@ import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';
 import { errorResult } from '../session/agent';
+import { BIDI_REQUIRED_HINT } from '../utils/bidi';
 
 // Stores restore functions returned by browser.emulate(), keyed by sessionId
 const restoreFunctions = new Map<string, () => Promise<void>>();
 
 export const emulateDeviceToolDefinition: ToolDefinition = {
   name: 'emulate_device',
-  description: 'Emulates a mobile or tablet device in the current browser session by setting viewport, DPR, user-agent, and touch events. Requires a BiDi-enabled session (start_session with capabilities: { webSocketUrl: true }). Omit device to list available presets. Pass "reset" to restore desktop defaults. Changes persist for all subsequent tool calls until reset or session close. Browser-only.',
+  description: 'Emulates a mobile or tablet device in the current browser session by setting viewport, DPR, user-agent, and touch events. Requires a BiDi session (the default for browser sessions; not Safari or wdio:enforceWebDriverClassic). Omit device to list available presets. Pass "reset" to restore desktop defaults. Changes persist for all subsequent tool calls until reset or session close. Browser-only.',
   annotations: { title: 'Emulate Device', destructiveHint: false, idempotentHint: true },
   inputSchema: {
     device: z.string().optional().describe(
@@ -50,7 +51,7 @@ export const emulateDeviceTool: ToolCallback = async ({
         isError: true,
         content: [{
           type: 'text',
-          text: 'Error: emulate_device requires a BiDi-enabled session.\nRestart the browser with: start_browser({ capabilities: { webSocketUrl: true } })',
+          text: `Error: emulate_device requires a BiDi-enabled session. ${BIDI_REQUIRED_HINT}`,
         }],
       };
     }

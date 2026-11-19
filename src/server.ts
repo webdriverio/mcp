@@ -167,7 +167,7 @@ function createServer(): McpServer {
   registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
 
   registerTool(switchTabToolDefinition, switchTabTool);
-  registerTool(switchFrameToolDefinition, switchFrameTool);
+  registerTool(switchFrameToolDefinition, instrument('switch_frame', switchFrameTool));
 
   registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
 
@@ -178,18 +178,18 @@ function createServer(): McpServer {
   registerTool(performActionsToolDefinition, instrument('perform_actions', performActionsTool));
   registerTool(snapshotToolDefinition, snapshotTool);
 
-  registerTool(setCookieToolDefinition, setCookieTool);
-  registerTool(deleteCookiesToolDefinition, deleteCookiesTool);
+  registerTool(setCookieToolDefinition, instrument('set_cookie', setCookieTool));
+  registerTool(deleteCookiesToolDefinition, instrument('delete_cookies', deleteCookiesTool));
 
   registerTool(tapElementToolDefinition, instrument('tap_element', tapElementTool));
   registerTool(swipeToolDefinition, instrument('swipe', swipeTool));
   registerTool(dragAndDropToolDefinition, instrument('drag_and_drop', dragAndDropTool));
 
-  registerTool(switchContextToolDefinition, switchContextTool);
+  registerTool(switchContextToolDefinition, instrument('switch_context', switchContextTool));
 
-  registerTool(rotateDeviceToolDefinition, rotateDeviceTool);
-  registerTool(hideKeyboardToolDefinition, hideKeyboardTool);
-  registerTool(setGeolocationToolDefinition, setGeolocationTool);
+  registerTool(rotateDeviceToolDefinition, instrument('rotate_device', rotateDeviceTool));
+  registerTool(hideKeyboardToolDefinition, instrument('hide_keyboard', hideKeyboardTool));
+  registerTool(setGeolocationToolDefinition, instrument('set_geolocation', setGeolocationTool));
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
   registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));

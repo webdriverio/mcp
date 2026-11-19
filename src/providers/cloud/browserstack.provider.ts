@@ -2,8 +2,13 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Local as BrowserstackTunnel } from 'browserstack-local';
+import type { Browser as WdioBrowser } from 'webdriverio';
+import { hasAppCapability } from '../../config/appium.config';
 import { basicAuth } from '../../utils/auth';
 import type { ConnectionConfig, SessionProvider, SessionResult } from '../types';
+
+const APP_AUTOMATE_SESSIONS_URL = 'https://api-cloud.browserstack.com/app-automate/sessions';
+const AUTOMATE_SESSIONS_URL = 'https://api.browserstack.com/automate/sessions';
 
 export class BrowserStackProvider implements SessionProvider {
   name = 'browserstack';
@@ -67,8 +72,9 @@ export class BrowserStackProvider implements SessionProvider {
 
     return {
       ...userCapabilities,
+      ...(options.browser ? { browserName: options.browser } : {}),
       platformName: platform,
-      'appium:app': options.app,
+      ...(options.browser ? {} : { 'appium:app': options.app ?? userCapabilities['appium:app'] }),
       'appium:autoGrantPermissions': (options.autoGrantPermissions as boolean | undefined) ?? true,
       'appium:autoAcceptAlerts': autoDismissAlerts ? undefined : (autoAcceptAlerts ?? true),
       'appium:autoDismissAlerts': autoDismissAlerts,
@@ -110,6 +116,7 @@ export class BrowserStackProvider implements SessionProvider {
     sessionType: 'browser' | 'ios' | 'android',
     result: SessionResult,
     tunnelHandle?: unknown,
+    browser?: WdioBrowser,
   ): Promise<void> {
     if (tunnelHandle) {
       const tunnel = tunnelHandle as InstanceType<typeof BrowserstackTunnel>;
@@ -121,17 +128,25 @@ export class BrowserStackProvider implements SessionProvider {
     const key = process.env.BROWSERSTACK_ACCESS_KEY;
     if (!user || !key) return;
 
-    const baseUrl = sessionType === 'browser'
-      ? 'https://api.browserstack.com/automate/sessions'
-      : 'https://api-cloud.browserstack.com/app-automate/sessions';
+    const requested = (browser as { requestedCapabilities?: Record<string, unknown> } | undefined)?.requestedCapabilities;
+    const isAppSession = sessionType !== 'browser' && (requested === undefined || hasAppCapability(requested));
+    const endpoints = isAppSession
+      ? [APP_AUTOMATE_SESSIONS_URL, AUTOMATE_SESSIONS_URL]
+      : [AUTOMATE_SESSIONS_URL, APP_AUTOMATE_SESSIONS_URL];
 
     const auth = basicAuth(user, key);
     const body: Record<string, string> = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
-    await fetch(`${baseUrl}/${sessionId}.json`, {
+    const init: RequestInit = {
       method: 'PUT',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    };
+    for (const baseUrl of endpoints) {
+      const res = await fetch(`${baseUrl}/${sessionId}.json`, init);
+      if (res.ok) return;
+      if (res.status !== 404) throw new Error(`BrowserStack result marking failed: HTTP ${res.status}`);
+    }
+    throw new Error('BrowserStack result marking failed: session not found on Automate or App Automate');
   }
 }
 

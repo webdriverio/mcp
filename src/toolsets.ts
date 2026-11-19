@@ -39,7 +39,7 @@ export const GROUPS = {
   device: { tools: ['emulate_device', 'set_geolocation'], desc: 'emulate a phone or tablet, fake the location' },
   extensions: { tools: ['open_web_extension'], desc: 'install and open a browser extension' },
   attach: { tools: ['launch_chrome', 'attach_session'], desc: 'launch Chrome with remote debugging, attach to a running WebDriver or Appium session' },
-  elements: { tools: ['get_elements'], desc: 'raw element list with bounds' },
+  elements: { tools: ['get_elements'], desc: 'accessibility tree with selectors' },
   'cloud-apps': { tools: ['list_apps', 'upload_app'], desc: 'upload and list mobile apps on BrowserStack, Sauce Labs, TestMu, TestingBot, Digital.ai' },
 } as const;
 

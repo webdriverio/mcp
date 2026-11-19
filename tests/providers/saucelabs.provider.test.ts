@@ -192,6 +192,16 @@ describe('SauceLabsProvider', () => {
       expect(caps['appium:app']).toBe('storage:filename=myapp.apk');
     });
 
+    it('keeps a user-supplied appium:app capability when app is omitted', () => {
+      const caps = provider.buildCapabilities({
+        platform: 'android',
+        deviceName: 'x',
+        platformVersion: '14',
+        capabilities: { 'appium:app': 'storage:filename=myapp.apk' },
+      });
+      expect(caps['appium:app']).toBe('storage:filename=myapp.apk');
+    });
+
     it('sets appiumVersion to latest for native app mode', () => {
       const caps = provider.buildCapabilities({
         platform: 'android',
@@ -329,6 +339,16 @@ describe('SauceLabsProvider', () => {
       await provider.onSessionClose('session-123', 'browser', { status: 'passed' });
 
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs the HTTP status instead of success when the REST API rejects the result', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 401, text: async () => 'Unauthorized' } as Response);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await provider.onSessionClose('session-123', 'browser', { status: 'passed' });
+
+      expect(errorSpy).toHaveBeenCalledWith('[SauceLabs] Failed to set job result: HTTP 401 — Unauthorized');
+      expect(errorSpy).not.toHaveBeenCalledWith('[SauceLabs] Job result set successfully via REST API');
     });
   });
 });

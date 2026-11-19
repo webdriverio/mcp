@@ -4,9 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { agentFor, errorResult, noSession, runAction, withActionTimeout } from '../session/agent';
-
-/** larger snapshots are not returned; `find` narrows them down */
-const MAX_CHARS = 12000;
+import { SNAPSHOT_MAX_CHARS } from '../utils/snapshot-text';
 
 export const snapshotToolDefinition: ToolDefinition = {
   name: 'snapshot',
@@ -17,10 +15,11 @@ export const snapshotToolDefinition: ToolDefinition = {
     full: coerceBoolean.optional().default(false).describe('Include text, not just interactive elements'),
     scope: z.string().optional().describe('Only below this ref or selector'),
     viewport: coerceBoolean.optional().default(false).describe('Only what is on screen'),
+    selectors: coerceBoolean.optional().default(false).describe('End each ref line with a selector for test code'),
   },
 };
 
-export const snapshotTool: ToolCallback = async ({ find, full = false, scope, viewport = false }: { find?: string; full?: boolean; scope?: string; viewport?: boolean }): Promise<CallToolResult> => {
+export const snapshotTool: ToolCallback = async ({ find, full = false, scope, viewport = false, selectors }: { find?: string; full?: boolean; scope?: string; viewport?: boolean; selectors?: boolean }): Promise<CallToolResult> => {
   const agent = await agentFor();
   if (!agent) return noSession();
   if (find) {
@@ -30,7 +29,7 @@ export const snapshotTool: ToolCallback = async ({ find, full = false, scope, vi
     return runAction(agent, 'find', { text: find, ...(scope && { scope }) }, `No match for ${JSON.stringify(find)}.`);
   }
   try {
-    const snapshot = await withActionTimeout(agent.snapshot({ interactive: !full, scope, viewport, maxChars: MAX_CHARS }), 'snapshot');
+    const snapshot = await withActionTimeout(agent.snapshot({ interactive: !full, scope, viewport, selectors, maxChars: SNAPSHOT_MAX_CHARS }), 'snapshot');
     return { content: [{ type: 'text', text: [snapshot.text, ...(snapshot.notes ?? [])].join('\n') }] };
   } catch (e) {
     return errorResult(e);

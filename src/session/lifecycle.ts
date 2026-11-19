@@ -107,17 +107,23 @@ export function registerSession(
         if (oldMetadata?.provider && !oldMetadata.externallyManaged) {
           const oldHistory = state.sessionHistory.get(oldSessionId);
           const provider = getProvider(oldMetadata.provider, oldMetadata.type);
-          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch(() => {});
+          await provider.onSessionClose?.(oldSessionId, oldMetadata.type, getSessionResult(oldHistory), oldMetadata.tunnelHandle, oldBrowser, oldMetadata.region).catch((e) => {
+            console.error('[WARN] Failed to run provider onSessionClose:', e);
+          });
         }
         if (!oldMetadata?.isAttached && !oldMetadata?.externallyManaged) {
-          await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => {});
           const oldTree = driverTree(oldMetadata?.driverRoots);
-          try {
-            await oldBrowser.deleteSession();
-          } catch {
+          const ended = await cleanupSessionRuntime(oldMetadata?.runtime, oldBrowser).catch(() => false);
+          if (ended) {
             killPids(oldTree);
-            // Continue to tunnel teardown. The state entry is removed below,
-            // so this is the last opportunity to release an auto-managed tunnel.
+          } else {
+            try {
+              await oldBrowser.deleteSession();
+            } catch {
+              killPids(oldTree);
+              // Continue to tunnel teardown. The state entry is removed below,
+              // so this is the last opportunity to release an auto-managed tunnel.
+            }
           }
         }
         if (oldMetadata?.provider && oldMetadata?.tunnelHandle && !oldMetadata.externallyManaged) {
@@ -176,18 +182,25 @@ async function closeSessionOnce(sessionId: string, detach: boolean, isAttached: 
           console.error('[WARN] Failed to run provider onSessionClose:', e);
         }
       }
+      const tree = driverTree(metadata?.driverRoots);
+      capturedTrees.set(sessionId, tree);
+      let ended = false;
       try {
-        await cleanupSessionRuntime(metadata?.runtime, browser);
+        ended = await cleanupSessionRuntime(metadata?.runtime, browser);
       } catch (e) {
         console.error('[WARN] Failed to clean up session runtime:', e);
       }
-      const tree = driverTree(metadata?.driverRoots);
-      capturedTrees.set(sessionId, tree);
       try {
-        await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
-      } catch (e) {
-        killPids(tree);
-        throw e;
+        if (ended) {
+          killPids(tree);
+        } else {
+          try {
+            await withTimeout(browser.deleteSession(), DELETE_SESSION_TIMEOUT_MS, () => new Error(`deleteSession did not finish within ${DELETE_SESSION_TIMEOUT_MS / 1000}s`));
+          } catch (e) {
+            killPids(tree);
+            throw e;
+          }
+        }
       } finally {
         // the tree is gone either way, so the shutdown fallback must not target it during the tunnel stop below
         if (metadata) { metadata.driverRoots = undefined; }

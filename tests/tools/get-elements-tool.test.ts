@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getElements } from '../../src/scripts/get-elements';
+import { getSnapshot } from '@wdio/elements';
 import { getBrowser } from '../../src/session/state';
 import { getElementsTool } from '../../src/tools/get-elements.tool';
+import { SNAPSHOT_MAX_CHARS } from '../../src/utils/snapshot-text';
 
-vi.mock('../../src/scripts/get-elements', () => ({
-  getElements: vi.fn(),
+vi.mock('@wdio/elements', () => ({
+  getSnapshot: vi.fn(),
 }));
 
 vi.mock('../../src/session/state', () => ({
@@ -23,44 +24,46 @@ type ToolFn = (args: Record<string, unknown>) => Promise<{
 }>;
 const callTool = getElementsTool as unknown as ToolFn;
 
-const mockGetVisible = getElements as ReturnType<typeof vi.fn>;
+const mockGetSnapshot = getSnapshot as ReturnType<typeof vi.fn>;
 const mockGetBrowser = getBrowser as ReturnType<typeof vi.fn>;
 
-const defaultResult = { total: 1, showing: 1, hasMore: false, elements: [{ name: 'btn', selector: '#btn' }] };
+const snapshotText = '[Page: Login — https://example.com]\n  e1  button "Save"  →  #save';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetBrowser.mockReturnValue({ isAndroid: false, isIOS: false });
-  mockGetVisible.mockResolvedValue(defaultResult);
+  mockGetSnapshot.mockResolvedValue({ format: 'legacy', text: snapshotText, elements: {} });
 });
 
 describe('get_elements tool', () => {
-  it('passes inViewportOnly false to getElements', async () => {
-    await callTool({ inViewportOnly: false });
-    expect(mockGetVisible).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ inViewportOnly: false })
-    );
+  it('forwards inViewportOnly to getSnapshot', async () => {
+    await callTool({ inViewportOnly: true });
+    expect(mockGetSnapshot).toHaveBeenCalledWith(expect.anything(), { inViewportOnly: true });
   });
 
-  it('returns toon-encoded text with element data', async () => {
+  it('covers the whole page when inViewportOnly is omitted', async () => {
+    await callTool({});
+    expect(mockGetSnapshot).toHaveBeenCalledWith(expect.anything(), { inViewportOnly: false });
+  });
+
+  it('returns the snapshot text verbatim', async () => {
     const result = await callTool({});
     expect(result.isError).toBeFalsy();
-    expect(result.content[0].text).toContain('btn');
+    expect(result.content).toEqual([{ type: 'text', text: snapshotText }]);
+  });
+
+  it('applies the snapshot cap to oversized text', async () => {
+    const text = 'x'.repeat(SNAPSHOT_MAX_CHARS + 1);
+    mockGetSnapshot.mockResolvedValue({ format: 'legacy', text, elements: {} });
+    const result = await callTool({});
+    expect(result.content[0].text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
+    expect(result.content[0].text).toContain('… truncated: showing');
   });
 
   it('returns isError true on failure', async () => {
-    mockGetVisible.mockRejectedValue(new Error('browser disconnected'));
+    mockGetSnapshot.mockRejectedValue(new Error('browser disconnected'));
     const result = await callTool({});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('browser disconnected');
-  });
-
-  it('passes limit and offset to getElements', async () => {
-    await callTool({ limit: 10, offset: 5 });
-    expect(mockGetVisible).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ limit: 10, offset: 5 })
-    );
   });
 });

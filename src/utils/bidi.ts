@@ -1,0 +1,1 @@
+export const BIDI_REQUIRED_HINT = 'This session negotiated WebDriver Classic (Safari, `wdio:enforceWebDriverClassic: true`, or a driver/grid without BiDi). Use a Chrome, Firefox or Edge session without `wdio:enforceWebDriverClassic`.';
