@@ -67,7 +67,7 @@ See the [v5 plan](docs/architecture/v5-proposal.md), "Open decisions".
 
 | Item | Status |
 | --- | --- |
-| v4.x with the deprecations published, window elapsed | blocked on pushing and merging feature/v4-prep-10.2 (no PR yet) |
+| v4.x with the deprecations published, window elapsed | deprecations merged to `main` in #195; not yet released (latest is 4.1.0, which predates them) |
 | Collector comparison on a mobile app and an Electron app | blocked on a device run; no owner |
 
 ## MCP v5 changes
