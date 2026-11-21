@@ -35,7 +35,7 @@ See the [v5 plan](docs/architecture/v5-proposal.md), "Open decisions".
 | --- | --- |
 | 1. `@wdio/session` is the engine, MCP the adapter | open, session owner |
 | 2. Devtools accepts session action events as a step source | open, devtools owners |
-| 4. MCP investment after v5 | open; decides the "After v5" list |
+| 4. MCP investment after v5 | open; decides the "After v5" list. Evidence plan: [run_code proposal](docs/architecture/run-code-proposal.md), *Measurement* |
 | 5. Who connects action events to the devtools recorder | open |
 | 6. Cutoff date for parking v5 | open |
 | 7. Fate of `@wdio/session`'s own `trace` action | open |
@@ -93,5 +93,6 @@ S4 (`exec` code and arguments), S6 (TypeScript in generated frame code), W1-W3 (
 Depends on open decision 4.
 
 - [Interaction sequencing](docs/architecture/interaction-sequencing-proposal.md): stale draft; re-scope against the agent first.
+- [`run_code`](docs/architecture/run-code-proposal.md): WebdriverIO code through the agent's `exec`, listed only by user opt-in. Can run earlier on v4.x as the decision 4 experiment (its open decision 4).
 - Cross-process session registry.
 - Visual regression, file upload/download, assertion helpers.
