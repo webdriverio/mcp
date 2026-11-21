@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import { z } from 'zod';
 import pkg from '../package.json' with { type: 'json' };
-import http from 'node:http';
+import type http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { parseArgs, type ParsedArgs } from './utils/parse-args';
 import { runCodeTool, runCodeToolDefinition } from './tools/run-code.tool';
-import { extractHost, sendJsonRpcError } from './utils/http-helpers';
+import { extractHost, listenOn, sendJsonRpcError } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
+import { clientLine, initializeClientInfo } from './utils/client-info';
 import type { ToolDefinition } from './types/tool';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
@@ -103,6 +105,7 @@ console.info = (...args) => console.error('[INFO]', ...args);
 console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 
+const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
 const defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS);
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
@@ -256,7 +259,7 @@ async function main() {
   }
 
   if (args.http) {
-    http.createServer((req, res) => {
+    const handle: http.RequestListener = (req, res) => {
 
       const host = extractHost(req.headers.host ?? '');
       if (!args.allowedHosts.includes(host)) {
@@ -309,6 +312,9 @@ async function main() {
             sendJsonRpcError(res, 400, -32700, 'Parse error');
             return;
           }
+          // a server per request never sees both initialize and initialized, so read the client from the request
+          const clientInfo = initializeClientInfo(body);
+          if (clientInfo) console.info(clientLine(clientInfo));
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
           const server = createServer(args);
           res.on('close', () => void server.close());
@@ -321,20 +327,27 @@ async function main() {
           if (!res.headersSent) sendJsonRpcError(res, 500, -32603, 'Internal error');
         }
       })();
-    }).listen(args.port, () => {
-      const originsMsg = args.allowedOrigins.length ? args.allowedOrigins.join(', ') : '(none — browsers blocked)';
-      console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
-      console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
-      console.error(`  allowed origins: ${originsMsg}`);
-      if (args.allowCode) console.warn('run_code is enabled over HTTP: any client that can reach this port can run code in this process.');
-    }).on('error', (error) => {
+    };
+    let listening: http.Server[];
+    try {
+      listening = await listenOn(args.hosts, args.port, handle);
+    } catch (error) {
       console.error('Fatal error starting HTTP server:', error);
       process.exit(1);
-    });
+    }
+    const originsMsg = args.allowedOrigins.length ? args.allowedOrigins.join(', ') : '(none — browsers blocked)';
+    console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
+    console.error(`  listening on:    ${listening.map((server) => (server.address() as AddressInfo).address).join(', ')}`);
+    console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
+    console.error(`  allowed origins: ${originsMsg}`);
+    const exposed = args.hosts.filter((host) => !LOOPBACK.has(host));
+    if (args.allowCode && exposed.length) console.warn(`run_code is enabled and the server listens on ${exposed.join(', ')}: any client that can reach it can run code in this process.`);
 
   } else {
     const transport = new StdioServerTransport();
-    await createServer(args).connect(transport);
+    const server = createServer(args);
+    server.server.oninitialized = () => console.info(clientLine(server.server.getClientVersion()));
+    await server.connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
     // the client closing stdin is how most of them stop a stdio server
     process.stdin.once('end', shutdown);

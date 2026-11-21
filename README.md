@@ -235,6 +235,7 @@ npx @wdio/mcp --http --port 3000
 |--------------------|------------------------------------|---------------------------------------------------------|
 | `--http`           | —                                  | Enable HTTP transport mode                              |
 | `--port`           | `3000`                             | Port to listen on                                       |
+| `--host`           | `127.0.0.1` and `::1`              | Address to listen on. Loopback only by default; `--host 0.0.0.0` exposes the server to the network (add its host name to `--allowedHosts`) |
 | `--allowedHosts`   | `localhost,127.0.0.1,::1`          | Allowed `Host` header values (DNS rebinding protection) |
 | `--allowedOrigins` | _(none — browser clients blocked)_ | Allowed `Origin` values for CORS. Use `*` to allow all. |
 
@@ -254,7 +255,8 @@ npx @wdio/mcp --allow-code
 WDIO_MCP_RUN_CODE=1 npx @wdio/mcp
 ```
 
-With `--http`, any client that can reach the port can call it; the server logs a warning at startup.
+Over `--http` the server listens on loopback only. With `--host` set to another address, any client that can reach it
+can call `run_code`, and the server logs a warning at startup.
 `expect` is not available in `run_code`; the code throws an `Error` to fail.
 
 ### Prerequisites For Mobile App Automation

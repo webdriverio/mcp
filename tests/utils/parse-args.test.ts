@@ -6,6 +6,7 @@ const defaults = {
   port: 3000,
   allowedHosts: ['localhost', '127.0.0.1', '::1'],
   allowedOrigins: [] as string[],
+  hosts: ['127.0.0.1', '::1'],
   allowCode: false,
 };
 
@@ -71,6 +72,16 @@ describe('parseArgs', () => {
 
   it('throws when --allowedOrigins has no value', () => {
     expect(() => parseArgs(['--http', '--allowedOrigins'])).toThrow('--allowedOrigins requires a comma-separated list');
+  });
+
+  it('listens on both loopback addresses unless --host names one', () => {
+    expect(parseArgs(['--http']).hosts).toEqual(['127.0.0.1', '::1']);
+    expect(parseArgs(['--http', '--host', '0.0.0.0']).hosts).toEqual(['0.0.0.0']);
+  });
+
+  it('throws when --host has no address', () => {
+    expect(() => parseArgs(['--http', '--host'])).toThrow('--host requires an address');
+    expect(() => parseArgs(['--http', '--host', '--port', '1'])).toThrow('--host requires an address');
   });
 
   it('lists run_code only on --allow-code or WDIO_MCP_RUN_CODE', () => {
