@@ -384,6 +384,9 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         `await browser.url(\`${escapeStr(scheme)}://\${extension}/${escapeStr(extensionPath)}\`);`,
       ].join('\n');
     }
+    // code that only read the page records no code of its own
+    case 'run_code':
+      return '// run_code: read only, nothing to replay';
     default:
       return `// [unknown tool] ${step.tool}`;
   }

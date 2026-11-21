@@ -6,6 +6,7 @@ const defaults = {
   port: 3000,
   allowedHosts: ['localhost', '127.0.0.1', '::1'],
   allowedOrigins: [] as string[],
+  allowCode: false,
 };
 
 describe('parseArgs', () => {
@@ -70,5 +71,12 @@ describe('parseArgs', () => {
 
   it('throws when --allowedOrigins has no value', () => {
     expect(() => parseArgs(['--http', '--allowedOrigins'])).toThrow('--allowedOrigins requires a comma-separated list');
+  });
+
+  it('lists run_code only on --allow-code or WDIO_MCP_RUN_CODE', () => {
+    expect(parseArgs([], {}).allowCode).toBe(false);
+    expect(parseArgs(['--allow-code'], {}).allowCode).toBe(true);
+    for (const value of ['1', 'true', 'TRUE']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(true);
+    for (const value of ['', '0', 'false', 'yes']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(false);
   });
 });

@@ -6,7 +6,8 @@ import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/ser
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { parseArgs } from './utils/parse-args';
+import { parseArgs, type ParsedArgs } from './utils/parse-args';
+import { runCodeTool, runCodeToolDefinition } from './tools/run-code.tool';
 import { extractHost, sendJsonRpcError } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
 import type { ToolDefinition } from './types/tool';
@@ -105,7 +106,7 @@ console.debug = (...args) => console.error('[DEBUG]', ...args);
 const defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS);
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
-function createServer(): McpServer {
+function createServer({ allowCode }: Pick<ParsedArgs, 'allowCode'>): McpServer {
   const server = new McpServer({
     title: 'WebdriverIO MCP Server',
     name: pkg.name,
@@ -192,6 +193,7 @@ function createServer(): McpServer {
   registerTool(setGeolocationToolDefinition, instrument('set_geolocation', setGeolocationTool));
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
+  if (allowCode) registerTool(runCodeToolDefinition, instrument('run_code', runCodeTool));
   registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
   registerTool(mockToolDefinition, instrument('mock', mockTool));
   registerTool(getMockCallsToolDefinition, instrument('get_mock_calls', getMockCallsTool));
@@ -245,7 +247,7 @@ function createServer(): McpServer {
 async function main() {
   installCrashHandlers(process, console.error);
   process.on('exit', killAllDriverTrees);
-  let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
+  let args: ParsedArgs;
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (e) {
@@ -308,7 +310,7 @@ async function main() {
             return;
           }
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-          const server = createServer();
+          const server = createServer(args);
           res.on('close', () => void server.close());
           await server.connect(transport);
           await transport.handleRequest(req, res, body);
@@ -324,6 +326,7 @@ async function main() {
       console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
       console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
       console.error(`  allowed origins: ${originsMsg}`);
+      if (args.allowCode) console.warn('run_code is enabled over HTTP: any client that can reach this port can run code in this process.');
     }).on('error', (error) => {
       console.error('Fatal error starting HTTP server:', error);
       process.exit(1);
@@ -331,7 +334,7 @@ async function main() {
 
   } else {
     const transport = new StdioServerTransport();
-    await createServer().connect(transport);
+    await createServer(args).connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
     // the client closing stdin is how most of them stop a stdio server
     process.stdin.once('end', shutdown);

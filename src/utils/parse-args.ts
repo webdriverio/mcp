@@ -3,6 +3,8 @@ export interface ParsedArgs {
   port: number;
   allowedHosts: string[];
   allowedOrigins: string[];
+  /** list `run_code`, which runs WebdriverIO code in this process: `--allow-code` or `WDIO_MCP_RUN_CODE=1` */
+  allowCode: boolean;
 }
 
 function parseList(argv: string[], flag: string): string[] | null {
@@ -15,7 +17,7 @@ function parseList(argv: string[], flag: string): string[] | null {
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-export function parseArgs(argv: string[]): ParsedArgs {
+export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env): ParsedArgs {
   const http = argv.includes('--http');
 
   const portIdx = argv.indexOf('--port');
@@ -32,5 +34,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const allowedHosts = parseList(argv, '--allowedHosts') ?? ['localhost', '127.0.0.1', '::1'];
   const allowedOrigins = parseList(argv, '--allowedOrigins') ?? [];
 
-  return { http, port, allowedHosts, allowedOrigins };
+  const allowCode = argv.includes('--allow-code') || ['1', 'true'].includes(env.WDIO_MCP_RUN_CODE?.toLowerCase() ?? '');
+
+  return { http, port, allowedHosts, allowedOrigins, allowCode };
 }
