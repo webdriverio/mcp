@@ -265,5 +265,6 @@ Unimplemented proposals only; shipped work is not listed here. See `docs/archite
 - `interaction-sequencing-proposal.md` — sequencing model for tool interactions
 - `trace-extraction-proposal.md` — extracting trace data to a standalone package; superseded by `v5-proposal.md`
 - `v5-proposal.md` — engine consolidation onto `@wdio/session` and devtools trace
+- `run-code-proposal.md` — `run_code` tool over the agent's `exec`; client-usage measurement for v5 decision 4
 
 `providers/registry.ts` + `providers/cloud/` is the extension point for new cloud providers.

@@ -167,9 +167,9 @@ Work MCP can do now, without waiting on other repos. It shrinks v5 to integratio
    `sameSite`: on `main` (pinned 10.1.0) `'lax'` and `'strict'` throw `invalid argument: invalid 'sameSite'`, and 10.2.0
    accepts both (one machine, 3 repetitions per cell; `src/tools/cookies.tool.ts:36` passes the value through).
 7. **Prepared, not yet submitted.** **Route non-agent tools through agent
-   actions.** `execute_script` (`exec`), mocks (`mock`/`unmock`), cookies (`cookies`/`storage`) and device tools (`app`,
+   actions.** Mocks (`mock`/`unmock`), cookies (`cookies`/`storage`) and device tools (`app`,
    `deeplink`, `rotate`, `keyboard`, `background`, `lock`, `unlock`) exist as actions in
-   `packages/wdio-session/src/actions/index.ts:28`, `:59-65`, `:75-78`, but only some could be routed without changing
+   `packages/wdio-session/src/actions/index.ts:59-65`, `:75-78`, but only some could be routed without changing
    behaviour:
    - **Routed:** `set_cookie` and `delete_cookies` (`cookies`).
    - **Held until a device run:** `rotate_device` (`rotate`), `hide_keyboard` (`keyboard`) and `drag_and_drop` with a
@@ -177,9 +177,12 @@ Work MCP can do now, without waiting on other repos. It shrinks v5 to integratio
      no device was available to run them, so they stay direct and `rotate_device`/`hide_keyboard` stay unrecorded.
    - **Newly recorded via `instrument`** (`src/server.ts`): `switch_frame`, `set_geolocation`, `set_cookie` and
      `delete_cookies`.
-   - **Kept direct** (session paths relative to `packages/wdio-session/`): `execute_script` — session's `exec` takes a
-     code string and no script arguments, and its result has no `code`, only a history entry
-     (`src/actions/exec.ts:96-155`; `src/session.ts:405-415` appends that entry and strips it from the result). The mock
+   - **Kept direct** (session paths relative to `packages/wdio-session/`): `execute_script` — it runs JavaScript in the
+     page, and session has no in-page script action to route it to. Session's `exec` is a different capability: WebdriverIO
+     code in Node with `browser`, `$` and refs in scope, variables kept between calls (`src/actions/specs.ts:182-187`).
+     It takes a code string and no script arguments, and its result has no `code`, only a history entry
+     (`src/actions/exec.ts:96-155`; `src/session.ts:405-415` appends that entry and strips it from the result). MCP has
+     no tool for it; `run-code-proposal.md` proposes one, `run_code`, next to `execute_script`. The mock
      tools — session's `mock` keeps its own registry in the session store (`src/actions/network.ts:114-118`), so routing
      only creation would leave two mock stores. `scroll` — session's uses `browser.scroll`, a wheel action
      (`src/actions/interact.ts:1179`); MCP's uses `window.scrollBy` (`src/tools/scroll.tool.ts:32` in MCP). `swipe` and
@@ -386,7 +389,9 @@ only — not a merge or port candidate.
 3. **Answered (webdriverio #16344, in 10.2.0).** **webdriverio monorepo:** is `workspace:*` in `dependencies` (snapshot
    and session) a deliberate lockstep policy? No: both packages now peer on `webdriverio ^10.0.0` (Chain A step 1).
 4. **Investment:** how many MCP users run shell-based agents (where the session CLI plus a skill is often better) versus
-   clients without a shell? The answer decides whether MCP grows or goes into maintenance after v5.
+   clients without a shell? The answer decides whether MCP grows or goes into maintenance after v5. How to get the
+   answer (client evidence so far, `clientInfo` logging, and an eval of MCP against the session CLI) is in
+   `run-code-proposal.md`, *Measurement*.
 5. **Connector:** who wires session action events into the devtools recorder — MCP or devtools?
 6. **Cutoff:** if decisions 1–2 stay open past an agreed date, is v5 explicitly parked while v4.x preparation continues?
 7. **Session trace:** does session's `trace` action stay, merge into devtools, or get dropped? Otherwise there is a third
