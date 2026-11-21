@@ -241,6 +241,24 @@ npx @wdio/mcp --http --port 3000
 
 Then point your MCP client at `http://localhost:3000/mcp`.
 
+### Running WebdriverIO code (`run_code`)
+
+`run_code` lets the agent run WebdriverIO code against the session in one call: loops, conditions and waits, such as
+filtering a table's rows or retrying until a toast appears. Only what the code prints comes back, so intermediate data
+stays out of the model's context. The code that changes the page is recorded into the generated script.
+
+It is **off by default**. The code runs inside the MCP server's own process with your user's permissions (`process`,
+`fetch` and dynamic `import` are available), so for the agent it is the same as a shell. Enable it with either:
+
+```bash
+npx @wdio/mcp --allow-code
+WDIO_MCP_RUN_CODE=1 npx @wdio/mcp
+```
+
+Over `--http` the server listens on loopback only. With `--host` set to another address, any client that can reach it
+can call `run_code`, and the server logs a warning at startup.
+`expect` is not available in `run_code`; the code throws an `Error` to fail.
+
 ### Prerequisites For Mobile App Automation
 
 - **Appium Server**: Install globally with `npm install -g appium`
@@ -755,6 +773,7 @@ navigate({ url: "https://example.com", session: "bob" })
 | `scroll`                 | Scroll in a direction (up/down) by specified pixels. Browser-only.                                                                                                                                     |
 | `execute_script`         | Execute arbitrary JavaScript in the browser, or Appium mobile commands on devices                                                                                                                      |
 | `execute_electron_script` | Execute privileged JavaScript in the Electron main process (Electron sessions only)                                                                                                                   |
+| `run_code`               | Run WebdriverIO code in Node against the session (`browser`, `$`, `$$`, `ref('e12')`); returns what it prints. Off unless enabled, see [Running WebdriverIO code](#running-webdriverio-code-run_code) |
 | `trigger_electron_deeplink` | Trigger an Electron deeplink whose scheme was explicitly configured at session start                                                                                                                 |
 | `mock` | Configure a session-scoped mock: an Electron main-process API function or a browser network request |
 | `get_mock_calls` | Inspect call arguments (Electron) or intercepted request records (browser) for a session-scoped mock |

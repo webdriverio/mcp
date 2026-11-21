@@ -7,6 +7,7 @@ const defaults = {
   allowedHosts: ['localhost', '127.0.0.1', '::1'],
   allowedOrigins: [] as string[],
   hosts: ['127.0.0.1', '::1'],
+  allowCode: false,
 };
 
 describe('parseArgs', () => {
@@ -81,5 +82,12 @@ describe('parseArgs', () => {
   it('throws when --host has no address', () => {
     expect(() => parseArgs(['--http', '--host'])).toThrow('--host requires an address');
     expect(() => parseArgs(['--http', '--host', '--port', '1'])).toThrow('--host requires an address');
+  });
+
+  it('lists run_code only on --allow-code or WDIO_MCP_RUN_CODE', () => {
+    expect(parseArgs([], {}).allowCode).toBe(false);
+    expect(parseArgs(['--allow-code'], {}).allowCode).toBe(true);
+    for (const value of ['1', 'true', 'TRUE']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(true);
+    for (const value of ['', '0', 'false', 'yes']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(false);
   });
 });

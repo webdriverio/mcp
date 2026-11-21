@@ -8,6 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { parseArgs, type ParsedArgs } from './utils/parse-args';
+import { runCodeTool, runCodeToolDefinition } from './tools/run-code.tool';
 import { extractHost, listenOn, sendJsonRpcError } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
 import { clientLine, initializeClientInfo } from './utils/client-info';
@@ -104,10 +105,11 @@ console.info = (...args) => console.error('[INFO]', ...args);
 console.warn = (...args) => console.error('[WARN]', ...args);
 console.debug = (...args) => console.error('[DEBUG]', ...args);
 
+const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
 const defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS);
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
-function createServer(): McpServer {
+function createServer({ allowCode }: Pick<ParsedArgs, 'allowCode'>): McpServer {
   const server = new McpServer({
     title: 'WebdriverIO MCP Server',
     name: pkg.name,
@@ -194,6 +196,7 @@ function createServer(): McpServer {
   registerTool(setGeolocationToolDefinition, instrument('set_geolocation', setGeolocationTool));
 
   registerTool(executeScriptToolDefinition, instrument('execute_script', executeScriptTool));
+  if (allowCode) registerTool(runCodeToolDefinition, instrument('run_code', runCodeTool));
   registerTool(executeElectronScriptToolDefinition, instrument('execute_electron_script', executeElectronScriptTool));
   registerTool(mockToolDefinition, instrument('mock', mockTool));
   registerTool(getMockCallsToolDefinition, instrument('get_mock_calls', getMockCallsTool));
@@ -313,7 +316,7 @@ async function main() {
           const clientInfo = initializeClientInfo(body);
           if (clientInfo) console.info(clientLine(clientInfo));
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-          const server = createServer();
+          const server = createServer(args);
           res.on('close', () => void server.close());
           await server.connect(transport);
           await transport.handleRequest(req, res, body);
@@ -337,10 +340,12 @@ async function main() {
     console.error(`  listening on:    ${listening.map((server) => (server.address() as AddressInfo).address).join(', ')}`);
     console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
     console.error(`  allowed origins: ${originsMsg}`);
+    const exposed = args.hosts.filter((host) => !LOOPBACK.has(host));
+    if (args.allowCode && exposed.length) console.warn(`run_code is enabled and the server listens on ${exposed.join(', ')}: any client that can reach it can run code in this process.`);
 
   } else {
     const transport = new StdioServerTransport();
-    const server = createServer();
+    const server = createServer(args);
     server.server.oninitialized = () => console.info(clientLine(server.server.getClientVersion()));
     await server.connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
