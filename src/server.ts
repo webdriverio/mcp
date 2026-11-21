@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { z } from 'zod';
 import pkg from '../package.json' with { type: 'json' };
-import http from 'node:http';
+import type http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { parseArgs } from './utils/parse-args';
-import { extractHost, sendJsonRpcError } from './utils/http-helpers';
+import { parseArgs, type ParsedArgs } from './utils/parse-args';
+import { extractHost, listenOn, sendJsonRpcError } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
 import { clientLine, initializeClientInfo } from './utils/client-info';
 import type { ToolDefinition } from './types/tool';
@@ -246,7 +247,7 @@ function createServer(): McpServer {
 async function main() {
   installCrashHandlers(process, console.error);
   process.on('exit', killAllDriverTrees);
-  let args:{ http: boolean; port: number; allowedHosts: string[]; allowedOrigins: string[] };
+  let args: ParsedArgs;
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (e) {
@@ -255,7 +256,7 @@ async function main() {
   }
 
   if (args.http) {
-    http.createServer((req, res) => {
+    const handle: http.RequestListener = (req, res) => {
 
       const host = extractHost(req.headers.host ?? '');
       if (!args.allowedHosts.includes(host)) {
@@ -323,15 +324,19 @@ async function main() {
           if (!res.headersSent) sendJsonRpcError(res, 500, -32603, 'Internal error');
         }
       })();
-    }).listen(args.port, () => {
-      const originsMsg = args.allowedOrigins.length ? args.allowedOrigins.join(', ') : '(none — browsers blocked)';
-      console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
-      console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
-      console.error(`  allowed origins: ${originsMsg}`);
-    }).on('error', (error) => {
+    };
+    let listening: http.Server[];
+    try {
+      listening = await listenOn(args.hosts, args.port, handle);
+    } catch (error) {
       console.error('Fatal error starting HTTP server:', error);
       process.exit(1);
-    });
+    }
+    const originsMsg = args.allowedOrigins.length ? args.allowedOrigins.join(', ') : '(none — browsers blocked)';
+    console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
+    console.error(`  listening on:    ${listening.map((server) => (server.address() as AddressInfo).address).join(', ')}`);
+    console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
+    console.error(`  allowed origins: ${originsMsg}`);
 
   } else {
     const transport = new StdioServerTransport();

@@ -1,4 +1,4 @@
-import type { ServerResponse } from 'node:http';
+import http, { type ServerResponse } from 'node:http';
 
 export function extractHost(header: string): string {
   if (header.startsWith('[')) {
@@ -12,4 +12,27 @@ export function sendJsonRpcError(res: ServerResponse, httpStatus: number, code: 
   const body = JSON.stringify({ jsonrpc: '2.0', id: null, error: { code, message } });
   res.writeHead(httpStatus, { 'Content-Type': 'application/json' });
   res.end(body);
+}
+
+const MISSING_ADDRESS = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT']);
+
+/**
+ * One server per address. Of several addresses, one the machine lacks (`::1` with IPv6 off) is skipped as long as
+ * another listens; any other error, or a single address failing, rejects.
+ */
+export async function listenOn(hosts: string[], port: number, handle: http.RequestListener): Promise<http.Server[]> {
+  const listening: http.Server[] = [];
+  for (const host of hosts) {
+    try {
+      const server = http.createServer(handle);
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject).listen(port, host, resolve);
+      });
+      listening.push(server);
+    } catch (e) {
+      if (hosts.length === 1 || !MISSING_ADDRESS.has((e as NodeJS.ErrnoException).code ?? '')) throw e;
+    }
+  }
+  if (!listening.length) throw new Error(`None of ${hosts.join(', ')} is available to listen on`);
+  return listening;
 }
