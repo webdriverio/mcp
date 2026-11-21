@@ -7,7 +7,7 @@ Status: not filed. Paste each section's title and body into the repo named in th
 | S1 | Export an in-process launch API (`@wdio/session/launch`) with hook injection | `webdriverio/webdriverio` | `Enhancement` |
 | S2 | Emit action events from `AgentSession` (`onAction` option or an emitter) | `webdriverio/webdriverio` | `Enhancement` |
 | S3 | Add Digital.ai as a cloud provider | `webdriverio/webdriverio` | `Enhancement` |
-| S4 | `exec` action: return `code` in the result and accept arguments | `webdriverio/webdriverio` | `Enhancement` |
+| S4 | `exec` action: return `code` in the result and accept arguments (filed, extended: webdriverio/webdriverio#16493) | `webdriverio/webdriverio` | `Enhancement` |
 | S5 | Public exporter for a standalone script with a launch preamble | `webdriverio/webdriverio` | `Enhancement` |
 | S6 | Agent-generated frame code is TypeScript, not JavaScript | `webdriverio/webdriverio` | `Bug 🐛` |
 | D1 | Standalone: `setupForDevtools()` cannot select trace mode | `webdriverio/devtools` | `bug` |

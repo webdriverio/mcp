@@ -93,6 +93,6 @@ S4 (`exec` code and arguments), S6 (TypeScript in generated frame code), W1-W3 (
 Depends on open decision 4.
 
 - [Interaction sequencing](docs/architecture/interaction-sequencing-proposal.md): stale draft; re-scope against the agent first.
-- [`run_code`](docs/architecture/run-code-proposal.md): WebdriverIO code through the agent's `exec`, listed only by user opt-in. Can run earlier on v4.x as the decision 4 experiment (its open decision 4).
+- [`run_code`](docs/architecture/run-code-proposal.md): WebdriverIO code through the agent's `exec`, listed only by user opt-in. v4 part in review (#199) as the decision 4 experiment; client logging in #198.
 - Cross-process session registry.
 - Visual regression, file upload/download, assertion helpers.

@@ -1,10 +1,12 @@
 # `run_code` — WebdriverIO code through the agent's `exec`
 
-**Status:** Proposal — not implemented, not run. Facts checked 2026-11-21 against `@wdio/mcp` `feature/v5` (`b2b1bf2`;
+**Status:** v4 part in review: `run_code` behind `--allow-code` / `WDIO_MCP_RUN_CODE` (#199), client logging (#198);
+the engine gaps are filed as webdriverio/webdriverio#16493. Facts checked 2026-11-21 against `@wdio/mcp` `feature/v5` (`b2b1bf2`;
 its `src/` is identical to `main` `1354cf8`) and the `@wdio/session` source at tag `v10.2.0` (`5743972`). Session paths
 are relative to `packages/wdio-session/`; MCP paths to this repo. The two never collide: `src/agent.ts`,
 `src/session.ts`, `src/constants.ts` and anything under `src/actions/`, `src/exec/` or `src/cli/` is session's
-(MCP has none of these); every other path is MCP's. No browser run backs this document (see *Unverified*).
+(MCP has none of these); every other path is MCP's. The engine behaviour was run on 2026-11-21 against the real `@wdio/session` agent with a stub
+browser; no real browser backs this document (see *Unverified*).
 
 **Placement:** an adapter over an engine action, so it fits decision 1 (session is the engine, MCP the adapter). The v5
 roadmap holds new tools until decision 4; this proposal is also the experiment that gives decision 4 its evidence (see
@@ -69,7 +71,10 @@ One tool, `run_code`, routed (gets the `session` argument from `withSessionTarge
 - **Shell-less clients** (Claude Desktop and similar): `run_code` is a new capability, and these are the clients it is
   for. The value and the risk are the same property.
 - Therefore listing must be the **user's** choice, made in configuration: not an `enable_tools` group, which the model
-  can turn on itself (`src/tool-visibility.ts`). Candidate: `--allow-code` / `WDIO_MCP_RUN_CODE=1`. Open decision 1.
+  can turn on itself (`src/tool-visibility.ts`). Decided: `--allow-code` and `WDIO_MCP_RUN_CODE=1`/`true`, either one.
+- **HTTP.** The HTTP server listens on every interface (`.listen(args.port)` in `src/server.ts`), and the `Host`
+  allowlist does not stop a client on the network that sends `Host: localhost`. With `--allow-code` that client can run
+  code in the server process. #199 logs a startup warning; binding to `127.0.0.1` by default is the fix, separately.
 - `console` inside `exec` goes to a sink (`capturedConsole`, `src/exec/context.ts:109`, `:180`), but `process.stdout.write` does not,
   and `src/server.ts` reassigns only `console`. Code that writes to `process.stdout` corrupts the stdio transport.
   Mitigation options: a `process` without `stdout` in the context (engine change) or documenting it. Open decision 3.
@@ -88,7 +93,9 @@ One tool, `run_code`, routed (gets the `session` argument from `withSessionTarge
   (`src/exec/context.ts:92`, `:208-224`). MCP creates the agent without a `cwd` (`src/session/agent.ts:25`), so it is
   `process.cwd()` (`src/agent.ts:253`) — whatever directory the client started the server in. `expect-webdriverio` is
   not in MCP's dependency tree today, so `expect` in `run_code` fails with `MISSING_DEPENDENCY`. Adding it as a
-  dependency is the likely fix; that pnpm then resolves it for session is unverified. Open decision 2.
+  dependency would work: with it added, pnpm links it next to `@wdio/session` (2026-11-21; +9.3 MB in the store). Decided
+  for v4: not added. Loops, waits and checks need only `waitUntil`/`waitFor*` and `throw`, and the generated script
+  imports only `remote`, so a recorded `expect` line would not run there. The tool description says `expect` is unavailable.
 - **Artifacts.** With no `artifactsDir`, the agent writes to a fresh `wdio-agent-*` temp directory (`src/agent.ts:254`);
   `exec`'s spill file lands there.
 
@@ -140,7 +147,8 @@ shell-less users at all. It is also small (about 13 repositories). It is a floor
 
 The direct signal is `clientInfo.name` in the MCP `initialize` request. Cheapest first:
 
-1. Log `clientInfo` (name and version) to stderr at the handshake, so it appears in every client log a user attaches.
+1. Log `clientInfo` (name and version) to stderr at the handshake, so it appears in every client log a user attaches
+   (#198: `[INFO] MCP client: <name> <version>`).
 2. Add a required "MCP client" dropdown to the bug and feature issue templates.
 3. A pinned GitHub Discussion poll, linked from the README.
 4. Re-run the code search each quarter with the queries below.
@@ -156,9 +164,10 @@ Code search queries (GitHub REST `search/code`, then drop `webdriverio/*`): `"@w
 
 ## Upstream
 
-- **S4, extended.** Besides returning `code` and accepting `args`: make `agent.run('exec', …)` accept the argument the
-  action reads (`code`, or map `e`), and let `run`/`runAction` take a timeout that reaches `$timeout`. Added to S4 in
-  `v5-upstream-issues-to-file.md` and `v5-upstream-issue-drafts.md`.
+- **S4, extended — filed as webdriverio/webdriverio#16493.** Besides returning `code` and accepting `args`: make
+  `agent.run('exec', …)` accept the argument the action reads (`code`, or map `e`), and let `run`/`runAction` take a
+  timeout that reaches `$timeout`. Reproduced on the real agent: a typed `run('exec', { e })` returns `""`; `$timeout:
+  3000` fails after 2,003 ms with the output so far. #199 works around both with `runAction('exec', { code, $timeout })`.
 - **S7 candidate, not drafted.** The process-wide `globalThis.browser` set by the first `exec` context. Drafted only
   once a matcher that reads it is identified. Listed under *Candidate, not drafted* in the drafts file.
 
@@ -166,19 +175,21 @@ Code search queries (GitHub REST `search/code`, then drop `webdriverio/*`): `"@w
 
 ## Open decisions
 
-1. **Opt-in mechanism** for listing `run_code`: a CLI flag, an environment variable, or both.
-2. **`expect-webdriverio`** as an MCP dependency, or `expect` unavailable in `run_code`.
-3. **`process.stdout`** inside `exec`: engine change, MCP-side guard, or documentation only.
-4. **Timing:** build behind the opt-in on v4.x as the decision 4 experiment, or wait for decision 4.
+1. **Opt-in mechanism.** Decided: a CLI flag and an environment variable (#199).
+2. **`expect-webdriverio`.** Decided for v4: not a dependency; `expect` is unavailable in `run_code` (see *Concurrency and
+   dependencies*).
+3. **`process.stdout`** inside `exec`: engine change, MCP-side guard, or documentation only. Open.
+4. **Timing.** Decided: v4.x behind the opt-in, as the decision 4 experiment (#199).
+5. **HTTP binding:** listen on `127.0.0.1` by default instead of every interface. Open; pre-existing, raised by #199.
 
 ---
 
 ## Unverified
 
-- **Nothing here was run.** The environment that wrote this had Chrome 153 and chromedriver 147 and could not download
-  a matching driver. Every behaviour above is read from source.
+- **No real browser.** The environment had Chrome 153 and chromedriver 147 and could not download a matching driver.
+  `exec` was run through the real `@wdio/session` agent with a stub browser (code that does not touch the page), which
+  covers input, timeout, persistence, history and output; page actions and ref rewriting were not run.
 - **Global `browser`:** which `expect-webdriverio` matchers read it.
-- **`expect` resolution** after adding `expect-webdriverio` to MCP's dependencies, under pnpm.
 - **Claude Desktop's working directory** for a stdio server, which decides where a relative `import` in `run_code` resolves.
 - **Code search completeness:** the REST code search returns at most 100 results per query and indexes default
   branches only; forks and private repositories are not covered.

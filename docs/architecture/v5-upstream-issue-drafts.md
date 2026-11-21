@@ -253,6 +253,8 @@ It is the one provider MCP has that session lacks. MCP can contribute the port.
 
 ## S4. `exec` result and arguments
 
+**Filed 2026-11-21 as webdriverio/webdriverio#16493**, together with the agent input and timeout items below.
+
 **Title:** `exec` action: return `code` in the result and accept arguments
 
 **Target repo:** `webdriverio/webdriverio` (`packages/wdio-session`)
