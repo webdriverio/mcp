@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { parseArgs } from './utils/parse-args';
 import { extractHost, sendJsonRpcError } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
+import { clientLine, initializeClientInfo } from './utils/client-info';
 import type { ToolDefinition } from './types/tool';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
@@ -307,6 +308,9 @@ async function main() {
             sendJsonRpcError(res, 400, -32700, 'Parse error');
             return;
           }
+          // a server per request never sees both initialize and initialized, so read the client from the request
+          const clientInfo = initializeClientInfo(body);
+          if (clientInfo) console.info(clientLine(clientInfo));
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
           const server = createServer();
           res.on('close', () => void server.close());
@@ -331,7 +335,9 @@ async function main() {
 
   } else {
     const transport = new StdioServerTransport();
-    await createServer().connect(transport);
+    const server = createServer();
+    server.server.oninitialized = () => console.info(clientLine(server.server.getClientVersion()));
+    await server.connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');
     // the client closing stdin is how most of them stop a stdio server
     process.stdin.once('end', shutdown);
