@@ -3,7 +3,7 @@ import { getState } from '../../src/session/state';
 
 const run = vi.fn();
 const snapshot = vi.fn();
-const session = { isWeb: true };
+const session = { isWeb: true, abandon: vi.fn() };
 let actions: { name: string }[] = [];
 const ALL_STEPS = ['click', 'fill', 'select', 'check', 'uncheck', 'press'].map((name) => ({ name }));
 const createAgentSession = vi.fn(async (browser: unknown) => ({ browser, run, snapshot, session, get actions() { return actions; } }));
@@ -37,6 +37,7 @@ beforeEach(() => {
   state.sessionMetadata.clear();
   state.currentSession = null;
   run.mockReset();
+  session.abandon.mockReset();
   snapshot.mockReset();
   createAgentSession.mockClear();
   actions = ALL_STEPS;
@@ -366,8 +367,39 @@ describe('action timeout for snapshots', () => {
 
   it('pageReport reports the timeout instead of hanging', async () => {
     snapshot.mockReturnValue(new Promise(() => {}));
-    const pending = pageReport({ snapshot } as never);
+    const pending = pageReport({ snapshot, session } as never);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(await pending).toContain('"snapshot" did not finish within 30s.');
+    expect(session.abandon).toHaveBeenCalledTimes(1);
+  });
+
+  it('abandons a timed-out snapshot so its late result does not change the session', async () => {
+    startSession('browser');
+    snapshot.mockReturnValue(new Promise(() => {}));
+    const pending = call(snapshotTool, {});
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(session.abandon).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(session.abandon).toHaveBeenCalledTimes(1);
+  });
+
+  it('abandons a timed-out action and reports TIMEOUT', async () => {
+    startSession('browser');
+    run.mockReturnValue(new Promise(() => {}));
+    const pending = call(clickTool, { selector: 'e3' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    const result = await pending;
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('"click" did not finish within 30s.');
+    expect(session.abandon).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not abandon an action that finishes in time', async () => {
+    startSession('browser');
+    run.mockResolvedValue({ text: 'Clicked' });
+    await call(clickTool, { selector: 'e3' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(session.abandon).not.toHaveBeenCalled();
   });
 });

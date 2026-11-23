@@ -29,7 +29,7 @@ export const snapshotTool: ToolCallback = async ({ find, full = false, scope, vi
     return runAction(agent, 'find', { text: find, ...(scope && { scope }) }, `No match for ${JSON.stringify(find)}.`);
   }
   try {
-    const snapshot = await withActionTimeout(agent.snapshot({ interactive: !full, scope, viewport, selectors, maxChars: SNAPSHOT_MAX_CHARS }), 'snapshot');
+    const snapshot = await withActionTimeout(agent.snapshot({ interactive: !full, scope, viewport, selectors, maxChars: SNAPSHOT_MAX_CHARS }), 'snapshot', agent);
     return { content: [{ type: 'text', text: [snapshot.text, ...(snapshot.notes ?? [])].join('\n') }] };
   } catch (e) {
     return errorResult(e);

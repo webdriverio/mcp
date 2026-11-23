@@ -60,18 +60,24 @@ export function errorResult(e: unknown, context?: string): CallToolResult {
   return { isError: true, content: [{ type: 'text', text: errorText(e, context) }] };
 }
 
-/** Rejects with a TIMEOUT error when `work` takes longer than the action limit. */
-export async function withActionTimeout<T>(work: Promise<T>, label: string): Promise<T> {
-  return withTimeout(work, ACTION_TIMEOUT_MS, () => new SessionError('TIMEOUT', `"${label}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`, {
-    hint: `The page may still be busy. \`${mcpHint('snapshot', { interactive: true })}\` shows where it is.`,
-  }));
+/**
+ * Rejects with a TIMEOUT error when `work` takes longer than the action limit. The action can't be cancelled; with
+ * its `agent`, it is abandoned, so when it finishes it no longer changes the session (frame, page baseline, history).
+ */
+export async function withActionTimeout<T>(work: Promise<T>, label: string, agent?: AgentSession): Promise<T> {
+  return withTimeout(work, ACTION_TIMEOUT_MS, () => {
+    agent?.session.abandon();
+    return new SessionError('TIMEOUT', `"${label}" did not finish within ${ACTION_TIMEOUT_MS / 1000}s.`, {
+      hint: `The page may still be busy. \`${mcpHint('snapshot', { interactive: true })}\` shows where it is.`,
+    });
+  });
 }
 
 export const APP_CHANGES_HINT = "App screens don't report changes: snapshot to see the result, and snapshot again if it is still loading.";
 
 export async function runActionWithChanges<A extends AgentActionName>(agent: AgentSession, action: A, args: ActionArgsOf<A>, done: string, appHint = true): Promise<{ result: CallToolResult; changes?: PageChange }> {
   try {
-    const result = await withActionTimeout(agent.run(action, args), action);
+    const result = await withActionTimeout(agent.run(action, args), action, agent);
     recordCode(result.code);
     const text = appHint && !agent.session.isWeb ? `${result.text || done}\n${APP_CHANGES_HINT}` : result.text || done;
     return { result: { content: [{ type: 'text', text }] }, changes: result.changes };
@@ -92,7 +98,7 @@ const MAX_PAGE_CHARS = 1500;
  */
 export async function pageReport(agent: AgentSession): Promise<string> {
   try {
-    const snapshot = await withActionTimeout(agent.snapshot({ interactive: true, maxChars: MAX_PAGE_CHARS }), 'snapshot');
+    const snapshot = await withActionTimeout(agent.snapshot({ interactive: true, maxChars: MAX_PAGE_CHARS }), 'snapshot', agent);
     const url = snapshot.page?.url ?? '';
     if (snapshot.tooBig) {
       const title = snapshot.page?.title;
