@@ -108,7 +108,17 @@ describe('get_elements tool on UI5 sessions', () => {
   it('cuts oversized control output at the snapshot cap', async () => {
     mockGetUi5Controls.mockResolvedValue(Array.from({ length: 400 }, (_, i) => ({ tagName: 'sap.m.Button', name: 'button-' + i, type: '', value: '', href: '', selector: 'ui5:{"id":' + i + '}', isInViewport: true })));
     const result = await callTool({});
-    expect(result.content[0].text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
-    expect(result.content[0].text).toContain('… truncated: showing');
+    const text = result.content[0].text;
+    const kept = Number(/^\[(\d+)\]/m.exec(text)?.[1]);
+    expect(text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
+    expect(text).toContain(`… truncated: showing ${kept} of 400 UI5 controls; the rest is NOT in this output`);
+    expect(text.match(/button-\d+/g)).toHaveLength(kept);
+  });
+
+  it('keeps zero controls with a note when one control alone exceeds the cap', async () => {
+    mockGetUi5Controls.mockResolvedValue([{ tagName: 'sap.m.Text', name: 'x'.repeat(SNAPSHOT_MAX_CHARS + 1), type: '', value: '', href: '', selector: 'ui5:{}', isInViewport: true }]);
+    const text = (await callTool({})).content[0].text;
+    expect(text).toContain('showing 0 of 1 UI5 controls');
+    expect(text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
   });
 });

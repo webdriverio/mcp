@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { withTimeout } from '../utils/with-timeout';
 
 interface Wdi5Bridge {
   start(config: Wdi5Config, browser: WebdriverIO.Browser): Promise<void>;
@@ -33,6 +34,10 @@ let runtime: { bridge: Wdi5Bridge; serviceModule: { default: Wdi5ServiceCtor }; 
 const configByBrowser = new WeakMap<WebdriverIO.Browser, Wdi5Config>();
 const ui5VersionByBrowser = new WeakMap<WebdriverIO.Browser, string>();
 let globalsQueue: Promise<unknown> = Promise.resolve();
+
+// The timeout frees the lock but cannot cancel the stuck wdi5 call; if it resumes later it sees whatever
+// session holds the globals then. Only late global reads remain (Authenticator.envName, Office365 `$`).
+export const WDI5_GLOBALS_TIMEOUT_MS = 120_000;
 
 const missingExport = (symbol: string): Error =>
   new Error(
@@ -70,6 +75,7 @@ function loadUi5Runtime() {
 
 // wdi5's bridge and Authenticator read the ambient `browser` and `$` at call time, so overlapping
 // sessions must not interleave their calls.
+// Not reentrant: fn must not call withWdi5Globals, it would wait on its own queue slot.
 function withWdi5Globals<T>(browser: WebdriverIO.Browser, fn: () => Promise<T>): Promise<T> {
   const run = globalsQueue.then(async () => {
     const globals = globalThis as unknown as Record<string, unknown>;
@@ -77,7 +83,7 @@ function withWdi5Globals<T>(browser: WebdriverIO.Browser, fn: () => Promise<T>):
     globals.browser = browser;
     globals.$ = browser.$.bind(browser);
     try {
-      return await fn();
+      return await withTimeout(fn(), WDI5_GLOBALS_TIMEOUT_MS, () => new Error(`wdi5 setup/login did not finish within ${WDI5_GLOBALS_TIMEOUT_MS / 1000}s`));
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) {

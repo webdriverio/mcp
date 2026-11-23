@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { authenticateUi5, cleanupUi5Runtime, ensureUi5Injected, initUi5 } from '../../src/ui5/runtime';
+import { authenticateUi5, cleanupUi5Runtime, ensureUi5Injected, initUi5, WDI5_GLOBALS_TIMEOUT_MS } from '../../src/ui5/runtime';
 
 interface FakeBrowser {
   sessionId: string;
@@ -149,6 +149,30 @@ describe('ui5 runtime per browser', () => {
     await Promise.all([pA, pB]);
     expect(order).toEqual(['start a', 'end a', 'start b', 'end b']);
     expect(vi.mocked(bridge.setup).mock.calls).toEqual([[configA, a], [configB, b]]);
+  });
+
+  it('times out a hung login, restores globals, and lets the next session run', async () => {
+    const a = makeBrowser('a', '1.120.0');
+    const b = makeBrowser('b', '1.71.0');
+    await initUi5(asBrowser(a), configA);
+    await initUi5(asBrowser(b), configB);
+
+    vi.useFakeTimers();
+    try {
+      vi.mocked(bridge.authenticate).mockImplementationOnce(() => new Promise<void>(() => undefined));
+      const hung = authenticateUi5(asBrowser(a), { provider: 'BasicAuth' });
+      const rejection = expect(hung).rejects.toThrow('wdi5 setup/login did not finish within 120s');
+      await vi.advanceTimersByTimeAsync(WDI5_GLOBALS_TIMEOUT_MS);
+      await rejection;
+      expect(globals.browser).toBeUndefined();
+      expect(globals.$).toBeUndefined();
+
+      await authenticateUi5(asBrowser(b), { provider: 'BasicAuth' });
+      expect(bridge.authenticate).toHaveBeenLastCalledWith({ provider: 'BasicAuth' }, '');
+      expect(globals.browser).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects authenticateUi5 before initUi5', async () => {
