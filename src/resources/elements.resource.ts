@@ -9,7 +9,7 @@ const ELEMENTS_URI = 'wdio://session/current/elements';
 export const elementsResource: ResourceDefinition = {
   name: 'session-current-elements',
   uri: ELEMENTS_URI,
-  description: 'Accessibility tree of the current page or screen (viewport only) with an eN ref and a ready-to-use selector on each actionable line. Prefer this over screenshot — faster, and far fewer tokens. Only use screenshot for visual verification or debugging.',
+  description: 'Accessibility tree of the current page or screen (viewport only) with an eN ref and a ready-to-use selector on each actionable line. Prefer this over screenshot — faster, and far fewer tokens. Only use screenshot for visual verification or debugging. On UI5 sessions it returns the UI5 control list instead.',
   handler: async () => {
     try {
       const browser = getBrowser();

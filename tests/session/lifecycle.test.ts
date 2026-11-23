@@ -12,13 +12,17 @@ import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
 
 // Mock the provider registry so lifecycle tests don't depend on real providers
-const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime } = vi.hoisted(() => ({
+const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime, mockCleanupUi5Runtime } = vi.hoisted(() => ({
   mockOnSessionClose: vi.fn().mockResolvedValue(undefined),
   mockStopTunnel: vi.fn().mockResolvedValue(undefined),
   mockCleanupSessionRuntime: vi.fn().mockResolvedValue(false),
+  mockCleanupUi5Runtime: vi.fn(),
 }));
 vi.mock('../../src/providers/registry', () => ({
   getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose, stopTunnel: mockStopTunnel })),
+}));
+vi.mock('../../src/ui5/runtime', () => ({
+  cleanupUi5Runtime: mockCleanupUi5Runtime,
 }));
 vi.mock('../../src/electron/runtime', () => ({
   cleanupSessionRuntime: mockCleanupSessionRuntime,
@@ -584,7 +588,7 @@ describe('closeSession', () => {
     error.mockRestore();
   });
 
-  it('clears the wdi5 ambient globals for a UI5 session instead of running Electron cleanup', async () => {
+  it('runs wdi5 runtime cleanup for a UI5 session instead of Electron cleanup', async () => {
     const browser = makeBrowser();
     const state = getState();
     state.browsers.set('ui5-session', browser);
@@ -596,15 +600,9 @@ describe('closeSession', () => {
     });
     state.currentSession = 'ui5-session';
 
-    const globals = globalThis as unknown as Record<string, unknown>;
-    // initUi5 writes the registered browser object into the ambient global
-    globals.browser = browser;
-    globals.__wdi5Config = { baseUrl: 'https://x', wdi5: {} };
-
     await closeSession('ui5-session', false, false);
 
-    expect(globals.browser).toBeUndefined();
-    expect(globals.__wdi5Config).toBeUndefined();
+    expect(mockCleanupUi5Runtime).toHaveBeenCalledWith(browser);
     expect(browser.deleteSession).toHaveBeenCalled();
     expect(mockCleanupSessionRuntime).not.toHaveBeenCalled();
   });

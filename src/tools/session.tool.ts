@@ -803,7 +803,7 @@ async function startUi5Session(args: StartSessionArgs): Promise<CallToolResult> 
 
     const auth = mergedCapabilities['wdi5:authentication'] as Record<string, unknown> | undefined;
     if (auth) {
-      await authenticateUi5(auth);
+      await authenticateUi5(wdioBrowser, auth);
     }
 
     if (config.wdi5.btpWorkZoneEnablement === true) {

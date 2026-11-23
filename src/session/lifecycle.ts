@@ -38,7 +38,7 @@ async function finalizeTrace(sessionId: string, browser: WebdriverIO.Browser): P
   }
 }
 
-// ui5 cleanup clears wdi5's ambient globals (globalThis.browser / __wdi5Config),
+// ui5 cleanup drops the per-browser wdi5 config and UI5 version,
 // electron cleanup tears down the electron service. Electron runtime stays ui5-agnostic.
 async function cleanupRuntime(metadata: SessionMetadata | undefined, browser: WebdriverIO.Browser): Promise<boolean> {
   if (metadata?.runtime === 'ui5') {

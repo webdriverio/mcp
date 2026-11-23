@@ -77,7 +77,7 @@ describe('start_session UI5', () => {
     });
 
     expect(mocks.authenticateUi5).toHaveBeenCalledTimes(1);
-    expect(mocks.authenticateUi5).toHaveBeenCalledWith({ provider: 'BasicAuth' });
+    expect(mocks.authenticateUi5).toHaveBeenCalledWith(mockBrowser, { provider: 'BasicAuth' });
   });
 
   it('enables the BTP work zone instead of injecting when btpWorkZoneEnablement is true', async () => {
