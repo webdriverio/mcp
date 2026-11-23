@@ -1,6 +1,7 @@
 import { ensureUi5Injected } from './runtime';
 
 export const UI5_SELECTOR_PREFIX = 'ui5:';
+export const UI5_CONTROL_TIMEOUT_MS = 3000;
 
 export function isUi5Selector(selector: string): boolean {
   return selector.startsWith(UI5_SELECTOR_PREFIX);

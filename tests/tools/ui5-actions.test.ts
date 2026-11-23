@@ -23,6 +23,7 @@ vi.mock('../../src/session/agent', async (importOriginal) => ({
   runAction: mocks.runAction,
 }));
 
+import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
 import { clickTool } from '../../src/tools/click.tool';
 import { setValueTool } from '../../src/tools/set-value.tool';
 
@@ -113,5 +114,33 @@ describe('ui5 control actions', () => {
     expect(mocks.ensureUi5Injected).not.toHaveBeenCalled();
     expect(mocks.runAction).toHaveBeenCalledWith(mocks.agent, 'click', { target: '#btn' }, 'Clicked.');
     expect(mocks.runAction).toHaveBeenCalledWith(mocks.agent, 'fill', { target: '#input', text: 'hello' }, 'Filled #input.');
+  });
+
+  it('fails a ui5 press that never settles within the action timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      press.mockReturnValue(new Promise(() => {}));
+      const pending = callClick({ selector: UI5_BUTTON });
+      await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
+      const result = await pending;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('"click" did not finish within 30s');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails a ui5 enterText that never settles within the action timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      enterText.mockReturnValue(new Promise(() => {}));
+      const pending = callSetValue({ selector: 'ui5:{"controlType":"sap.m.Input"}', value: 'hi' });
+      await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
+      const result = await pending;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('"fill" did not finish within 30s');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

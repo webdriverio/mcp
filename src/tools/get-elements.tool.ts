@@ -2,12 +2,10 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
 import { getBrowser, isUi5Session } from '../session/state';
 import { getSnapshot } from '@wdio/elements';
-import { encode } from '@toon-format/toon';
 import { coerceBoolean } from '../utils/zod-helpers';
 import { errorResult } from '../session/agent';
 import { SNAPSHOT_MAX_CHARS, truncateSnapshot } from '../utils/snapshot-text';
-import { ensureUi5Injected } from '../ui5/runtime';
-import { getUi5Controls } from '../scripts/get-ui5-controls';
+import { getUi5ControlsText } from '../ui5/controls-text';
 
 export const getElementsToolDefinition: ToolDefinition = {
   name: 'get_elements',
@@ -24,9 +22,7 @@ export const getElementsTool: ToolCallback = async ({ inViewportOnly = false, in
   try {
     const browser = getBrowser();
     if (isUi5Session()) {
-      await ensureUi5Injected(browser);
-      const controls = await getUi5Controls(browser, { inViewportOnly, includeContainers, includeBounds });
-      return { content: [{ type: 'text' as const, text: encode(controls).replace(/,""/g, ',').replace(/"",/g, ',') }] };
+      return { content: [{ type: 'text' as const, text: await getUi5ControlsText(browser, { inViewportOnly, includeContainers, includeBounds }) }] };
     }
     const { text } = await getSnapshot(browser, { inViewportOnly });
     return { content: [{ type: 'text' as const, text: truncateSnapshot(text) }] };

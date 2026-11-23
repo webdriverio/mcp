@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from '../types/tool';
-import { runAction, agentFor, noSession, errorResult } from '../session/agent';
+import { runAction, agentFor, noSession, errorResult, withActionTimeout } from '../session/agent';
 import { getBrowser } from '../session/state';
-import { isUi5Selector, resolveUi5Control } from '../ui5/selector';
-
-const UI5_CONTROL_TIMEOUT_MS = 3000;
+import { isUi5Selector, resolveUi5Control, UI5_CONTROL_TIMEOUT_MS } from '../ui5/selector';
 
 export const setValueToolDefinition: ToolDefinition = {
   name: 'set_value',
@@ -22,7 +20,7 @@ export const setValueTool: ToolCallback = async ({ selector, value }: { selector
     try {
       const browser = getBrowser();
       const control = await resolveUi5Control(browser, selector, UI5_CONTROL_TIMEOUT_MS);
-      await control.enterText(value);
+      await withActionTimeout(control.enterText(value), 'fill');
       return { content: [{ type: 'text', text: `Text "${value}" entered into element` }] };
     } catch (e) {
       return errorResult(e, 'Error entering text');

@@ -7,12 +7,12 @@
  */
 
 export interface Ui5ControlInfo {
-  tagName: string;       // UI5 control type, e.g. 'sap.m.Button'
+  tagName: string;
   name: string;
   type: string;
   value: string;
   href: string;
-  selector: string;      // 'ui5:' + RecordReplay selector object
+  selector: string;
   isInViewport: boolean;
   boundingBox?: { x: number; y: number; width: number; height: number };
 }
@@ -124,7 +124,7 @@ const ui5ControlsScript = (includeBounds: boolean, includeContainers: boolean, i
   const nodeClaims = new Map<Element, { index: number; isWrapper: boolean }>();
 
   // registry.all() returns an id-keyed map (not an array) across UI5 versions
-  // ponytail: full-registry RecordReplay walk, ~100ms/visible control (22s on a ~850-control app);
+  // Full-registry RecordReplay walk, ~100ms/visible control (22s on a ~850-control app);
   // cap or batch per frame if large apps become a problem even with the interactable filter
   for (const el of Object.values(registry.all())) {
     const controlType = el.getMetadata().getName();
@@ -193,10 +193,6 @@ const ui5ControlsScript = (includeBounds: boolean, includeContainers: boolean, i
   return controls;
 })();
 
-/**
- * Get rendered UI5 controls via the sap.ui.core element registry.
- * Interactable controls only by default; pass includeContainers for the full registry walk.
- */
 export async function getUi5Controls(
   browser: WebdriverIO.Browser,
   params: GetUi5ControlsOptions = {},

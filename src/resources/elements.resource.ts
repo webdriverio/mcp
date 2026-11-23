@@ -1,7 +1,8 @@
 import type { ResourceDefinition } from '../types/resource';
-import { getBrowser } from '../session/state';
+import { getBrowser, isUi5Session } from '../session/state';
 import { getSnapshot } from '@wdio/elements';
 import { truncateSnapshot } from '../utils/snapshot-text';
+import { getUi5ControlsText } from '../ui5/controls-text';
 
 const ELEMENTS_URI = 'wdio://session/current/elements';
 
@@ -12,6 +13,10 @@ export const elementsResource: ResourceDefinition = {
   handler: async () => {
     try {
       const browser = getBrowser();
+      if (isUi5Session()) {
+        const text = await getUi5ControlsText(browser, { inViewportOnly: true });
+        return { contents: [{ uri: ELEMENTS_URI, mimeType: 'text/plain', text }] };
+      }
       const { text } = await getSnapshot(browser, { inViewportOnly: true });
       return { contents: [{ uri: ELEMENTS_URI, mimeType: 'text/plain', text: truncateSnapshot(text) }] };
     } catch (e) {

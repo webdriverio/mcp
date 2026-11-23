@@ -28,7 +28,7 @@ let runtime: { bridge: Wdi5Bridge; serviceModule: { default: Wdi5ServiceCtor } }
 
 const missingExport = (symbol: string): Error =>
   new Error(
-    `wdio-ui5-service@3.2.0 is missing expected export "${symbol}" — internal layout changed, pin review needed`,
+    `wdio-ui5-service is missing expected export "${symbol}" — internal layout changed, pin review needed`,
   );
 
 function loadUi5Runtime() {

@@ -104,4 +104,11 @@ describe('get_elements tool on UI5 sessions', () => {
     expect(mockGetSnapshot).not.toHaveBeenCalled();
     expect(result.content[0].text).toContain('sap.m.Button');
   });
+
+  it('cuts oversized control output at the snapshot cap', async () => {
+    mockGetUi5Controls.mockResolvedValue(Array.from({ length: 400 }, (_, i) => ({ tagName: 'sap.m.Button', name: 'button-' + i, type: '', value: '', href: '', selector: 'ui5:{"id":' + i + '}', isInViewport: true })));
+    const result = await callTool({});
+    expect(result.content[0].text.length).toBeLessThanOrEqual(SNAPSHOT_MAX_CHARS);
+    expect(result.content[0].text).toContain('… truncated: showing');
+  });
 });
