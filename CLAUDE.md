@@ -52,6 +52,7 @@ src/
 ├── config/            # appium.config.ts — iOS/Android capability builders
 ├── utils/             # auth.ts, parse-args.ts, http-helpers.ts, zod-helpers.ts (coerceBoolean),
 │                       #   docs-index.ts + docs-client.ts (docs corpus)
+│                       #   client-info.ts (logs the connecting MCP client to stderr at the handshake)
 └── types/             # ToolDefinition, ResourceDefinition, RecordedStep interfaces
 ```
 
