@@ -62,7 +62,8 @@ export interface ToolSettings {
 const toolSettings: ToolSettings = { enabledGroups: new Set() };
 
 export function platformOf(metadata: SessionMetadata): ToolPlatform {
-  return metadata.runtime === 'electron' ? 'electron' : metadata.type;
+  if (metadata.runtime === 'electron' || metadata.runtime === 'ui5') return metadata.runtime;
+  return metadata.type;
 }
 
 /** the platform falls back to the active session when no registration was seen yet */

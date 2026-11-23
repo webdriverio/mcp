@@ -30,7 +30,7 @@ function createServer() {
     tools.set(definition.name, tool);
     return tool;
   };
-  for (const name of ['click_element', 'tap_element', 'select_option', 'get_cookies']) {
+  for (const name of ['click_element', 'tap_element', 'select_option', 'get_elements', 'get_cookies']) {
     registerTool({ name, description: name, inputSchema: {} }, noop);
   }
   const dispose = setupToolVisibility(tools, registerTool);
@@ -59,6 +59,17 @@ describe('tool visibility across servers', () => {
     const second = createServer();
     expect(second.listed()).toContain('tap_element');
     expect(second.listed()).not.toContain('select_option');
+  });
+
+  it('lists get_elements in a UI5 session only once the elements group is enabled', async () => {
+    const server = createServer();
+    registerSession('u1', browserMock(), { type: 'browser', runtime: 'ui5', capabilities: {}, isAttached: false }, historyOf('u1'));
+    expect(server.listed()).toContain('select_option');
+    expect(server.listed()).not.toContain('tap_element');
+    expect(server.listed()).not.toContain('get_elements');
+
+    await (server.tools.get('enable_tools') as unknown as { handler: (a: unknown, e: unknown) => Promise<unknown> }).handler({ groups: ['elements'] }, {});
+    expect(server.listed()).toContain('get_elements');
   });
 
   it('keeps enable_tools additions for later servers', async () => {

@@ -3,7 +3,7 @@ import { GROUPS, groupOf, showAllTools, toolAppliesTo } from '../src/toolsets';
 
 describe('toolAppliesTo', () => {
   it('lists general tools everywhere', () => {
-    for (const platform of [undefined, 'browser', 'electron', 'ios', 'android'] as const) {
+    for (const platform of [undefined, 'browser', 'electron', 'ui5', 'ios', 'android'] as const) {
       expect(toolAppliesTo('start_session', platform)).toBe(true);
       expect(toolAppliesTo('execute_script', platform)).toBe(true);
     }
@@ -14,6 +14,14 @@ describe('toolAppliesTo', () => {
     expect(toolAppliesTo('tap_element', 'browser')).toBe(false);
     expect(toolAppliesTo('tap_element', 'ios')).toBe(true);
     expect(toolAppliesTo('get_elements', 'android')).toBe(true);
+  });
+
+  it('lists browser-only tools for UI5 sessions, which are web pages', () => {
+    expect(toolAppliesTo('select_option', 'ui5')).toBe(true);
+    expect(toolAppliesTo('press_key', 'ui5')).toBe(true);
+    expect(toolAppliesTo('snapshot', 'ui5')).toBe(true);
+    expect(toolAppliesTo('get_elements', 'ui5')).toBe(true);
+    expect(toolAppliesTo('tap_element', 'ui5')).toBe(false);
   });
 
   it('lists the browser page tools before any session starts', () => {

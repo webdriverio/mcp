@@ -8,10 +8,16 @@ export function isUi5Selector(selector: string): boolean {
 }
 
 export function parseUi5Selector(selector: string): Record<string, unknown> {
+  const body = selector.slice(UI5_SELECTOR_PREFIX.length);
   try {
-    return JSON.parse(selector.slice(UI5_SELECTOR_PREFIX.length)) as Record<string, unknown>;
+    return JSON.parse(body) as Record<string, unknown>;
   } catch {
-    throw new Error(`Invalid ui5 selector (expected '${UI5_SELECTOR_PREFIX}' + JSON object): ${selector}`);
+    try {
+      // toon-encoded tool output escapes the JSON quotes
+      return JSON.parse(body.replace(/\\(["\\])/g, '$1')) as Record<string, unknown>;
+    } catch {
+      throw new Error(`Invalid ui5 selector (expected '${UI5_SELECTOR_PREFIX}' + JSON object): ${selector}`);
+    }
   }
 }
 

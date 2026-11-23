@@ -70,6 +70,18 @@ describe('withSessionTarget', () => {
     expect(result.content[0].text).toContain('press_key');
   });
 
+  it('routes a UI5 session as a browser page, but not as a mobile one', async () => {
+    addSession('s1');
+    getState().sessionMetadata.get('s1')!.runtime = 'ui5';
+    const page = await (withSessionTarget('select_option', echo()) as unknown as Fn)({ session: 's1' }, extra);
+    const elements = await (withSessionTarget('get_elements', echo()) as unknown as Fn)({ session: 's1' }, extra);
+    const tap = await (withSessionTarget('tap_element', echo()) as unknown as Fn)({ session: 's1' }, extra);
+    expect(page.isError).toBeUndefined();
+    expect(elements.isError).toBeUndefined();
+    expect(tap.isError).toBe(true);
+    expect(tap.content[0].text).toContain('does not apply to ui5 session');
+  });
+
   it('leaves single-session untargeted output unprefixed', async () => {
     addSession('s1');
     getState().currentSession = 's1';
