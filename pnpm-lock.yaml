@@ -55,8 +55,8 @@ importers:
         specifier: ^1.1.18
         version: 1.2.0
       wdio-ui5-service:
-        specifier: 3.0.12
-        version: 3.0.12(@wdio/globals@9.31.3(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))
+        specifier: 3.2.0
+        version: 3.2.0(@wdio/globals@9.31.3(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))
       webdriverio:
         specifier: 10.2.0
         version: 10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)
@@ -4213,16 +4213,16 @@ packages:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
 
-  wdio-ui5-service@3.0.12:
-    resolution: {integrity: sha512-nOmuC3Kc0MNhkt0PzlCzBda3sUoNYTws36ky9efm0lOGeqK8tcJ9aUv2lfkseYwGwAM5Cu0tdcai6sXQZ49gKw==}
+  wdio-ui5-service@3.2.0:
+    resolution: {integrity: sha512-4a0A2IgSgxuIuunl2aApwYYX/e4pReW8XHYutJumfXqAcQQZ3r1+5K2tY+TlWBDdsI+nESmiI/fhs9vajlY4RQ==}
     engines: {node: '>=20', npm: '>=10'}
     peerDependencies:
-      '@wdio/cli': ^9
-      '@wdio/globals': ^9
-      '@wdio/local-runner': ^9
-      '@wdio/mocha-framework': ^9
-      '@wdio/spec-reporter': ^9
-      webdriverio: ^9
+      '@wdio/cli': ^9 || ^10
+      '@wdio/globals': ^9 || ^10
+      '@wdio/local-runner': ^9 || ^10
+      '@wdio/mocha-framework': ^9 || ^10
+      '@wdio/spec-reporter': ^9 || ^10
+      webdriverio: ^9 || ^10
 
   web-worker@1.5.0:
     resolution: {integrity: sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw==}
@@ -8453,7 +8453,7 @@ snapshots:
 
   walk-up-path@4.0.0: {}
 
-  wdio-ui5-service@3.0.12(@wdio/globals@9.31.3(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)):
+  wdio-ui5-service@3.2.0(@wdio/globals@9.31.3(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)))(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0)):
     dependencies:
       '@wdio/globals': 9.31.3(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))
       compare-versions: 6.1.1
