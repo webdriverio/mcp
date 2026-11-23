@@ -1,4 +1,4 @@
-const clean = (value: unknown) => typeof value === 'string' ? value.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 100) : '';
+const clean = (value: unknown) => typeof value === 'string' ? value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '').trim().slice(0, 100) : '';
 
 /** the connecting client as one log line, from the `clientInfo` of its `initialize` request */
 export function clientLine(info: unknown): string {

@@ -11,6 +11,12 @@ describe('clientLine', () => {
     expect(clientLine({ name: 42, version: '1.0' })).toBe('MCP client: unknown 1.0');
   });
 
+  it('drops line and paragraph separators, which some log viewers break on', () => {
+    const ls = String.fromCodePoint(0x2028);
+    const ps = String.fromCodePoint(0x2029);
+    expect(clientLine({ name: `a${ls}[ERROR] fake${ps}b`, version: `1${ls}${ps}` })).toBe('MCP client: a[ERROR] fakeb 1');
+  });
+
   it('keeps one line: control characters dropped, length capped', () => {
     expect(clientLine({ name: 'evil\n[ERROR] fake\u001b[31m', version: '1' })).toBe('MCP client: evil[ERROR] fake[31m 1');
     expect(clientLine({ name: 'x'.repeat(500) }).length).toBe('MCP client: '.length + 100);
