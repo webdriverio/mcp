@@ -1,0 +1,93 @@
+name: Bug report
+description: A tool, resource or session in @wdio/mcp does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Your MCP client's log for this server includes a line like
+        `[INFO] MCP client: <name> <version>` (stderr, at connect); paste it with the logs below.
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      description: The app or agent that runs this server.
+      options:
+        - Claude Code
+        - Claude Desktop
+        - Cursor
+        - VS Code (GitHub Copilot)
+        - Codex
+        - Gemini CLI
+        - opencode
+        - Windsurf
+        - Kiro
+        - Cline
+        - Other (name it below)
+    validations:
+      required: true
+  - type: input
+    id: client-version
+    attributes:
+      label: MCP client version
+      description: For "Other", the client's name too.
+  - type: input
+    id: mcp-version
+    attributes:
+      label: "@wdio/mcp version"
+      description: For example from `npm ls @wdio/mcp`, or the version pinned in your MCP config.
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio (default)
+        - HTTP (--http)
+    validations:
+      required: true
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session
+      multiple: true
+      options:
+        - Local browser
+        - Local Appium, Android
+        - Local Appium, iOS
+        - Electron
+        - BrowserStack
+        - Sauce Labs
+        - TestMu / LambdaTest
+        - TestingBot
+        - Digital.ai
+        - attach_session or provider "external"
+        - No session (startup, docs search)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Tool calls
+      description: The tool calls that lead to the problem, with their arguments, in order.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: The server's stderr from your MCP client's log, including the `MCP client` line.
+      render: shell

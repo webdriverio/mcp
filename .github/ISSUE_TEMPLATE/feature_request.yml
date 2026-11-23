@@ -1,0 +1,47 @@
+name: Feature request
+description: A tool, option or behaviour @wdio/mcp should have.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      description: The app or agent you would use it with.
+      options:
+        - Claude Code
+        - Claude Desktop
+        - Cursor
+        - VS Code (GitHub Copilot)
+        - Codex
+        - Gemini CLI
+        - opencode
+        - Windsurf
+        - Kiro
+        - Cline
+        - Other (name it below)
+    validations:
+      required: true
+  - type: input
+    id: client-version
+    attributes:
+      label: MCP client version
+      description: For "Other", the client's name too.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change you would like, as tool calls or options if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds or other approaches you considered.
