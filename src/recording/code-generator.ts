@@ -33,6 +33,12 @@ function getElectronDeeplinkScheme(history: SessionHistory): string | undefined 
 
 const MOCK_TOOLS = new Set(['mock', 'get_mock_calls', 'manage_mock']);
 
+function hasEmulateDeviceReset(history: SessionHistory): boolean {
+  return history.steps.some(
+    step => step.tool === 'emulate_device' && step.params.device === 'reset' && step.status !== 'error',
+  );
+}
+
 // Only the leading session-start declaration; recorded script text may contain the same string.
 const assignSessionStart = (steps: string): string => steps.replace('const browser = await remote(', 'browser = await remote(');
 
@@ -304,6 +310,46 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       return `// [not replayable: no recorded code] switch_frame: '${escapeStr(p.selector)}'`;
     case 'set_geolocation':
       return `await browser.setGeoLocation({ latitude: ${p.latitude}, longitude: ${p.longitude}${p.altitude !== undefined ? `, altitude: ${p.altitude}` : ''} });`;
+    case 'switch_context': {
+      const context = String(p.context ?? '');
+      if (/^\d+$/.test(context)) {
+        const index = Number.parseInt(context, 10) - 1;
+        if (index >= 0) {
+          return `await browser.switchContext((await browser.getContexts())[${index}]);`;
+        }
+      }
+      return `await browser.switchContext('${escapeStr(context)}');`;
+    }
+    case 'rotate_device':
+      return `await browser.setOrientation('${escapeStr(p.orientation)}');`;
+    case 'hide_keyboard':
+      return 'await browser.hideKeyboard();';
+    case 'switch_tab': {
+      if (p.handle) {
+        if (history.steps.some(s => s.tool === 'attach_session')) {
+          return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
+        }
+        return `// [not replayable: session-specific window handle] switch_tab: '${escapeStr(p.handle)}'`;
+      }
+      if (p.index !== undefined) {
+        return `await browser.switchToWindow((await browser.getWindowHandles())[${Number(p.index)}]);`;
+      }
+      return '// switch_tab: missing handle or index';
+    }
+    case 'emulate_device': {
+      const device = p.device;
+      if (!device) return '// emulate_device: listed available devices';
+      if (device === 'reset') {
+        return [
+          'if (restoreDeviceEmulation) {',
+          '  await restoreDeviceEmulation();',
+          '  restoreDeviceEmulation = undefined;',
+          '}',
+        ].join('\n');
+      }
+      const call = `await browser.emulate('device', '${escapeStr(device)}');`;
+      return hasEmulateDeviceReset(history) ? `restoreDeviceEmulation = ${call}` : call;
+    }
     case 'scroll': {
       const scrollAmount = (p.direction as string) === 'down' ? (p.pixels as number) : -(p.pixels as number);
       return `await browser.execute(() => window.scrollBy(0, ${scrollAmount}));`;
@@ -426,6 +472,9 @@ export function generateCode(history: SessionHistory): string {
   // Failed mock steps emit only an error comment, so they must not pull in the declaration either.
   if (history.steps.some(step => MOCK_TOOLS.has(step.tool) && step.params.mockType !== 'electron' && step.status !== 'error')) {
     stepLines.unshift('const browserMocks = new Map();');
+  }
+  if (hasEmulateDeviceReset(history)) {
+    stepLines.unshift('let restoreDeviceEmulation;');
   }
 
   const steps = stepLines
