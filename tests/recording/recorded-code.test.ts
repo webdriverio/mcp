@@ -95,17 +95,20 @@ describe('recording the code the agent ran', () => {
 
     await record('emulate_device', emulateDeviceTool, { device: 'iPhone 15' });
     await record('switch_tab', switchTabTool, { index: 1 });
+    await record('switch_tab', switchTabTool, { handle: 'tab-0' });
     await record('emulate_device', emulateDeviceTool, { device: 'reset' });
 
     const current = buildCurrentSessionSteps();
     expect(current).not.toBeNull();
     const parsedSteps = JSON.parse(current!.stepsJson) as { steps: Array<{ tool: string; status: string }> };
-    expect(parsedSteps.steps.map(s => s.tool)).toEqual(['emulate_device', 'switch_tab', 'emulate_device']);
+    expect(parsedSteps.steps.map(s => s.tool)).toEqual(['emulate_device', 'switch_tab', 'switch_tab', 'emulate_device']);
     expect(parsedSteps.steps.every(s => s.status === 'ok')).toBe(true);
 
     expect(current!.generatedJs).toContain('let restoreDeviceEmulation;');
     expect(current!.generatedJs).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
     expect(current!.generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(current!.generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[0]);');
+    expect(current!.generatedJs).not.toContain("'tab-0'");
     expect(current!.generatedJs).toContain('await restoreDeviceEmulation();');
     expect(current!.generatedJs).not.toContain('[unknown tool]');
   });

@@ -326,7 +326,10 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
       return 'await browser.hideKeyboard();';
     case 'switch_tab': {
       if (p.handle) {
-        return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
+        if (history.steps.some(s => s.tool === 'attach_session')) {
+          return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
+        }
+        return `// [not replayable: session-specific window handle] switch_tab: '${escapeStr(p.handle)}'`;
       }
       if (p.index !== undefined) {
         return `await browser.switchToWindow((await browser.getWindowHandles())[${Number(p.index)}]);`;

@@ -291,9 +291,49 @@ describe('generateCode - tool mappings', () => {
     expect(code).not.toContain('[unknown tool]');
   });
 
-  it('switch_tab (handle) → browser.switchToWindow()', () => {
-    const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-123' } }]));
-    expect(code).toContain("await browser.switchToWindow('CDwindow-123');");
+  it('switch_tab (handle without recorded code) → unreplayable comment for start_session, switchToWindow for attach_session', () => {
+    const startCode = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-123' } }]));
+    expect(startCode).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-123'");
+    expect(startCode).not.toContain("browser.switchToWindow('CDwindow-123')");
+    expect(startCode).not.toContain('[unknown tool]');
+
+    const attachHistory: SessionHistory = {
+      sessionId: 'attach-tab',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        {
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 'attach-tab', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'switch_tab',
+          params: { handle: 'CDwindow-123' },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const attachCode = generateCode(attachHistory);
+    expect(attachCode).toContain("await browser.switchToWindow('CDwindow-123');");
+    expect(attachCode).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab (handle with recorded index lookup code) → emits replayable index lookup', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'switch_tab',
+      params: { handle: 'CDwindow-123' },
+      code: ['await browser.switchToWindow((await browser.getWindowHandles())[1]);'],
+    }]));
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(code).not.toContain('CDwindow-123');
     expect(code).not.toContain('[unknown tool]');
   });
 
