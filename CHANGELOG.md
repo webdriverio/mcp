@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.2.0](https://github.com/webdriverio/mcp/compare/v4.1.0...v4.2.0) (2026-11-24)
+
+### Features
+
+* collect elements via @wdio/elements and deprecate the local accessibility tree ([a457933](https://github.com/webdriverio/mcp/commit/a457933bf8dcd5b317baad578582f2c0120bec69))
+* deprecate ./snapshot, ./trace and wdio-show-trace ahead of v5 ([cb33cf5](https://github.com/webdriverio/mcp/commit/cb33cf5dccebc3d28ea2befbcdaf8acd2a3a7ff0))
+* **elements:** return the snapshot tree with selectors from get_elements ([7156400](https://github.com/webdriverio/mcp/commit/7156400e44eda721ed6d51dfd9a57d7fa41a2b7d))
+* route cookie tools through the session agent and record more steps ([16cfb9d](https://github.com/webdriverio/mcp/commit/16cfb9dd90ad09e9016f8cf2f3ad97966b41d39b))
+* **trace:** trace remaining Appium mobile tools ([#191](https://github.com/webdriverio/mcp/issues/191)) ([cdb7607](https://github.com/webdriverio/mcp/commit/cdb7607b38c665defa8c5d33f7ecf2b37f3ae1d3)), closes [#190](https://github.com/webdriverio/mcp/issues/190)
+
+### Bug Fixes
+
+* **cloud:** BrowserStack mobile browser result marking, appium:app and browser caps, Sauce Labs marking errors ([#193](https://github.com/webdriverio/mcp/issues/193)) ([a10aa9c](https://github.com/webdriverio/mcp/commit/a10aa9cb118c46b6ebe8d7560bbdf9f4e5772c1e))
+* **cookies:** read the whole cookie jar on BiDi sessions ([bfd8b2f](https://github.com/webdriverio/mcp/commit/bfd8b2fdbbb4252796ed2a8ac1d6f02acf340574))
+* **electron:** end Electron sessions once and stop the app on close ([9cbb201](https://github.com/webdriverio/mcp/commit/9cbb2018803a943b9a4b5c2fd33508849b5ab9db))
+* **elements:** steer truncated get_elements output to snapshot find ([0f52e60](https://github.com/webdriverio/mcp/commit/0f52e607007ddbc65e489d42ea4028364af3432a))
+* **local-browser:** disable AutomationControlled only in headless Chrome/Edge ([#186](https://github.com/webdriverio/mcp/issues/186)) ([b62dff3](https://github.com/webdriverio/mcp/commit/b62dff31b816f1959ef9f57b97b0957e22c47652)), closes [#185](https://github.com/webdriverio/mcp/issues/185)
+* **recording:** rewrite only the session-start declaration in generated code ([1157bca](https://github.com/webdriverio/mcp/commit/1157bcab722fea5adba44c73daab8c6f51424d73))
+* treat BiDi as the default session protocol ([d853c23](https://github.com/webdriverio/mcp/commit/d853c23a1f152dbb698fe9e73c9af982e91c3e1b))
+
 ## [4.1.0](https://github.com/webdriverio/mcp/compare/v4.0.1...v4.1.0) (2026-10-30)
 
 ### Features
