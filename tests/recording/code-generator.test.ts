@@ -263,6 +263,87 @@ describe('generateCode - tool mappings', () => {
     expect(code).toContain('await browser.setGeoLocation({ latitude: 52.5, longitude: 13.4, altitude: 35 });');
   });
 
+  it('switch_context (name) → browser.switchContext()', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_context', params: { context: 'WEBVIEW_com.example.app' } }]));
+    expect(code).toContain("await browser.switchContext('WEBVIEW_com.example.app');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_context (1-based index) → resolves context from getContexts()', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_context', params: { context: '2' } }]));
+    expect(code).toContain('await browser.switchContext((await browser.getContexts())[1]);');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('rotate_device → browser.setOrientation()', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'rotate_device', params: { orientation: 'LANDSCAPE' } },
+      { tool: 'rotate_device', params: { orientation: 'PORTRAIT' } },
+    ]));
+    expect(code).toContain("await browser.setOrientation('LANDSCAPE');");
+    expect(code).toContain("await browser.setOrientation('PORTRAIT');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('hide_keyboard → browser.hideKeyboard()', () => {
+    const code = generateCode(makeHistory([{ tool: 'hide_keyboard', params: {} }]));
+    expect(code).toContain('await browser.hideKeyboard();');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab (handle) → browser.switchToWindow()', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-123' } }]));
+    expect(code).toContain("await browser.switchToWindow('CDwindow-123');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab (0-based index) → browser.switchToWindow((await browser.getWindowHandles())[index])', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'switch_tab', params: { index: 1 } },
+      { tool: 'switch_tab', params: { index: 0 } },
+    ]));
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[0]);');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device (preset without reset) → browser.emulate()', () => {
+    const code = generateCode(makeHistory([{ tool: 'emulate_device', params: { device: 'iPhone 15' } }]));
+    expect(code).toContain("await browser.emulate('device', 'iPhone 15');");
+    expect(code).not.toContain('restoreDeviceEmulation');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device (preset + reset) → captures and invokes restore function', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'emulate_device', params: { device: 'iPhone 15' } },
+      { tool: 'emulate_device', params: { device: 'reset' } },
+    ]));
+    expect(code.match(/let restoreDeviceEmulation;/g)).toHaveLength(1);
+    expect(code).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
+    expect(code).toContain('await restoreDeviceEmulation();');
+    expect(code).toContain('restoreDeviceEmulation = undefined;');
+    expect(code).not.toContain("browser.emulate('device', 'reset')");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device (no device / list presets) → comment without browser.emulate()', () => {
+    const code = generateCode(makeHistory([{ tool: 'emulate_device', params: {} }]));
+    expect(code).toContain('// emulate_device: listed available devices');
+    expect(code).not.toContain('browser.emulate(');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device does not declare restoreDeviceEmulation when reset step failed', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'emulate_device', params: { device: 'iPhone 15' } },
+      { tool: 'emulate_device', params: { device: 'reset' }, status: 'error', error: 'BiDi required' },
+    ]));
+    expect(code).not.toContain('let restoreDeviceEmulation;');
+    expect(code).toContain("await browser.emulate('device', 'iPhone 15');");
+    expect(code).toContain('// [error] emulate_device:');
+  });
+
   it('scroll down → positive scrollBy', () => {
     const code = generateCode(makeHistory([{ tool: 'scroll', params: { direction: 'down', pixels: 300 } }]));
     expect(code).toContain('window.scrollBy(0, 300)');
