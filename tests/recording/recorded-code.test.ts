@@ -11,9 +11,12 @@ vi.mock('@wdio/session/agent', async (importOriginal) => ({
 
 const { withRecording } = await import('../../src/recording/step-recorder');
 const { generateCode } = await import('../../src/recording/code-generator');
+const { buildCurrentSessionSteps } = await import('../../src/resources/sessions.resource');
 const { clickTool } = await import('../../src/tools/click.tool');
 const { performActionsTool, selectOptionTool, pressKeyTool } = await import('../../src/tools/page-input.tool');
 const { setCookieTool, deleteCookiesTool } = await import('../../src/tools/cookies.tool');
+const { switchTabTool } = await import('../../src/tools/tabs.tool');
+const { emulateDeviceTool } = await import('../../src/tools/emulate-device.tool');
 
 const extra = {} as Parameters<ToolCallback>[1];
 const record = (name: string, tool: unknown, params: Record<string, unknown>) => (withRecording(name, tool as ToolCallback) as unknown as (p: unknown, e: unknown) => Promise<unknown>)(params, extra);
@@ -76,5 +79,32 @@ describe('recording the code the agent ran', () => {
       ["await browser.setCookies({ name: 'session', value: 'abc', path: '/' })"],
       ["await browser.deleteCookies('session')"],
     ]);
+  });
+
+  it('switch_tab and emulate_device appear in session steps and generated code when recorded', async () => {
+    const restoreFn = vi.fn().mockResolvedValue(undefined);
+    getState().browsers.set('s1', {
+      isBidi: true,
+      getWindowHandles: vi.fn().mockResolvedValue(['tab-0', 'tab-1']),
+      switchToWindow: vi.fn().mockResolvedValue(undefined),
+      emulate: vi.fn().mockResolvedValue(restoreFn),
+    } as unknown as WebdriverIO.Browser);
+
+    await record('switch_tab', switchTabTool, { index: 1 });
+    await record('emulate_device', emulateDeviceTool, { device: 'iPhone 15' });
+    await record('emulate_device', emulateDeviceTool, { device: 'reset' });
+
+    const payload = buildCurrentSessionSteps();
+    expect(payload).not.toBeNull();
+    const parsed = JSON.parse(payload!.stepsJson);
+    expect(parsed.steps.map((s: { tool: string }) => s.tool)).toEqual([
+      'switch_tab',
+      'emulate_device',
+      'emulate_device',
+    ]);
+    expect(payload!.generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(payload!.generatedJs).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
+    expect(payload!.generatedJs).toContain('await restoreDeviceEmulation?.();');
+    expect(payload!.generatedJs).not.toContain('[unknown tool]');
   });
 });

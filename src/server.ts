@@ -163,10 +163,10 @@ function createServer(): McpServer {
   registerTool(attachSessionToolDefinition, attachSessionRecorded);
   registerTool(closeSessionToolDefinition, closeSessionTool);
   registerTool(launchChromeToolDefinition, instrument('launch_chrome', launchChromeTool));
-  registerTool(emulateDeviceToolDefinition, emulateDeviceTool);
+  registerTool(emulateDeviceToolDefinition, instrument('emulate_device', emulateDeviceTool));
   registerTool(navigateToolDefinition, instrument('navigate', navigateTool));
 
-  registerTool(switchTabToolDefinition, switchTabTool);
+  registerTool(switchTabToolDefinition, instrument('switch_tab', switchTabTool));
   registerTool(switchFrameToolDefinition, instrument('switch_frame', switchFrameTool));
 
   registerTool(scrollToolDefinition, instrument('scroll', scrollTool));
