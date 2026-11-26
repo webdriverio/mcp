@@ -4,6 +4,7 @@ import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
 import { getBrowser } from '../session/state';
 import { errorResult } from '../session/agent';
+import { recordCode } from '../recording/step-recorder';
 
 export const switchTabToolDefinition: ToolDefinition = {
   name: 'switch_tab',
@@ -20,6 +21,15 @@ export const switchTabTool: ToolCallback = async ({ handle, index }: { handle?: 
     const browser = getBrowser();
     if (handle) {
       await browser.switchToWindow(handle);
+      try {
+        const handles = await browser.getWindowHandles();
+        const resolvedIndex = Array.isArray(handles) ? handles.indexOf(handle) : -1;
+        if (resolvedIndex >= 0) {
+          recordCode(`await browser.switchToWindow((await browser.getWindowHandles())[${resolvedIndex}]);`);
+        }
+      } catch {
+        // Best-effort index resolution for cross-session replay; the switch itself succeeded.
+      }
       return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
     } else if (index !== undefined) {
       const handles = await browser.getWindowHandles();

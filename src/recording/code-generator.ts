@@ -298,11 +298,14 @@ function generateStep(step: RecordedStep, history: SessionHistory, hasDeviceRese
       if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
     case 'switch_tab':
-      if (p.handle) {
-        return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
-      }
       if (p.index !== undefined) {
         return `await browser.switchToWindow((await browser.getWindowHandles())[${p.index}]);`;
+      }
+      if (p.handle) {
+        if (history.steps.some(s => s.tool === 'attach_session')) {
+          return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
+        }
+        return `// [not replayable: session-specific window handle] switch_tab: '${escapeStr(p.handle)}'`;
       }
       return '// [not replayable] switch_tab: missing handle and index';
     // BiDi sessions reject browser.switchFrame; the agent's frame code is variable-based and back-to-top needs none

@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { getState } from '../../src/session/state';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { getState, getToolSettings } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
 
 const run = vi.fn();
@@ -11,12 +13,10 @@ vi.mock('@wdio/session/agent', async (importOriginal) => ({
 
 const { withRecording } = await import('../../src/recording/step-recorder');
 const { generateCode } = await import('../../src/recording/code-generator');
-const { buildCurrentSessionSteps } = await import('../../src/resources/sessions.resource');
+const { createServer } = await import('../../src/create-server');
 const { clickTool } = await import('../../src/tools/click.tool');
 const { performActionsTool, selectOptionTool, pressKeyTool } = await import('../../src/tools/page-input.tool');
 const { setCookieTool, deleteCookiesTool } = await import('../../src/tools/cookies.tool');
-const { switchTabTool } = await import('../../src/tools/tabs.tool');
-const { emulateDeviceTool } = await import('../../src/tools/emulate-device.tool');
 
 const extra = {} as Parameters<ToolCallback>[1];
 const record = (name: string, tool: unknown, params: Record<string, unknown>) => (withRecording(name, tool as ToolCallback) as unknown as (p: unknown, e: unknown) => Promise<unknown>)(params, extra);
@@ -33,6 +33,12 @@ beforeEach(() => {
   state.sessionMetadata.set('s1', { type: 'browser', capabilities: {}, isAttached: false });
   history = { sessionId: 's1', type: 'browser', startedAt: '2026-01-01T00:00:00.000Z', capabilities: {}, steps: [] };
   state.sessionHistory.set('s1', history);
+});
+
+afterEach(() => {
+  const settings = getToolSettings();
+  settings.enabledGroups.clear();
+  settings.platform = undefined;
 });
 
 describe('recording the code the agent ran', () => {
@@ -81,30 +87,47 @@ describe('recording the code the agent ran', () => {
     ]);
   });
 
-  it('switch_tab and emulate_device appear in session steps and generated code when recorded', async () => {
+  it('records switch_tab (by handle and index) and emulate_device through real server registrations', async () => {
     const restoreFn = vi.fn().mockResolvedValue(undefined);
     getState().browsers.set('s1', {
       isBidi: true,
-      getWindowHandles: vi.fn().mockResolvedValue(['tab-0', 'tab-1']),
+      getWindowHandles: vi.fn().mockResolvedValue(['CDwindow-0', 'CDwindow-1']),
       switchToWindow: vi.fn().mockResolvedValue(undefined),
       emulate: vi.fn().mockResolvedValue(restoreFn),
     } as unknown as WebdriverIO.Browser);
 
-    await record('switch_tab', switchTabTool, { index: 1 });
-    await record('emulate_device', emulateDeviceTool, { device: 'iPhone 15' });
-    await record('emulate_device', emulateDeviceTool, { device: 'reset' });
+    const server = createServer('none');
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
-    const payload = buildCurrentSessionSteps();
-    expect(payload).not.toBeNull();
-    const parsed = JSON.parse(payload!.stepsJson);
-    expect(parsed.steps.map((s: { tool: string }) => s.tool)).toEqual([
-      'switch_tab',
-      'emulate_device',
-      'emulate_device',
-    ]);
-    expect(payload!.generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
-    expect(payload!.generatedJs).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
-    expect(payload!.generatedJs).toContain('await restoreDeviceEmulation?.();');
-    expect(payload!.generatedJs).not.toContain('[unknown tool]');
+    try {
+      await client.callTool({ name: 'enable_tools', arguments: { groups: ['device'] } });
+      await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-1' } });
+      await client.callTool({ name: 'switch_tab', arguments: { index: 0 } });
+      await client.callTool({ name: 'emulate_device', arguments: { device: 'iPhone 15' } });
+      await client.callTool({ name: 'emulate_device', arguments: { device: 'reset' } });
+
+      const stepsRes = await client.readResource({ uri: 'wdio://session/current/steps' });
+      const stepsText = (stepsRes.contents[0] as { text: string }).text;
+      const parsed = JSON.parse(stepsText);
+      expect(parsed.steps.map((s: { tool: string }) => s.tool)).toEqual([
+        'switch_tab',
+        'switch_tab',
+        'emulate_device',
+        'emulate_device',
+      ]);
+
+      const codeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+      const generatedJs = (codeRes.contents[0] as { text: string }).text;
+      expect(generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+      expect(generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[0]);');
+      expect(generatedJs).not.toContain('CDwindow-1');
+      expect(generatedJs).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
+      expect(generatedJs).toContain('await restoreDeviceEmulation?.();');
+      expect(generatedJs).not.toContain('[unknown tool]');
+    } finally {
+      await Promise.all([client.close(), server.close()]);
+    }
   });
 });

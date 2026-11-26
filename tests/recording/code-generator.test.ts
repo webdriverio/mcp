@@ -235,8 +235,39 @@ describe('generateCode - tool mappings', () => {
     expect(code).toContain("await browser.$('#input').setValue('hello');");
   });
 
-  it('switch_tab by handle → browser.switchToWindow()', () => {
+  it('switch_tab by handle without recorded code in a fresh start_session → not-replayable comment instead of stale handle', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-1' } }]));
+    expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-1'");
+    expect(code).not.toContain("switchToWindow('CDwindow-1')");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab by handle in an attach_session → browser.switchToWindow() with handle', () => {
+    const history: SessionHistory = {
+      sessionId: 'attached-1',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        {
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 'attached-1', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'switch_tab',
+          params: { handle: 'CDwindow-1' },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const code = generateCode(history);
     expect(code).toContain("await browser.switchToWindow('CDwindow-1');");
     expect(code).not.toContain('[unknown tool]');
   });
@@ -251,10 +282,10 @@ describe('generateCode - tool mappings', () => {
     expect(code).not.toContain('[unknown tool]');
   });
 
-  it('switch_tab prefers handle over index when both are present', () => {
+  it('switch_tab prefers replayable index over session-specific handle when both are present without recorded code', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'h-1', index: 1 } }]));
-    expect(code).toContain("await browser.switchToWindow('h-1');");
-    expect(code).not.toContain('getWindowHandles');
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(code).not.toContain("switchToWindow('h-1')");
   });
 
   it('switch_context by name → browser.switchContext()', () => {
