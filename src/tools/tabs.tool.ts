@@ -2,7 +2,8 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
-import { getBrowser } from '../session/state';
+import { getBrowser, getState } from '../session/state';
+import { activeSessionId } from '../session/context';
 import { errorResult } from '../session/agent';
 import { recordCode } from '../recording/step-recorder';
 
@@ -21,14 +22,18 @@ export const switchTabTool: ToolCallback = async ({ handle, index }: { handle?: 
     const browser = getBrowser();
     if (handle) {
       await browser.switchToWindow(handle);
-      try {
-        const handles = await browser.getWindowHandles();
-        const resolvedIndex = Array.isArray(handles) ? handles.indexOf(handle) : -1;
-        if (resolvedIndex >= 0) {
-          recordCode(`await browser.switchToWindow((await browser.getWindowHandles())[${resolvedIndex}]);`);
+      const history = getState().sessionHistory.get(activeSessionId());
+      const isAttachedSession = Boolean(history?.steps.some(step => step.tool === 'attach_session'));
+      if (!isAttachedSession) {
+        try {
+          const handles = await browser.getWindowHandles();
+          const resolvedIndex = Array.isArray(handles) ? handles.indexOf(handle) : -1;
+          if (resolvedIndex >= 0) {
+            recordCode(`await browser.switchToWindow((await browser.getWindowHandles())[${resolvedIndex}]);`);
+          }
+        } catch {
+          // Best-effort index resolution for fresh-session replay; the switch itself succeeded.
         }
-      } catch {
-        // Best-effort index resolution for cross-session replay; the switch itself succeeded.
       }
       return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
     } else if (index !== undefined) {

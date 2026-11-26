@@ -282,9 +282,40 @@ describe('generateCode - tool mappings', () => {
     expect(code).not.toContain('[unknown tool]');
   });
 
-  it('switch_tab prefers replayable index over session-specific handle when both are present without recorded code', () => {
+  it('switch_tab preserves handle precedence in attach_session even when index is also present', () => {
+    const history: SessionHistory = {
+      sessionId: 'attached-2',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        {
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 'attached-2', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'switch_tab',
+          params: { handle: 'h-1', index: 1 },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const code = generateCode(history);
+    expect(code).toContain("await browser.switchToWindow('h-1');");
+    expect(code).not.toContain('getWindowHandles())[1]');
+  });
+
+  it('switch_tab marks replay as unavailable instead of using ignored index when both handle and index are present in fresh start_session without recorded code', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'h-1', index: 1 } }]));
-    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[1]);');
+    expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'h-1'");
+    expect(code).not.toContain('getWindowHandles())[1]');
     expect(code).not.toContain("switchToWindow('h-1')");
   });
 

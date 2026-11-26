@@ -130,4 +130,49 @@ describe('recording the code the agent ran', () => {
       await Promise.all([client.close(), server.close()]);
     }
   });
+
+  it('keeps handle-based replay for attach_session and avoids falling back to ignored index on fresh sessions', async () => {
+    const getWindowHandles = vi.fn().mockRejectedValue(new Error('handles unavailable'));
+    getState().browsers.set('s1', {
+      isBidi: true,
+      getWindowHandles,
+      switchToWindow: vi.fn().mockResolvedValue(undefined),
+    } as unknown as WebdriverIO.Browser);
+
+    const server = createServer('none');
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+    try {
+      // Fresh session: handle wins over index; if getWindowHandles fails, mark unreplayable instead of using ignored index
+      await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-0', index: 1 } });
+      const freshCodeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+      const freshJs = (freshCodeRes.contents[0] as { text: string }).text;
+      expect(freshJs).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-0'");
+      expect(freshJs).not.toContain('getWindowHandles())[1]');
+
+      // Attached session: keep exact handle even when getWindowHandles would succeed
+      getWindowHandles.mockResolvedValue(['CDwindow-0', 'CDwindow-1']);
+      history.steps = [{
+        index: 1,
+        tool: 'attach_session',
+        params: { sessionId: 's1', provider: 'external', platform: 'browser' },
+        status: 'ok',
+        durationMs: 0,
+        timestamp: '2026-01-01T00:00:00.000Z',
+      }];
+      getState().sessionMetadata.set('s1', { type: 'browser', capabilities: {}, isAttached: true });
+
+      await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-1', index: 0 } });
+      expect(history.steps[1].code).toBeUndefined();
+      const attachedCodeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+      const attachedJs = (attachedCodeRes.contents[0] as { text: string }).text;
+      expect(attachedJs).toContain("await browser.switchToWindow('CDwindow-1');");
+      expect(attachedJs).not.toContain('getWindowHandles())[1]');
+      expect(attachedJs).not.toContain('getWindowHandles())[0]');
+    } finally {
+      await Promise.all([client.close(), server.close()]);
+    }
+  });
 });
