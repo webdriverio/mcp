@@ -1,23 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createServer, SERVER_INSTRUCTIONS } from '../src/create-server';
+import { createServer, serverInstructions } from '../src/create-server';
 import { GROUPS } from '../src/toolsets';
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-async function connect(clientName: string) {
-  const server = createServer('none', { detectClient: true });
+async function connect(clientName: string, allowCode = false) {
+  const server = createServer('none', { detectClient: true, allowCode });
   const client = new Client({ name: clientName, version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return { client, close: () => Promise.all([client.close(), server.close()]) };
 }
 
-async function listedTools(clientName: string): Promise<string[]> {
-  const { client, close } = await connect(clientName);
+async function listedTools(clientName: string, allowCode = false): Promise<string[]> {
+  const { client, close } = await connect(clientName, allowCode);
   try {
     return (await client.listTools()).tools.map((tool) => tool.name);
   } finally {
@@ -25,34 +25,36 @@ async function listedTools(clientName: string): Promise<string[]> {
   }
 }
 
-describe('SERVER_INSTRUCTIONS', () => {
+describe('serverInstructions', () => {
   it('stays within 4096 characters', () => {
-    expect(SERVER_INSTRUCTIONS.length).toBeLessThanOrEqual(4096);
+    expect(serverInstructions(true).length).toBeLessThanOrEqual(4096);
   });
 
   it('states the hidden-group rule in client-neutral wording', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('Groups below are hidden by default; if enable_tools is listed, call it with the group name:');
-    expect(SERVER_INSTRUCTIONS).not.toMatch(/call enable_tools/);
+    expect(serverInstructions(false)).toContain('Groups below are hidden by default; if enable_tools is listed, call it with the group name:');
+    expect(serverInstructions(false)).not.toMatch(/call enable_tools/);
   });
 
-  it('names only tools, groups and resources that are registered', async () => {
-    const registered = new Set([...await listedTools('claude-code'), 'enable_tools']);
-    const referenced = [...SERVER_INSTRUCTIONS.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+  it.each([false, true])('names only tools, groups and resources that are registered (allowCode: %s)', async (allowCode) => {
+    const instructions = serverInstructions(allowCode);
+    const registered = new Set([...await listedTools('claude-code', allowCode), 'enable_tools']);
+    const referenced = [...instructions.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
     const unknown = referenced.filter((name) => !registered.has(name) && !(name in GROUPS) && !name.startsWith('wdio://'));
     expect(unknown).toEqual([]);
+    expect(referenced.includes('run_code')).toBe(allowCode);
   });
 
   it('maps every hidden group and its tools', () => {
     for (const [group, { tools }] of Object.entries(GROUPS)) {
-      expect(SERVER_INSTRUCTIONS).toContain(`\`${group}\``);
-      for (const tool of tools) expect(SERVER_INSTRUCTIONS).toContain(`\`${tool}\``);
+      expect(serverInstructions(false)).toContain(`\`${group}\``);
+      for (const tool of tools) expect(serverInstructions(false)).toContain(`\`${tool}\``);
     }
   });
 
   it('is sent to the client on initialize', async () => {
     const { client, close } = await connect('cursor');
     try {
-      expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
+      expect(client.getInstructions()).toBe(serverInstructions(false));
     } finally {
       await close();
     }

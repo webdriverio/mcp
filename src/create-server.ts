@@ -120,17 +120,22 @@ const HIDDEN_FAMILIES = (Object.keys(GROUPS) as ToolGroup[]).map((group) => {
   return `- Group \`${group}\`: ${desc}. Tools: ${tools.map((tool) => `\`${tool}\``).join(', ')}. Keywords: ${GROUP_KEYWORDS[group]}.`;
 });
 
-export const SERVER_INSTRUCTIONS = 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.' + [
-  '',
-  'Workflow:',
-  '- snapshot, then act with refs.',
-  '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
-  '- Refs from the latest result stay valid until the page changes.',
-  '',
-  'Tool families. Groups below are hidden by default; if enable_tools is listed, call it with the group name:',
-  ...TOOL_FAMILIES,
-  ...HIDDEN_FAMILIES,
-].join('\n');
+const CODE_FAMILY = '- Code (opt-in): `run_code`. WebdriverIO code in Node with browser, $ and expect; variables persist between calls. Keywords: script, code, loop, batch, assertion.';
+
+export function serverInstructions(allowCode: boolean): string {
+  const families = allowCode ? [...TOOL_FAMILIES.slice(0, 2), CODE_FAMILY, ...TOOL_FAMILIES.slice(2)] : TOOL_FAMILIES;
+  return 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.' + [
+    '',
+    'Workflow:',
+    '- snapshot, then act with refs.',
+    '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
+    '- Refs from the latest result stay valid until the page changes.',
+    '',
+    'Tool families. Groups below are hidden by default; if enable_tools is listed, call it with the group name:',
+    ...families,
+    ...HIDDEN_FAMILIES,
+  ].join('\n');
+}
 
 type InitializeHandler = (request: unknown, extra: unknown) => Promise<ServerResult>;
 
@@ -157,7 +162,7 @@ export function createServer(
     description: pkg.description,
     websiteUrl: 'https://github.com/webdriverio/mcp',
   }, {
-    instructions: SERVER_INSTRUCTIONS,
+    instructions: serverInstructions(allowCode),
     capabilities: {
       tools: {},
       resources: {},
