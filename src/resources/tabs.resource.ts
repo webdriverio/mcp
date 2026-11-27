@@ -1,7 +1,7 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
 import { withActionTimeout } from '../session/agent';
-import { tabSelectionGeneration } from '../session/tab-selection';
+import { SessionError } from '@wdio/session/agent';
 
 type Tab = { handle: string; title: string; url: string; isActive: boolean };
 
@@ -18,7 +18,7 @@ async function readTabsBidi(browser: WebdriverIO.Browser, handles: string[], cur
   })));
 }
 
-async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], currentHandle: string, generation: number, signal: AbortSignal): Promise<Tab[]> {
+async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], currentHandle: string, signal: AbortSignal): Promise<Tab[]> {
   const tabs: Tab[] = [];
   try {
     for (const handle of handles) {
@@ -27,32 +27,33 @@ async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], 
       tabs.push({ handle, title: await browser.getTitle(), url: await browser.getUrl(), isActive: handle === currentHandle });
     }
   } finally {
-    // A selection made after this read began is newer; restoring would undo it.
-    if (tabSelectionGeneration(browser) === generation) await browser.switchToWindow(currentHandle);
+    // A read that timed out can finish after later tool calls; restoring would undo their tab selection.
+    if (!signal.aborted) await browser.switchToWindow(currentHandle);
   }
   return tabs;
 }
 
-async function readOpenTabs(signal: AbortSignal): Promise<Tab[]> {
-  const browser = getBrowser();
-  const generation = tabSelectionGeneration(browser);
+async function readOpenTabs(browser: WebdriverIO.Browser, signal: AbortSignal): Promise<Tab[]> {
   const handles = await browser.getWindowHandles();
   const currentHandle = await browser.getWindowHandle();
   return browser.isBidi
     ? readTabsBidi(browser, handles, currentHandle)
-    : readTabsClassic(browser, handles, currentHandle, generation, signal);
+    : readTabsClassic(browser, handles, currentHandle, signal);
 }
 
 export async function readTabs(): Promise<{ mimeType: string; text: string }> {
   const abort = new AbortController();
+  let browser: WebdriverIO.Browser | undefined;
   try {
-    const tabs = await withActionTimeout(readOpenTabs(abort.signal), 'get_tabs').catch((e: unknown) => {
+    browser = getBrowser();
+    const tabs = await withActionTimeout(readOpenTabs(browser, abort.signal), 'get_tabs').catch((e: unknown) => {
       abort.abort();
       throw e;
     });
     return { mimeType: 'application/json', text: JSON.stringify(tabs) };
   } catch (e) {
-    return { mimeType: 'text/plain', text: `Error: ${e}` };
+    const leftOnTab = e instanceof SessionError && e.code === 'TIMEOUT' && browser && !browser.isBidi;
+    return { mimeType: 'text/plain', text: `Error: ${e}${leftOnTab ? ' The browser may be left on another tab; call switch_tab to choose one.' : ''}` };
   }
 }
 

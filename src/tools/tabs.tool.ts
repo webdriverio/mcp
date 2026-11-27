@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { SessionError } from '@wdio/session/agent';
 import { getBrowser } from '../session/state';
 import { errorResult, withActionTimeout } from '../session/agent';
-import { noteTabSelected } from '../session/tab-selection';
 
 export const switchTabToolDefinition: ToolDefinition = {
   name: 'switch_tab',
@@ -20,7 +19,6 @@ export const switchTabToolDefinition: ToolDefinition = {
 async function switchTab(handle?: string, index?: number): Promise<CallToolResult> {
   const browser = getBrowser();
   if (handle) {
-    noteTabSelected(browser);
     await browser.switchToWindow(handle);
     return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
   } else if (index !== undefined) {
@@ -28,7 +26,6 @@ async function switchTab(handle?: string, index?: number): Promise<CallToolResul
     if (index >= handles.length) {
       return { isError: true, content: [{ type: 'text', text: `Error: index ${index} out of range (${handles.length} tabs)` }] };
     }
-    noteTabSelected(browser);
     await browser.switchToWindow(handles[index]);
     return { content: [{ type: 'text', text: `Switched to tab ${index}: ${handles[index]}` }] };
   }

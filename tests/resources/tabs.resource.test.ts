@@ -7,7 +7,6 @@ vi.mock('../../src/session/state', () => ({
 import { getBrowser } from '../../src/session/state';
 import { readTabs, tabsResource } from '../../src/resources/tabs.resource';
 import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
-import { noteTabSelected } from '../../src/session/tab-selection';
 
 const mockGetBrowser = getBrowser as ReturnType<typeof vi.fn>;
 
@@ -94,7 +93,47 @@ describe('readTabs', () => {
     }
   });
 
-  it('stops switching after the action timeout and returns to the original window', async () => {
+  it('adds the switch_tab hint when a classic read times out', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetBrowser.mockReturnValue({
+        isBidi: false,
+        getWindowHandles: vi.fn(() => new Promise(() => {})),
+        getWindowHandle: vi.fn(),
+      });
+
+      const pending = readTabs();
+      await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
+      const result = await pending;
+
+      expect(result.text).toContain('did not finish within 30s');
+      expect(result.text).toContain(' The browser may be left on another tab; call switch_tab to choose one.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('omits the switch_tab hint when a BiDi read times out', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetBrowser.mockReturnValue({
+        isBidi: true,
+        getWindowHandles: vi.fn(() => new Promise(() => {})),
+        getWindowHandle: vi.fn(),
+      });
+
+      const pending = readTabs();
+      await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
+      const result = await pending;
+
+      expect(result.text).toContain('did not finish within 30s');
+      expect(result.text).not.toContain('switch_tab');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops switching after the action timeout and does not return to the original window', async () => {
     vi.useFakeTimers();
     try {
       const switchToWindow = vi.fn().mockResolvedValue(undefined);
@@ -112,7 +151,7 @@ describe('readTabs', () => {
       const result = await pending;
 
       expect(result.text).toContain('did not finish within 30s');
-      expect(switchToWindow.mock.calls).toEqual([['h0'], ['h0']]);
+      expect(switchToWindow.mock.calls).toEqual([['h0']]);
     } finally {
       vi.useRealTimers();
     }
@@ -138,48 +177,23 @@ describe('readTabs', () => {
     ]);
   });
 
-  it('does not restore the original window when a selection lands while the current handle is read', async () => {
-    const switchToWindow = vi.fn().mockResolvedValue(undefined);
-    let releaseHandle: (handle: string) => void = () => {};
-    const browser = {
-      isBidi: false,
-      getWindowHandles: vi.fn().mockResolvedValue(['h0', 'h1']),
-      getWindowHandle: vi.fn(() => new Promise<string>((resolve) => { releaseHandle = resolve; })),
-      switchToWindow,
-      getTitle: vi.fn().mockResolvedValue('T'),
-      getUrl: vi.fn().mockResolvedValue('https://a.test/'),
-    };
-    mockGetBrowser.mockReturnValue(browser);
-
-    const pending = readTabs();
-    await vi.waitFor(() => expect(browser.getWindowHandle).toHaveBeenCalled());
-    noteTabSelected(browser as unknown as WebdriverIO.Browser);
-    releaseHandle('h0');
-    await pending;
-
-    expect(switchToWindow.mock.calls).toEqual([['h0'], ['h1']]);
-  });
-
-  it('does not switch back after a timed-out classic read when another tab was selected meanwhile', async () => {
+  it('does not return to the original window after a timed-out classic read finishes late', async () => {
     vi.useFakeTimers();
     try {
       const switchToWindow = vi.fn().mockResolvedValue(undefined);
       let releaseTitle: (title: string) => void = () => {};
-      const browser = {
+      mockGetBrowser.mockReturnValue({
         isBidi: false,
         getWindowHandles: vi.fn().mockResolvedValue(['h0', 'h1']),
-        getWindowHandle: vi.fn().mockResolvedValue('h0'),
+        getWindowHandle: vi.fn().mockResolvedValue('h1'),
         switchToWindow,
         getTitle: vi.fn(() => new Promise<string>((resolve) => { releaseTitle = resolve; })),
         getUrl: vi.fn().mockResolvedValue('https://a.test/'),
-      };
-      mockGetBrowser.mockReturnValue(browser);
+      });
 
       const pending = readTabs();
       await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
       await pending;
-
-      noteTabSelected(browser as unknown as WebdriverIO.Browser);
       releaseTitle('A');
       await vi.advanceTimersByTimeAsync(0);
 

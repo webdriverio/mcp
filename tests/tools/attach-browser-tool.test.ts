@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { remote } from 'webdriverio';
 import { getState } from '../../src/session/state';
-import { tabSelectionGeneration } from '../../src/session/tab-selection';
 import { startSessionTool } from '../../src/tools/session.tool';
 
 // Stub fetch so getActiveTabUrl / closeStaleMappers / waitForCDP don't make real network requests
@@ -123,11 +122,9 @@ describe('attach_browser', () => {
       .mockResolvedValueOnce('https://other.example.com')  // handle-1
       .mockResolvedValueOnce('https://active.example.com') // handle-2 — match
       .mockResolvedValue('https://active.example.com');    // subsequent calls
-    const generationBefore = tabSelectionGeneration(mockBrowser as unknown as WebdriverIO.Browser);
 
     await callTool();
 
-    expect(tabSelectionGeneration(mockBrowser as unknown as WebdriverIO.Browser)).toBe(generationBefore + 1);
     expect(mockBrowser.switchToWindow).toHaveBeenCalledWith('handle-1');
     expect(mockBrowser.switchToWindow).toHaveBeenCalledWith('handle-2');
     expect(mockBrowser.url).not.toHaveBeenCalled();
