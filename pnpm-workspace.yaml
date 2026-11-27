@@ -1,2 +1,11 @@
 onlyBuiltDependencies:
   - sharp
+overrides:
+  'release-it>undici': ^6.24.0
+  basic-ftp: ^5.3.1
+  lodash: ^4.18.1
+  hono: ^4.12.18
+  '@hono/node-server': ^1.19.14
+  defu: ^6.1.7
+  'vitest>vite': ^7.3.2
+  ip-address: ^10.1.1
