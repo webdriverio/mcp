@@ -3,6 +3,8 @@ export interface ParsedArgs {
   port: number;
   allowedHosts: string[];
   allowedOrigins: string[];
+  /** addresses the HTTP server listens on: both loopbacks unless `--host` names one */
+  hosts: string[];
 }
 
 function parseList(argv: string[], flag: string): string[] | null {
@@ -32,5 +34,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const allowedHosts = parseList(argv, '--allowedHosts') ?? ['localhost', '127.0.0.1', '::1'];
   const allowedOrigins = parseList(argv, '--allowedOrigins') ?? [];
 
-  return { http, port, allowedHosts, allowedOrigins };
+  const hostIdx = argv.indexOf('--host');
+  const host = hostIdx === -1 ? undefined : argv[hostIdx + 1];
+  if (hostIdx !== -1 && (!host || host.startsWith('--'))) throw new Error('--host requires an address');
+  const hosts = host ? [host] : ['127.0.0.1', '::1'];
+
+  return { http, port, allowedHosts, allowedOrigins, hosts };
 }
