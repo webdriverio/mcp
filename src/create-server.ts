@@ -88,6 +88,7 @@ import { executeElectronScriptTool, executeElectronScriptToolDefinition } from '
 import { mockTool, mockToolDefinition, getMockCallsTool, getMockCallsToolDefinition, manageMockTool, manageMockToolDefinition } from './tools/mock.tool';
 import { triggerElectronDeeplinkTool, triggerElectronDeeplinkToolDefinition } from './tools/electron-deeplink.tool';
 import { withSessionTarget, withSessionlessContext } from './session/routing';
+import { saveCodeTool, saveCodeToolDefinition } from './tools/save-code.tool';
 
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
@@ -198,6 +199,7 @@ export function createServer(
   registerTool(getContextsToolDefinition, getContextsTool);
   registerTool(appStateToolDefinition, appStateTool);
   registerTool(getCookiesToolDefinition, getCookiesTool);
+  registerTool(saveCodeToolDefinition, saveCodeTool);
 
   const disposeToolVisibility = setupToolVisibility(tools, registerTool);
   server.server.onclose = disposeToolVisibility;
