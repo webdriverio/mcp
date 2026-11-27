@@ -22,7 +22,7 @@ const browserMock = () => ({ deleteSession: vi.fn().mockResolvedValue(undefined)
 const historyOf = (sessionId: string): SessionHistory => ({ sessionId, type: 'browser', startedAt: new Date().toISOString(), capabilities: {}, steps: [] });
 
 /** what createServer() does per HTTP request */
-function createServer() {
+function createServer(setup = setupToolVisibility) {
   const server = new McpServer({ name: 'test', version: '0' });
   const tools = new Map<string, RegisteredTool>();
   const registerTool = (definition: ToolDefinition, callback: ToolCallback) => {
@@ -33,7 +33,7 @@ function createServer() {
   for (const name of ['click_element', 'tap_element', 'select_option', 'get_cookies']) {
     registerTool({ name, description: name, inputSchema: {} }, noop);
   }
-  const { dispose } = setupToolVisibility(tools, registerTool, false);
+  const { dispose } = setup(tools, registerTool, false);
   const listed = () => [...tools].filter(([, tool]) => tool.enabled).map(([name]) => name);
   return { tools, listed, dispose };
 }
@@ -117,8 +117,11 @@ describe('tool visibility across servers', () => {
     expect(server.listed()).toEqual(createServer().listed());
   });
 
-  it('keeps one session listener however many servers are created', () => {
-    const servers = Array.from({ length: 5 }, createServer);
+  it('keeps one session listener however many servers are created', async () => {
+    vi.resetModules();
+    registered.mockClear();
+    const fresh = await import('../src/tool-visibility');
+    const servers = Array.from({ length: 5 }, () => createServer(fresh.setupToolVisibility));
     expect(registered).toHaveBeenCalledTimes(1);
     expect(servers).toHaveLength(5);
   });

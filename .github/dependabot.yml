@@ -27,6 +27,9 @@ updates:
     open-pull-requests-limit: 10
     ignore:
       - dependency-name: "@types/node"
+      # typescript-eslint and tsup dts need the TS compiler API, which 7.0 does not ship (expected in 7.1)
+      - dependency-name: "typescript"
+        versions: [">=7"]
       - dependency-name: "*"
         update-types: ["version-update:semver-minor", "version-update:semver-patch"]
     groups:
