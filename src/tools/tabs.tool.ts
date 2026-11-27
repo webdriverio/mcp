@@ -2,8 +2,9 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tool';
 import { z } from 'zod';
+import { SessionError } from '@wdio/session/agent';
 import { getBrowser } from '../session/state';
-import { errorResult } from '../session/agent';
+import { errorResult, withActionTimeout } from '../session/agent';
 
 export const switchTabToolDefinition: ToolDefinition = {
   name: 'switch_tab',
@@ -15,22 +16,29 @@ export const switchTabToolDefinition: ToolDefinition = {
   },
 };
 
+async function switchTab(handle?: string, index?: number): Promise<CallToolResult> {
+  const browser = getBrowser();
+  if (handle) {
+    await browser.switchToWindow(handle);
+    return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
+  } else if (index !== undefined) {
+    const handles = await browser.getWindowHandles();
+    if (index >= handles.length) {
+      return { isError: true, content: [{ type: 'text', text: `Error: index ${index} out of range (${handles.length} tabs)` }] };
+    }
+    await browser.switchToWindow(handles[index]);
+    return { content: [{ type: 'text', text: `Switched to tab ${index}: ${handles[index]}` }] };
+  }
+  return { isError: true, content: [{ type: 'text', text: 'Error: Must provide either handle or index' }] };
+}
+
 export const switchTabTool: ToolCallback = async ({ handle, index }: { handle?: string; index?: number }): Promise<CallToolResult> => {
   try {
-    const browser = getBrowser();
-    if (handle) {
-      await browser.switchToWindow(handle);
-      return { content: [{ type: 'text', text: `Switched to tab: ${handle}` }] };
-    } else if (index !== undefined) {
-      const handles = await browser.getWindowHandles();
-      if (index >= handles.length) {
-        return { isError: true, content: [{ type: 'text', text: `Error: index ${index} out of range (${handles.length} tabs)` }] };
-      }
-      await browser.switchToWindow(handles[index]);
-      return { content: [{ type: 'text', text: `Switched to tab ${index}: ${handles[index]}` }] };
-    }
-    return { isError: true, content: [{ type: 'text', text: 'Error: Must provide either handle or index' }] };
+    return await withActionTimeout(switchTab(handle, index), 'switch_tab');
   } catch (e) {
-    return errorResult(e, 'Error switching tab');
+    const failed = errorResult(e, 'Error switching tab');
+    if (!(e instanceof SessionError && e.code === 'TIMEOUT')) return failed;
+    const [{ text }] = failed.content as { text: string }[];
+    return { isError: true, content: [{ type: 'text', text: `${text}\nThe switch may still land, so the active tab is unknown: call get_tabs.` }] };
   }
 };

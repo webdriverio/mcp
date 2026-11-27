@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { localBrowserProvider, matchHeadedUserAgent } from '../../src/providers/local-browser.provider';
+import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
 
 describe('LocalBrowserProvider', () => {
   it('fails BiDi commands after 30s instead of the 180s default', () => {
@@ -32,6 +33,21 @@ describe('LocalBrowserProvider', () => {
     const caps = localBrowserProvider.buildCapabilities({ browser: 'safari', headless: true });
     expect(caps.browserName).toBe('safari');
     expect(caps['goog:chromeOptions']).toBeUndefined();
+  });
+
+  it('buildCapabilities: caps pageLoad at the action timeout', () => {
+    const caps = localBrowserProvider.buildCapabilities({ browser: 'chrome', headless: false });
+    expect(caps.timeouts).toEqual({ pageLoad: ACTION_TIMEOUT_MS });
+  });
+
+  it('buildCapabilities: keeps pageLoad when the user sets another timeout', () => {
+    const caps = localBrowserProvider.buildCapabilities({ browser: 'chrome', headless: false, capabilities: { timeouts: { script: 5_000 } } });
+    expect(caps.timeouts).toEqual({ pageLoad: ACTION_TIMEOUT_MS, script: 5_000 });
+  });
+
+  it('buildCapabilities: keeps a user timeouts capability', () => {
+    const caps = localBrowserProvider.buildCapabilities({ browser: 'chrome', headless: false, capabilities: { timeouts: { pageLoad: 120_000 } } });
+    expect(caps.timeouts).toEqual({ pageLoad: 120_000 });
   });
 
   it('buildCapabilities: merges user capabilities', () => {

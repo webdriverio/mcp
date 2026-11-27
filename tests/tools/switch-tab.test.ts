@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../src/session/state';
+import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
 import { switchTabTool } from '../../src/tools/tabs.tool';
 
 const callTool = switchTabTool as unknown as (args: Record<string, unknown>) => Promise<{
@@ -79,6 +80,22 @@ describe('switch_tab', () => {
     const result = await callTool({ index: 5 });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('out of range');
+  });
+
+  it('fails with the action timeout when switching never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      setupSession('s5');
+      mockSwitchToWindow.mockReturnValue(new Promise(() => {}));
+      const pending = callTool({ handle: 'handle-1' });
+      await vi.advanceTimersByTimeAsync(ACTION_TIMEOUT_MS);
+      const result = await pending;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('"switch_tab" did not finish within 30s');
+      expect(result.content[0].text).toContain('call get_tabs');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns error when neither handle nor index provided', async () => {
