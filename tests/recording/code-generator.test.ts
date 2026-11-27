@@ -235,7 +235,7 @@ describe('generateCode - tool mappings', () => {
     expect(code).toContain("await browser.$('#input').setValue('hello');");
   });
 
-  it('switch_tab by handle without recorded code in a fresh start_session → not-replayable comment instead of stale handle', () => {
+  it('switch_tab by handle in a fresh start_session → not-replayable comment instead of stale handle', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-1' } }]));
     expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-1'");
     expect(code).not.toContain("switchToWindow('CDwindow-1')");
@@ -312,7 +312,7 @@ describe('generateCode - tool mappings', () => {
     expect(code).not.toContain('getWindowHandles())[1]');
   });
 
-  it('switch_tab marks replay as unavailable instead of using ignored index when both handle and index are present in fresh start_session without recorded code', () => {
+  it('switch_tab marks replay as unavailable instead of using ignored index when both handle and index are present in fresh start_session', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'h-1', index: 1 } }]));
     expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'h-1'");
     expect(code).not.toContain('getWindowHandles())[1]');
