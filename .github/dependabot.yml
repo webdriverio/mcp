@@ -29,6 +29,8 @@ updates:
       - dependency-name: "@types/node"
       - dependency-name: "*"
         update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "typescript"
+        versions: [">=7"]
     groups:
       major-deps-updates-v5:
         update-types:
