@@ -36,3 +36,10 @@ export async function listenOn(hosts: string[], port: number, handle: http.Reque
   if (!listening.length) throw new Error(`None of ${hosts.join(', ')} is available to listen on`);
   return listening;
 }
+
+const WILDCARD_HOSTS = ['0.0.0.0', '::'];
+
+export function serverUrl(hosts: string[], port: number): string {
+  const host = hosts.length > 1 || WILDCARD_HOSTS.includes(hosts[0]) ? 'localhost' : hosts[0];
+  return `http://${host.includes(':') ? `[${host}]` : host}:${port}/mcp`;
+}

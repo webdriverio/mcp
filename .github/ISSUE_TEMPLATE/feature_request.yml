@@ -24,8 +24,8 @@ body:
   - type: input
     id: client-version
     attributes:
-      label: MCP client version
-      description: For "Other", the client's name too.
+      label: MCP client version (for "Other", name and version)
+      description: For example "Zed 0.190" when you picked Other above.
   - type: textarea
     id: problem
     attributes:
