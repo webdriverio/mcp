@@ -90,6 +90,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.74.0",
     "vitest": "^4.1.2",
     "yauzl": "^3.3.0"
   },
