@@ -39,6 +39,9 @@ importers:
       '@wdio/session':
         specifier: 10.2.0
         version: 10.2.0(@wdio/electron-service@10.4.1(tsx@4.23.15)(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0))(tsx@4.23.15)(webdriverio@10.2.0(puppeteer-core@25.16.0(yauzl@3.4.0))(yauzl@3.4.0))(yauzl@3.4.0)
+      acorn:
+        specifier: ^8.16.0
+        version: 8.16.0
       browserstack-local:
         specifier: ^1.5.12
         version: 1.5.16

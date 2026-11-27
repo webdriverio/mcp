@@ -183,6 +183,7 @@ Only files whose purpose is not evident from the tree above.
 | `src/tools/session.tool.ts` | `start_session` (browser + mobile), `close_session` |
 | `src/tools/get-elements.tool.ts` | `get_elements` (mobile and Electron only) — `getSnapshot` accessibility tree text with selectors |
 | `src/tools/cloud-provider.tool.ts` | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Bearer auth) |
+| `src/tools/run-code.tool.ts` | `run_code` (opt-in) — `@wdio/session`'s `exec` through `runAction` with `code` and `$timeout` (the typed `run('exec')` passes `e` and runs nothing, webdriverio/webdriverio#16493); records the history entry the call appended |
 | `src/tools/query-docs.tool.ts` | `query_docs` — BM25 search over the WebdriverIO docs corpus |
 | `src/utils/docs-index.ts` | Docs corpus fetch/cache, fence-aware chunking, path alignment, 3-field BM25 index + search |
 | `src/utils/docs-client.ts` | Boundary layer for the docs corpus — resolves the cache dir and loads the index |
@@ -257,6 +258,7 @@ catch (e) {
 | `TESTINGBOT_SECRET` | TestingBot sessions + tools |
 | `DIGITALAI_CLOUD_URL` | Digital.ai sessions + tools (cloud host, e.g. `https://cloud.example.com`) |
 | `DIGITALAI_ACCESS_KEY` | Digital.ai sessions + tools |
+| `WDIO_MCP_RUN_CODE` | `1`/`true` lists `run_code` (same as `--allow-code`); off by default |
 
 ## Planned Improvements
 
@@ -265,5 +267,6 @@ Unimplemented proposals only; shipped work is not listed here. See `docs/archite
 - `interaction-sequencing-proposal.md` — sequencing model for tool interactions
 - `trace-extraction-proposal.md` — extracting trace data to a standalone package; superseded by `v5-proposal.md`
 - `v5-proposal.md` — engine consolidation onto `@wdio/session` and devtools trace
+- `run-code-proposal.md` — client-usage measurement for v5 decision 4 (the run_code tool itself is implemented)
 
 `providers/registry.ts` + `providers/cloud/` is the extension point for new cloud providers.

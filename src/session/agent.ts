@@ -49,7 +49,7 @@ function errorMessage(e: unknown): string {
   return named ? [e.name, e.message].filter(Boolean).join(': ') : e.message;
 }
 
-function errorText(e: unknown, context?: string): string {
+export function errorText(e: unknown, context?: string): string {
   const message = errorMessage(e);
   const hint = e instanceof SessionError ? e.hint : undefined;
   const ended = sessionEnded(e) ? `This browser session has ended. If you did not close it, start a new one with \`${mcpHint('open')}\`.` : undefined;

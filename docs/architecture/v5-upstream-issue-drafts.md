@@ -253,6 +253,8 @@ It is the one provider MCP has that session lacks. MCP can contribute the port.
 
 ## S4. `exec` result and arguments
 
+**Filed 2026-11-21 as webdriverio/webdriverio#16493**, together with the agent input and timeout items below.
+
 **Title:** `exec` action: return `code` in the result and accept arguments
 
 **Target repo:** `webdriverio/webdriverio` (`packages/wdio-session`)
@@ -281,11 +283,19 @@ history but does not return it, so a caller that builds a script from action res
 - [ ] `exec` accepts an optional `args` array that the code can read (for example as `args` in scope), JSON values at
       minimum.
 - [ ] The recorded/returned code is runnable on its own when `args` were passed (values inlined or declared).
+- [ ] `agent.run('exec', …)` accepts the input `exec` reads. Its typed arguments come from the CLI spec, `e`, `file` and
+      `history` (`src/actions/specs.ts:188-191`), but `exec` reads `args.code` (`src/actions/exec.ts:97`); only the CLI
+      maps one to the other (`src/cli/command.ts:260-283`). A typed `agent.run('exec', { e })` compiles and runs empty code.
+- [ ] `run`/`runAction` accept a timeout that reaches `$timeout`. The agent dispatches without `opts.timeout`
+      (`src/agent.ts:131-132`), `$timeout` is set only from it (`src/session.ts:324`), and without it `exec` waits with no
+      bound (`src/actions/exec.ts:72-75`).
 
 **Why it matters to @wdio/mcp**
 
-MCP's `execute_script` tool takes a script plus an `args` array. Routing it through `exec` lets its recorded code come
-from the agent like every other action.
+MCP proposes a `run_code` tool over `exec` (`run-code-proposal.md` in `webdriverio/mcp`). Returned `code` lets its
+recorded steps come from the agent like every other action, `args` lets callers pass values without building code
+strings, and the agent-side input and timeout let it call `exec` through the typed API with a bound. `execute_script`
+stays a separate, in-page tool.
 ````
 
 ## S5. Public code exporter
@@ -850,3 +860,9 @@ Everything below is marked **unverified** as of 2026-11-14, unless an item gives
 ## Candidate, not drafted
 
 The BiDi `getCookies()` candidate is now drafted as W1, with its cause.
+
+- **S7 candidate (2026-11-21): `exec` sets a process-wide `browser`.** `getExecContext` runs
+  `globalThis.browser ??= session.browser` and the same for `driver` (`src/exec/context.ts:93-98`, at `v10.2.0`; its
+  comment says some matchers read the global). In a process with several sessions, such as MCP with concurrent
+  sessions, the first session to run `exec` keeps the global, so those matchers would act on it. Not drafted until a
+  matcher that reads the global is identified and the effect is reproduced.

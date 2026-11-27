@@ -1,7 +1,9 @@
 // tests/recording/code-generator.test.ts
 import { describe, expect, it } from 'vitest';
+import { parse } from 'acorn';
 import { browserMockKey, generateCode } from '../../src/recording/code-generator';
 import type { SessionHistory, RecordedStep } from '../../src/types/recording';
+import { hoistRunCodeBody, hoistRunCodeSteps } from '../../src/recording/run-code-hoist';
 
 const START_BROWSER_STEP: RecordedStep = {
   index: 1,
@@ -216,6 +218,78 @@ describe('generateCode - header', () => {
     expect(code).toContain("sessionId: 'existing-bs-session'");
     expect(code).not.toContain('remote(');
     expect(code).not.toContain('deleteSession');
+  });
+});
+
+describe('generateCode - run_code bodies', () => {
+  const parseAsModule = (code: string) => parse(code, { ecmaVersion: 'latest', sourceType: 'module', allowAwaitOutsideFunction: true });
+
+  it('a top-level return in a recorded body still compiles as the module script', () => {
+    const code = generateCode(makeHistory([{ tool: 'run_code', params: {}, code: ['const x = 1;\nif (x) return;\nconsole.log(x);'] }]));
+    expect(() => parseAsModule(code)).not.toThrow();
+  });
+
+  it('hoists a top-level declaration so a later step sees it', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'run_code', params: {}, code: ['const rows = 3'] },
+      { tool: 'run_code', params: {}, code: ['console.log(rows)'] },
+    ]));
+    expect(code.match(/^ *let rows;$/gm)).toHaveLength(1);
+    expect(code).toContain('rows = 3;');
+    expect(() => parseAsModule(code)).not.toThrow();
+  });
+
+  it('hoists destructured bindings', () => {
+    const code = generateCode(makeHistory([{ tool: 'run_code', params: {}, code: ['const { a, b } = obj'] }]));
+    expect(code).toMatch(/^ *let a, b;$/m);
+    expect(code).toContain('({ a, b } = obj);');
+  });
+
+  describe('execution', () => {
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (out: unknown[]) => Promise<void>;
+    const runBodies = async (bodies: string[]): Promise<unknown[]> => {
+      const out: unknown[] = [];
+      const hoisted = hoistRunCodeSteps(makeHistory(bodies.map(code => ({ tool: 'run_code', params: {}, code: [code] }))).steps);
+      const prelude = hoisted.names.length ? `let ${hoisted.names.join(', ')};\n` : '';
+      await new AsyncFunction('out', prelude + hoisted.steps.flatMap(step => step.code ?? []).join('\n'))(out);
+      return out;
+    };
+
+    it('declares every declarator of a multi-declarator const', async () => {
+      expect(await runBodies(['const a = 1, b = 2', 'out.push(a + b)'])).toEqual([3]);
+    });
+
+    it('treats init-less var as already hoisted and init-less let as undefined', async () => {
+      const code = generateCode(makeHistory([{ tool: 'run_code', params: {}, code: ['var x; let y;'] }]));
+      expect(code).toContain('y = undefined;');
+      expect(code).not.toContain('x = undefined');
+      expect(await runBodies(['var x; let y; out.push(x, y)'])).toEqual([undefined, undefined]);
+    });
+
+    it('calls a function declared later in the same step', async () => {
+      expect(await runBodies(['out.push(f()); function f() { return 1 }'])).toEqual([1]);
+    });
+
+    it('keeps async function modifiers when hoisting', async () => {
+      expect(await runBodies(['out.push(g() instanceof Promise); async function g() { return 1 }'])).toEqual([true]);
+    });
+
+    it('calls a function declared in an earlier step from a later step', async () => {
+      expect(await runBodies(['function f() { return 2 }', 'out.push(f())'])).toEqual([2]);
+    });
+
+    it('shares a class declared in one step with a later step', async () => {
+      expect(await runBodies(['class C { m() { return 2 } }', 'out.push(new C().m())'])).toEqual([2]);
+    });
+
+    it('keeps a var inside a block local to its step', async () => {
+      expect(await runBodies(['if (true) { var y = 1 }', 'out.push(typeof y)'])).toEqual(['undefined']);
+      expect(await runBodies(['if (true) { var y = 1; out.push(y) }'])).toEqual([1]);
+    });
+  });
+
+  it('emits a body that fails to parse unwrapped', () => {
+    expect(hoistRunCodeBody('const = ;')).toEqual({ names: [], code: 'const = ;' });
   });
 });
 
@@ -451,6 +525,27 @@ describe('generateCode - error and sentinel steps', () => {
     }]));
     expect(code).toContain('// [error] click_element:');
     expect(code).toContain('Element not found');
+  });
+
+  it('comments every line of a multiline error', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'run_code',
+      params: { code: 'x' },
+      status: 'error',
+      error: 'row 5\nis missing',
+    }]));
+    expect(code).toMatch(/^ *\/\/ \[error\] run_code: code="x" — row 5\n *\/\/ is missing$/m);
+  });
+
+  it('comments every line of a multiline error after the recorded code', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'run_code',
+      params: { code: 'x' },
+      status: 'error',
+      error: 'row 5\nis missing',
+      code: ['const a = 1'],
+    }]));
+    expect(code).toMatch(/^ *\}\)\(\);\n *\/\/ \[error\] run_code: code="x" — row 5\n *\/\/ is missing$/m);
   });
 
   it('emits session transition as a comment block', () => {
