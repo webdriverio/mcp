@@ -1,13 +1,13 @@
 # `@wdio/mcp` v5 — upstream issues to file
 
-Status: not filed. Paste each section's title and body into the repo named in the table. 9 items go to `webdriverio/webdriverio` (S1-S6, W1-W3) and 8 to `webdriverio/devtools` (D1-D8). The `<ID> —` heading prefix and the prototype line are not pasted. Cross-references (for example "see the launch API issue") get real issue numbers back-filled after filing. Labels are suggestions; non-maintainers may not be able to set them.
+Status: S4 filed (webdriverio/webdriverio#16493, open); the rest not filed. Paste each section's title and body into the repo named in the table. 9 items go to `webdriverio/webdriverio` (S1-S6, W1-W3) and 8 to `webdriverio/devtools` (D1-D8). The `<ID> —` heading prefix and the prototype line are not pasted. Cross-references (for example "see the launch API issue") get real issue numbers back-filled after filing. Labels are suggestions; non-maintainers may not be able to set them.
 
 | ID | Title | Repo | Label |
 | --- | --- | --- | --- |
 | S1 | Export an in-process launch API (`@wdio/session/launch`) with hook injection | `webdriverio/webdriverio` | `Enhancement` |
 | S2 | Emit action events from `AgentSession` (`onAction` option or an emitter) | `webdriverio/webdriverio` | `Enhancement` |
 | S3 | Add Digital.ai as a cloud provider | `webdriverio/webdriverio` | `Enhancement` |
-| S4 | `exec` action: return `code` in the result and accept arguments | `webdriverio/webdriverio` | `Enhancement` |
+| S4 | `exec` action: return `code` in the result and accept arguments (filed, extended: webdriverio/webdriverio#16493) | `webdriverio/webdriverio` | `Enhancement` |
 | S5 | Public exporter for a standalone script with a launch preamble | `webdriverio/webdriverio` | `Enhancement` |
 | S6 | Agent-generated frame code is TypeScript, not JavaScript | `webdriverio/webdriverio` | `Bug 🐛` |
 | D1 | Standalone: `setupForDevtools()` cannot select trace mode | `webdriverio/devtools` | `bug` |
@@ -53,8 +53,8 @@ Default and naming drifts to decide:
 ### S4 — `exec` action: return `code` in the result and accept arguments
 
 **Problem:** Other agent actions return the WebdriverIO code they ran in `AgentActionResult.code`; `exec` records its code in history but does not return it, so callers building a script from action results must special-case `exec`. `exec` also takes only source text, so values must be serialised into the code string.
-**Proposal:** `exec` sets `code` on its result to the text it records (absent when nothing is recorded, e.g. `history: false` or read-only code); accept an optional `args` array the code can read (JSON values at minimum); recorded and returned code runs standalone when `args` are passed (inlined or declared).
-**Evidence:** `@wdio/session` 10.2.0 (tag `v10.2.0`): `exec` returns `{ text, data, files, history }` (`src/actions/exec.ts:150-155`); `dispatch` appends `outcome.history` then removes it from the returned object (`src/session.ts:405-415`); `AgentActionResult.code` is optional (`src/agent/types.ts:62`).
+**Proposal:** `exec` sets `code` on its result to the text it records (absent when nothing is recorded, e.g. `history: false` or read-only code); accept an optional `args` array the code can read (JSON values at minimum); recorded and returned code runs standalone when `args` are passed (inlined or declared); `agent.run('exec', …)` accepts the input `exec` reads (today its typed arguments are the CLI's `e` and `file`, while `exec` reads `code`, so a typed call runs empty code); `run`/`runAction` accept a timeout that reaches `exec`'s `$timeout`.
+**Evidence:** `@wdio/session` 10.2.0 (tag `v10.2.0`): `exec` returns `{ text, data, files, history }` (`src/actions/exec.ts:150-155`); `dispatch` appends `outcome.history` then removes it from the returned object (`src/session.ts:405-415`); `AgentActionResult.code` is optional (`src/agent/types.ts:62`); the spec declares `e`, `file` and `history` (`src/actions/specs.ts:188-191`), `exec` reads `args.code` (`src/actions/exec.ts:97`) and only the CLI maps one to the other (`src/cli/command.ts:260-283`); the agent dispatches without `opts.timeout` (`src/agent.ts:131-132`), so `$timeout` is unset (`src/session.ts:324`) and `exec` has no time bound (`src/actions/exec.ts:72-75`).
 
 ### S5 — Public exporter for a standalone script with a launch preamble
 

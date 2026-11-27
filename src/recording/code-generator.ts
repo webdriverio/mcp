@@ -1,10 +1,16 @@
 // src/recording/code-generator.ts
 import type { RecordedStep, SessionHistory } from '../types/recording';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
+import { hoistRunCodeSteps } from './run-code-hoist';
 
 /** Escape single quotes so generated JS string literals are valid. */
 function escapeStr(value: unknown): string {
   return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/** Every line gets its own `// `, so a multiline error cannot end the comment early and leave code behind. */
+function commentLines(text: string): string {
+  return text.split('\n').map((line) => `// ${line}`).join('\n');
 }
 
 function formatParams(params: Record<string, unknown>): string {
@@ -136,6 +142,10 @@ function unreplayableRef(step: RecordedStep): string {
 /** the agent's code calls the bare `$` and `$$` globals */
 const BARE_SELECTOR_GLOBAL = /(?<![.\w$])\$\$?\(/;
 
+function errorComment(step: RecordedStep): string {
+  return commentLines(`[error] ${step.tool}: ${formatParams(step.params)} — ${step.error ?? 'unknown error'}`);
+}
+
 function generateStep(step: RecordedStep, history: SessionHistory): string {
   if (step.tool === '__session_transition__') {
     const newId = (step.params.newSessionId as string) ?? 'unknown';
@@ -144,13 +154,11 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
 
   if (step.code?.length) {
     const lines = [...step.code];
-    if (step.status === 'error') lines.push(`// [error] ${step.tool}: ${formatParams(step.params)} — ${step.error ?? 'unknown error'}`);
+    if (step.status === 'error') lines.push(errorComment(step));
     return lines.join('\n');
   }
 
-  if (step.status === 'error') {
-    return `// [error] ${step.tool}: ${formatParams(step.params)} — ${step.error ?? 'unknown error'}`;
-  }
+  if (step.status === 'error') return errorComment(step);
 
   const p = step.params;
   switch (step.tool) {
@@ -384,6 +392,9 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
         `await browser.url(\`${escapeStr(scheme)}://\${extension}/${escapeStr(extensionPath)}\`);`,
       ].join('\n');
     }
+    // code that only read the page records no code of its own
+    case 'run_code':
+      return '// run_code: read only, nothing to replay';
     default:
       return `// [unknown tool] ${step.tool}`;
   }
@@ -419,7 +430,9 @@ export function generateCode(history: SessionHistory): string {
       : isLambdaTest ? (ltOptions?.tunnel === true)
         : (tbOptions?.tunnel === true);
 
-  const stepLines = history.steps.map(step => generateStep(step, history));
+  const hoisted = hoistRunCodeSteps(history.steps);
+  const stepLines = hoisted.steps.map(step => generateStep(step, history));
+  if (hoisted.names.length) stepLines.unshift(`let ${hoisted.names.join(', ')};`);
   if (history.steps.some(step => step.code?.some(line => BARE_SELECTOR_GLOBAL.test(line)))) {
     stepLines.unshift('const $ = (...args) => browser.$(...args);', 'const $$ = (...args) => browser.$$(...args);');
   }
