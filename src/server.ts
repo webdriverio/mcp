@@ -114,7 +114,7 @@ async function main() {
 
   } else {
     const transport = new StdioServerTransport();
-    const server = createServer(defaultNetworkLogs);
+    const server = createServer(defaultNetworkLogs, { detectClient: true });
     server.server.oninitialized = () => console.info(clientLine(server.server.getClientVersion()));
     await server.connect(transport);
     console.error('WebdriverIO MCP Server running on stdio');

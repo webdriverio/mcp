@@ -49,7 +49,14 @@ export function groupOf(name: string): ToolGroup | undefined {
   return (Object.keys(GROUPS) as ToolGroup[]).find((group) => (GROUPS[group].tools as readonly string[]).includes(name));
 }
 
-/** `WDIO_MCP_TOOLS=all` lists every tool from the start, for clients that ignore tool list changes */
-export function showAllTools(env = process.env): boolean {
-  return env.WDIO_MCP_TOOLS === 'all';
+/** these clients run their own tool search */
+export const TOOL_SEARCH_CLIENTS: readonly string[] = ['claude-code'];
+
+/**
+ * `WDIO_MCP_TOOLS=all` lists every tool from the start, for clients that ignore tool list changes;
+ * `gated` keeps the hidden groups for every client
+ */
+export function showAllTools(clientName: string | undefined, env = process.env): boolean {
+  if (env.WDIO_MCP_TOOLS === 'gated') return false;
+  return env.WDIO_MCP_TOOLS === 'all' || (clientName !== undefined && TOOL_SEARCH_CLIENTS.includes(clientName));
 }
