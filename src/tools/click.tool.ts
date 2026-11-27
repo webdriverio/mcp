@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback, CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolDefinition } from '../types/tool';
 import { runAction, agentFor, noSession } from '../session/agent';
 

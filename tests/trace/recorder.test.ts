@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { getState } from '../../src/session/state';
 import { withTrace, recordInitialNavigation } from '../../src/trace/recorder';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';

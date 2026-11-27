@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import type http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { parseArgs, type ParsedArgs } from './utils/parse-args';
 import { extractHost, listenOn, sendJsonRpcError, serverUrl } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
@@ -86,7 +86,7 @@ async function main() {
           // a server per request never sees both initialize and initialized, so read the client from the request
           const clientInfo = initializeClientInfo(body);
           if (clientInfo) console.info(clientLine(clientInfo));
-          const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+          const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
           const server = createServer(defaultNetworkLogs, { allowCode: args.allowCode });
           res.on('close', () => void server.close());
           await server.connect(transport);

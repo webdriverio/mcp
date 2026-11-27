@@ -1,5 +1,6 @@
 import sharp from 'sharp';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
+import type { ToolResult } from '../types/tool';
 import { getBrowser, getState } from '../session/state.js';
 import { activeSessionId } from '../session/context.js';
 import { createTraceSession, getMonotonicMs, getTraceSession } from './state.js';
@@ -104,11 +105,11 @@ export function withTrace(toolName: string, callback: ToolCallback): ToolCallbac
       title: formatActionTitle(action, params as Record<string, unknown>),
     });
 
-    let result: Awaited<ReturnType<ToolCallback>>;
+    let result: ToolResult;
     let actionError: string | undefined;
 
     try {
-      result = await callback(params, extra);
+      result = (await callback(params, extra)) as ToolResult;
       if ((result as { isError?: boolean }).isError) {
         const text = result.content?.find((c) => c.type === 'text')?.text;
         actionError = text ? String(text) : 'unknown error';

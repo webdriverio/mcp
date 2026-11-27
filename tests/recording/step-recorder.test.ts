@@ -1,6 +1,6 @@
 // tests/recording/step-recorder.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { getState } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
 import { sessionContext } from '../../src/session/context';

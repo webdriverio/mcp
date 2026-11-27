@@ -1,9 +1,10 @@
 // src/recording/step-recorder.ts
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import type { RecordedStep, SessionHistory } from '../types/recording';
 import { getState } from '../session/state';
 import { activeSessionId } from '../session/context';
+import type { ToolResult } from '../types/tool';
 
 const recordedCode = new AsyncLocalStorage<string[]>();
 
@@ -44,7 +45,7 @@ export function getSessionHistory(): Map<string, SessionHistory> {
   return getState().sessionHistory;
 }
 
-function extractErrorText(result: Awaited<ReturnType<ToolCallback>>): string {
+function extractErrorText(result: ToolResult): string {
   const textContent = result.content.find((c: any) => c.type === 'text');
   return textContent ? (textContent as any).text : 'Unknown error';
 }
@@ -53,7 +54,7 @@ export function withRecording(toolName: string, callback: ToolCallback): ToolCal
   return async (params, extra) => {
     const start = Date.now();
     const code: string[] = [];
-    const result = await recordedCode.run(code, () => callback(params, extra));
+    const result = (await recordedCode.run(code, () => callback(params, extra))) as ToolResult;
     const isError = (result as any).isError === true;
     appendStep(
       toolName,

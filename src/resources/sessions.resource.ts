@@ -1,5 +1,5 @@
 import type { ResourceDefinition } from '../types/resource';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type { SessionHistory } from '../types/recording';
 import { generateCode } from '../recording/code-generator';
 import { getSessionHistory } from '../recording/step-recorder';

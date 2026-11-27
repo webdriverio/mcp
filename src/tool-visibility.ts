@@ -1,4 +1,4 @@
-import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/server';
 import type { ToolDefinition } from './types/tool';
 import { getState, getToolSettings, onSessionsChanged, platformOf } from './session/state';
 import { groupOf, GROUPS, toolAppliesTo, type ToolGroup } from './toolsets';

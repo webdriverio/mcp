@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/server';
 import type { ToolDefinition } from '../src/types/tool';
 import type { SessionHistory } from '../src/types/recording';
 import type { SessionMetadata, onSessionsChanged } from '../src/session/state';

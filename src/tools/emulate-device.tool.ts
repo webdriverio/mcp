@@ -1,5 +1,4 @@
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback, CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolDefinition } from '../types/tool';
 // the device names browser.emulate('device', …) accepts; not exported by webdriverio
 type DeviceName = Extract<Parameters<WebdriverIO.Browser['emulate']>, ['device', unknown]>[1];

@@ -1,8 +1,9 @@
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { getState, platformOf } from './state';
 import { activeSessionId, sessionContext } from './context';
 import type { SessionCallContext } from './context';
 import { toolAppliesTo } from '../toolsets';
+import type { ToolResult } from '../types/tool';
 import { withTimeout } from '../utils/with-timeout';
 
 export { activeSessionId, sessionContext };
@@ -46,8 +47,6 @@ export function runInSessionQueue<T>(sessionId: string, fn: () => Promise<T>): P
   queues.set(sessionId, tail);
   return run;
 }
-
-type ToolResult = Awaited<ReturnType<ToolCallback>>;
 
 function errorResult(message: string): ToolResult {
   return { isError: true, content: [{ type: 'text', text: `Error: ${message}` }] };

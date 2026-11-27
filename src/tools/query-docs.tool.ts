@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { encode } from '@toon-format/toon';
 import type { ToolDefinition } from '../types/tool.js';
 import { coerceBoolean } from '../utils/zod-helpers';
