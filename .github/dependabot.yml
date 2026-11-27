@@ -8,6 +8,9 @@ updates:
     ignore:
       # Node.js updates require changes to .nvmrc
       - dependency-name: "@types/node"
+      # majors go to feature/v5 (entry below)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
     groups:
       patch-deps-updates-main:
@@ -16,7 +19,18 @@ updates:
       minor-deps-updates-main:
         update-types:
           - "minor"
-      major-deps-updates-main:
+  - package-ecosystem: npm
+    directory: "/"
+    target-branch: feature/v5
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "@types/node"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+    groups:
+      major-deps-updates-v5:
         update-types:
           - "major"
   - package-ecosystem: github-actions
