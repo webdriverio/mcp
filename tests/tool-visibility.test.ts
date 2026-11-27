@@ -33,7 +33,7 @@ function createServer() {
   for (const name of ['click_element', 'tap_element', 'select_option', 'get_cookies']) {
     registerTool({ name, description: name, inputSchema: {} }, noop);
   }
-  const dispose = setupToolVisibility(tools, registerTool);
+  const { dispose } = setupToolVisibility(tools, registerTool, false);
   const listed = () => [...tools].filter(([, tool]) => tool.enabled).map(([name]) => name);
   return { tools, listed, dispose };
 }

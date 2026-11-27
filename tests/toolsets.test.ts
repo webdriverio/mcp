@@ -52,8 +52,18 @@ describe('groupOf', () => {
 });
 
 describe('showAllTools', () => {
-  it('is on with WDIO_MCP_TOOLS=all', () => {
-    expect(showAllTools({ WDIO_MCP_TOOLS: 'all' })).toBe(true);
-    expect(showAllTools({})).toBe(false);
+  it.each([
+    [{ WDIO_MCP_TOOLS: 'all' }, 'claude-code', true],
+    [{ WDIO_MCP_TOOLS: 'all' }, 'cursor', true],
+    [{ WDIO_MCP_TOOLS: 'gated' }, 'claude-code', false],
+    [{ WDIO_MCP_TOOLS: 'gated' }, 'cursor', false],
+    [{}, 'claude-code', true],
+    [{}, 'cursor', false],
+  ])('env %o, client %s: %s', (env, clientName, expected) => {
+    expect(showAllTools(clientName, env)).toBe(expected);
+  });
+
+  it('stays gated for a client without a name', () => {
+    expect(showAllTools(undefined, {})).toBe(false);
   });
 });

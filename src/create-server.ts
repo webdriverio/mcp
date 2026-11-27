@@ -2,6 +2,7 @@ import { z } from 'zod';
 import pkg from '../package.json' with { type: 'json' };
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { InitializeRequestSchema, type ServerResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from './types/tool';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
@@ -37,6 +38,7 @@ import { launchChromeTool, launchChromeToolDefinition } from './tools/launch-chr
 import { emulateDeviceTool, emulateDeviceToolDefinition } from './tools/emulate-device.tool';
 import { withRecording } from './recording/step-recorder';
 import { setupToolVisibility } from './tool-visibility';
+import { GROUPS, showAllTools, type ToolGroup } from './toolsets';
 import { withTrace } from './trace/recorder.js';
 import {
   accessibilityResource,
@@ -91,8 +93,60 @@ import { withSessionTarget, withSessionlessContext } from './session/routing';
 
 const SESSION_TARGET_SCHEMA = z.string().optional().describe('Target session: map name or sessionId. Omit to use the default session.');
 
+const GROUP_KEYWORDS: Record<ToolGroup, string> = {
+  mocks: 'mock, stub, spy, intercept, network request, Electron API',
+  cookies: 'cookie, session, login, auth',
+  device: 'emulate, phone, tablet, viewport, geolocation, GPS',
+  extensions: 'extension, crx, addon',
+  attach: 'Chrome, remote debugging, CDP, attach, running session',
+  elements: 'accessibility tree, selectors, element list',
+  'cloud-apps': 'app upload, APK, IPA, BrowserStack, Sauce Labs, TestMu, TestingBot, Digital.ai',
+};
+
+const TOOL_FAMILIES = [
+  '- Sessions: `start_session`, `close_session`. Browsers, Electron apps, Appium iOS/Android, cloud providers. Keywords: open, close, browser, appium, electron, cloud.',
+  '- Page actions: `navigate`, `click_element`, `set_value`, `select_option`, `press_key`, `perform_actions`, `scroll`, `switch_tab`, `switch_frame`, `execute_script`. Keywords: click, type, fill, form, key, scroll, tab, iframe, javascript.',
+  '- Snapshot and screenshots: `snapshot`, `get_screenshot`, `get_tabs`. Keywords: page state, refs, selectors, image.',
+  '- Mobile gestures and device (Appium sessions): `tap_element`, `swipe`, `drag_and_drop`, `rotate_device`, `hide_keyboard`, `switch_context`, `get_contexts`, `get_app_state`. Keywords: tap, swipe, drag, rotate, keyboard, webview, native app.',
+  '- Electron: `execute_electron_script`, `trigger_electron_deeplink`. Keywords: main process, deeplink, electron app.',
+  '- Docs: `query_docs`. Keywords: WebdriverIO API, config, options.',
+  '- Recording and code: `wdio://session/current/steps`, `wdio://session/current/code` (generated WebdriverIO JS).',
+];
+
+const HIDDEN_FAMILIES = (Object.keys(GROUPS) as ToolGroup[]).map((group) => {
+  const { tools, desc } = GROUPS[group];
+  return `- Group \`${group}\`: ${desc}. Tools: ${tools.map((tool) => `\`${tool}\``).join(', ')}. Keywords: ${GROUP_KEYWORDS[group]}.`;
+});
+
+export const SERVER_INSTRUCTIONS = 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.' + [
+  '',
+  'Workflow:',
+  '- snapshot, then act with refs.',
+  '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
+  '- Refs from the latest result stay valid until the page changes.',
+  '',
+  'Tool families. Groups below are hidden by default; if enable_tools is listed, call it with the group name:',
+  ...TOOL_FAMILIES,
+  ...HIDDEN_FAMILIES,
+].join('\n');
+
+type InitializeHandler = (request: unknown, extra: unknown) => Promise<ServerResult>;
+
+/** the SDK keeps its initialize handler private, so it is wrapped: the first tools/list follows this response, so tools must already be enabled */
+function onClientInitialize(server: McpServer, onClient: (clientName: string | undefined) => void): void {
+  const handlers = (server.server as unknown as { _requestHandlers: Map<string, InitializeHandler> })._requestHandlers;
+  const initialize = handlers.get(InitializeRequestSchema.shape.method.value);
+  if (!initialize) throw new Error('MCP SDK initialize handler not found; onClientInitialize needs updating for this SDK version');
+  server.server.setRequestHandler(InitializeRequestSchema, async (request, extra) => {
+    const result = await initialize(request, extra);
+    onClient(request.params.clientInfo?.name);
+    return result;
+  });
+}
+
 export function createServer(
   defaultNetworkLogs = parseNetworkLogsMode(process.env.WDIO_MCP_NETWORK_LOGS),
+  { detectClient = false }: { detectClient?: boolean } = {},
 ): McpServer {
   const server = new McpServer({
     title: 'WebdriverIO MCP Server',
@@ -101,13 +155,7 @@ export function createServer(
     description: pkg.description,
     websiteUrl: 'https://github.com/webdriverio/mcp',
   }, {
-    instructions: 'MCP server for browser, local Electron application, and mobile app automation using WebdriverIO. Supports Chrome, Firefox, Edge, Safari, Electron renderer automation and main-process scripts, plus iOS/Android native app testing via Appium.' + [
-      '',
-      'Workflow:',
-      '- snapshot, then act with refs.',
-      '- Several steps in a row (fill a form, then submit): ONE perform_actions call.',
-      '- Refs from the latest result stay valid until the page changes.',
-    ].join('\n'),
+    instructions: SERVER_INSTRUCTIONS,
     capabilities: {
       tools: {},
       resources: {},
@@ -199,8 +247,13 @@ export function createServer(
   registerTool(appStateToolDefinition, appStateTool);
   registerTool(getCookiesToolDefinition, getCookiesTool);
 
-  const disposeToolVisibility = setupToolVisibility(tools, registerTool);
-  server.server.onclose = disposeToolVisibility;
+  const visibility = setupToolVisibility(tools, registerTool, showAllTools(undefined));
+  server.server.onclose = visibility.dispose;
+  if (detectClient) {
+    onClientInitialize(server, (clientName) => {
+      if (showAllTools(clientName)) visibility.showAll();
+    });
+  }
 
   registerResource(sessionsIndexResource);
   registerResource(sessionCurrentStepsResource);

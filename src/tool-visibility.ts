@@ -1,7 +1,7 @@
 import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolDefinition } from './types/tool';
 import { getState, getToolSettings, onSessionsChanged, platformOf } from './session/state';
-import { groupOf, GROUPS, toolAppliesTo, showAllTools, type ToolGroup } from './toolsets';
+import { groupOf, GROUPS, toolAppliesTo, type ToolGroup } from './toolsets';
 import { enableToolsToolDefinition } from './tools/enable-tools.tool';
 
 const refreshers = new Set<() => void>();
@@ -25,20 +25,22 @@ function listenOnce(): void {
  * Every tool definition is sent with every model request. Tools that only
  * work on mobile or Electron sessions stay hidden until such a session
  * starts, so a browser session doesn't pay for them on every turn.
- * Returns a function that detaches the server again.
  */
 export function setupToolVisibility(
   tools: Map<string, RegisteredTool>,
   registerTool: (definition: ToolDefinition, callback: ToolCallback) => RegisteredTool,
-): () => void {
-  if (showAllTools()) return () => {};
+  showingAll: boolean,
+): { dispose: () => void; showAll: () => void } {
+  let showing = showingAll;
   const refresh = () => {
     const { platform, enabledGroups } = getToolSettings();
     const live = [...getState().sessionMetadata.values()].map(platformOf);
     const platforms = live.length ? live : [platform];
     for (const [name, tool] of tools) {
       const group = groupOf(name);
-      const listed = platforms.some((p) => toolAppliesTo(name, p)) && (!group || enabledGroups.has(group));
+      const listed = showing
+        ? name !== enableToolsToolDefinition.name
+        : platforms.some((p) => toolAppliesTo(name, p)) && (!group || enabledGroups.has(group));
       if (listed && !tool.enabled) tool.enable();
       if (!listed && tool.enabled) tool.disable();
     }
@@ -52,5 +54,11 @@ export function setupToolVisibility(
   refresh();
   listenOnce();
   refreshers.add(refresh);
-  return () => refreshers.delete(refresh);
+  return {
+    dispose: () => void refreshers.delete(refresh),
+    showAll: () => {
+      showing = true;
+      refresh();
+    },
+  };
 }
