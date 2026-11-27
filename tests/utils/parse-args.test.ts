@@ -7,6 +7,7 @@ const defaults = {
   allowedHosts: ['localhost', '127.0.0.1', '::1'],
   allowedOrigins: [] as string[],
   allowCode: false,
+  hosts: ['127.0.0.1', '::1'],
 };
 
 describe('parseArgs', () => {
@@ -78,5 +79,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['--allow-code'], {}).allowCode).toBe(true);
     for (const value of ['1', 'true', 'TRUE']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(true);
     for (const value of ['', '0', 'false', 'yes']) expect(parseArgs([], { WDIO_MCP_RUN_CODE: value }).allowCode).toBe(false);
+  });
+
+  it('listens on both loopback addresses unless --host names one', () => {
+    expect(parseArgs(['--http']).hosts).toEqual(['127.0.0.1', '::1']);
+    expect(parseArgs(['--http', '--host', '0.0.0.0']).hosts).toEqual(['0.0.0.0']);
+  });
+
+  it('throws when --host has no address', () => {
+    expect(() => parseArgs(['--http', '--host'])).toThrow('--host requires an address');
+    expect(() => parseArgs(['--http', '--host', '--port', '1'])).toThrow('--host requires an address');
   });
 });

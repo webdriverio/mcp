@@ -5,6 +5,8 @@ export interface ParsedArgs {
   allowedOrigins: string[];
   /** list `run_code`, which runs WebdriverIO code in this process: `--allow-code` or `WDIO_MCP_RUN_CODE=1` */
   allowCode: boolean;
+  /** addresses the HTTP server listens on: both loopbacks unless `--host` names one */
+  hosts: string[];
 }
 
 function parseList(argv: string[], flag: string): string[] | null {
@@ -35,6 +37,10 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   const allowedOrigins = parseList(argv, '--allowedOrigins') ?? [];
 
   const allowCode = argv.includes('--allow-code') || ['1', 'true'].includes(env.WDIO_MCP_RUN_CODE?.toLowerCase() ?? '');
+  const hostIdx = argv.indexOf('--host');
+  const host = hostIdx === -1 ? undefined : argv[hostIdx + 1];
+  if (hostIdx !== -1 && (!host || host.startsWith('--'))) throw new Error('--host requires an address');
+  const hosts = host ? [host] : ['127.0.0.1', '::1'];
 
-  return { http, port, allowedHosts, allowedOrigins, allowCode };
+  return { http, port, allowedHosts, allowedOrigins, allowCode, hosts };
 }

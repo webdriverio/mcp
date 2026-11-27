@@ -8,7 +8,8 @@
     "releaseName": "v${version}"
   },
   "npm": {
-    "skipChecks": true
+    "skipChecks": true,
+    "publishArgs": ["--ignore-scripts"]
   },
   "plugins": {
     "@release-it/conventional-changelog": {

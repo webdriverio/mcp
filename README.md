@@ -235,6 +235,7 @@ npx @wdio/mcp --http --port 3000
 |--------------------|------------------------------------|---------------------------------------------------------|
 | `--http`           | —                                  | Enable HTTP transport mode                              |
 | `--port`           | `3000`                             | Port to listen on                                       |
+| `--host`           | `127.0.0.1` and `::1`              | Address to listen on. Loopback only by default; `--host 0.0.0.0` exposes the server to the network (add its host name to `--allowedHosts`) |
 | `--allowedHosts`   | `localhost,127.0.0.1,::1`          | Allowed `Host` header values (DNS rebinding protection) |
 | `--allowedOrigins` | _(none — browser clients blocked)_ | Allowed `Origin` values for CORS. Use `*` to allow all. |
 
@@ -727,7 +728,7 @@ Both tools require a `provider` parameter (`'browserstack'`, `'saucelabs'`, `'te
 
 ## Available Tools
 
-The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, the raw element list, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. With several live sessions, tools are listed for the union of their platforms. Set `WDIO_MCP_TOOLS=all` to list everything up front.
+The server lists only the tools that fit the current session: browser sessions get the page tools below, mobile sessions the gestures and device tools, Electron sessions the Electron tools. Rarely used groups (mocks, cookies, device emulation, extensions, attaching, the raw element list, cloud app uploads) are listed after the agent calls `enable_tools`, so their definitions aren't sent with every request. With several live sessions, tools are listed for the union of their platforms. Set `WDIO_MCP_TOOLS=all` to list everything up front, or `WDIO_MCP_TOOLS=gated` to keep the hidden groups for every client. On stdio, clients that run their own tool search (`claude-code`) get everything up front without it; detection by client name does not apply over `--http`, so set `WDIO_MCP_TOOLS=all` there.
 
 Set `WDIO_MCP_NETWORK_LOGS` to configure the default Chromium network/performance log capture mode for `start_session`: `none` (default, off), `failures` (`Network.loadingFailed` and `Network.responseReceived` entries with HTTP status `>= 400`), or `all` (every Chromium `performance` log entry). Individual sessions can override this default via `start_session({ networkLogs: 'none' | 'failures' | 'all' })`.
 

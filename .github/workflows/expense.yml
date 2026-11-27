@@ -37,9 +37,12 @@ on:
           - "950"
           - "1000"
 
+permissions: {}
+
 jobs:
   authorize:
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - uses: octokit/request-action@b91aabaa861c777dcdb14e2387e30eddf04619ae # v3.0.0
         with:

@@ -146,7 +146,7 @@ function errorComment(step: RecordedStep): string {
   return commentLines(`[error] ${step.tool}: ${formatParams(step.params)} — ${step.error ?? 'unknown error'}`);
 }
 
-function generateStep(step: RecordedStep, history: SessionHistory): string {
+function generateStep(step: RecordedStep, history: SessionHistory, hasDeviceReset = false): string {
   if (step.tool === '__session_transition__') {
     const newId = (step.params.newSessionId as string) ?? 'unknown';
     return `// --- new session: ${newId} started at ${step.timestamp} ---`;
@@ -305,11 +305,44 @@ function generateStep(step: RecordedStep, history: SessionHistory): string {
     case 'set_value':
       if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `await browser.$('${escapeStr(p.selector)}').setValue('${escapeStr(p.value)}');`;
+    case 'switch_tab':
+      if (p.handle) {
+        if (history.steps.some(s => s.tool === 'attach_session')) {
+          return `await browser.switchToWindow('${escapeStr(p.handle)}');`;
+        }
+        return `// [not replayable: session-specific window handle] switch_tab: '${escapeStr(p.handle)}'`;
+      }
+      if (p.index !== undefined) {
+        return `await browser.switchToWindow((await browser.getWindowHandles())[${p.index}]);`;
+      }
+      return '// [not replayable] switch_tab: missing handle and index';
     // BiDi sessions reject browser.switchFrame; the agent's frame code is variable-based and back-to-top needs none
     case 'switch_frame':
       if (!p.selector) return '// switch_frame: back to the top document';
       if (isSnapshotRef(p.selector)) return unreplayableRef(step);
       return `// [not replayable: no recorded code] switch_frame: '${escapeStr(p.selector)}'`;
+    case 'emulate_device': {
+      if (!p.device) return '// emulate_device: listed available devices';
+      if (p.device === 'reset') {
+        return 'await restoreDeviceEmulation?.();\nrestoreDeviceEmulation = undefined;';
+      }
+      const call = `await browser.emulate('device', '${escapeStr(p.device)}');`;
+      return hasDeviceReset ? `restoreDeviceEmulation = ${call}` : call;
+    }
+    case 'switch_context': {
+      const ctx = String(p.context);
+      if (/^\d+$/.test(ctx)) {
+        const index = Number.parseInt(ctx, 10) - 1;
+        if (index >= 0) {
+          return `await browser.switchContext((await browser.getContexts())[${index}]);`;
+        }
+      }
+      return `await browser.switchContext('${escapeStr(ctx)}');`;
+    }
+    case 'rotate_device':
+      return `await browser.setOrientation('${escapeStr(p.orientation)}');`;
+    case 'hide_keyboard':
+      return 'await browser.hideKeyboard();';
     case 'set_geolocation':
       return `await browser.setGeoLocation({ latitude: ${p.latitude}, longitude: ${p.longitude}${p.altitude !== undefined ? `, altitude: ${p.altitude}` : ''} });`;
     case 'scroll': {
@@ -431,10 +464,17 @@ export function generateCode(history: SessionHistory): string {
         : (tbOptions?.tunnel === true);
 
   const hoisted = hoistRunCodeSteps(history.steps);
-  const stepLines = hoisted.steps.map(step => generateStep(step, history));
+  const hasDeviceReset = history.steps.some(
+    step => step.tool === 'emulate_device' && step.params.device === 'reset' && step.status !== 'error' && !step.code?.length,
+  );
+
+  const stepLines = hoisted.steps.map(step => generateStep(step, history, hasDeviceReset));
   if (hoisted.names.length) stepLines.unshift(`let ${hoisted.names.join(', ')};`);
   if (history.steps.some(step => step.code?.some(line => BARE_SELECTOR_GLOBAL.test(line)))) {
     stepLines.unshift('const $ = (...args) => browser.$(...args);', 'const $$ = (...args) => browser.$$(...args);');
+  }
+  if (hasDeviceReset) {
+    stepLines.unshift('let restoreDeviceEmulation;');
   }
   // Failed mock steps emit only an error comment, so they must not pull in the declaration either.
   if (history.steps.some(step => MOCK_TOOLS.has(step.tool) && step.params.mockType !== 'electron' && step.status !== 'error')) {

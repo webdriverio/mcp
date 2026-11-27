@@ -309,6 +309,172 @@ describe('generateCode - tool mappings', () => {
     expect(code).toContain("await browser.$('#input').setValue('hello');");
   });
 
+  it('switch_tab by handle in a fresh start_session → not-replayable comment instead of stale handle', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'CDwindow-1' } }]));
+    expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-1'");
+    expect(code).not.toContain("switchToWindow('CDwindow-1')");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab by handle in an attach_session → browser.switchToWindow() with handle', () => {
+    const history: SessionHistory = {
+      sessionId: 'attached-1',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        {
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 'attached-1', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'switch_tab',
+          params: { handle: 'CDwindow-1' },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const code = generateCode(history);
+    expect(code).toContain("await browser.switchToWindow('CDwindow-1');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab by index (including 0) → browser.switchToWindow((await browser.getWindowHandles())[index])', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'switch_tab', params: { index: 0 } },
+      { tool: 'switch_tab', params: { index: 2 } },
+    ]));
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[0]);');
+    expect(code).toContain('await browser.switchToWindow((await browser.getWindowHandles())[2]);');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_tab preserves handle precedence in attach_session even when index is also present', () => {
+    const history: SessionHistory = {
+      sessionId: 'attached-2',
+      type: 'browser',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      capabilities: { browserName: 'chrome' },
+      steps: [
+        {
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 'attached-2', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          index: 2,
+          tool: 'switch_tab',
+          params: { handle: 'h-1', index: 1 },
+          status: 'ok',
+          durationMs: 10,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const code = generateCode(history);
+    expect(code).toContain("await browser.switchToWindow('h-1');");
+    expect(code).not.toContain('getWindowHandles())[1]');
+  });
+
+  it('switch_tab marks replay as unavailable instead of using ignored index when both handle and index are present in fresh start_session', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_tab', params: { handle: 'h-1', index: 1 } }]));
+    expect(code).toContain("// [not replayable: session-specific window handle] switch_tab: 'h-1'");
+    expect(code).not.toContain('getWindowHandles())[1]');
+    expect(code).not.toContain("switchToWindow('h-1')");
+  });
+
+  it('switch_context by name → browser.switchContext()', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_context', params: { context: 'WEBVIEW_com.example.app' } }]));
+    expect(code).toContain("await browser.switchContext('WEBVIEW_com.example.app');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('switch_context by 1-based numeric index → browser.switchContext((await browser.getContexts())[index - 1])', () => {
+    const code = generateCode(makeHistory([{ tool: 'switch_context', params: { context: '2' } }]));
+    expect(code).toContain('await browser.switchContext((await browser.getContexts())[1]);');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('rotate_device → browser.setOrientation()', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'rotate_device', params: { orientation: 'LANDSCAPE' } },
+      { tool: 'rotate_device', params: { orientation: 'PORTRAIT' } },
+    ]));
+    expect(code).toContain("await browser.setOrientation('LANDSCAPE');");
+    expect(code).toContain("await browser.setOrientation('PORTRAIT');");
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('hide_keyboard → browser.hideKeyboard()', () => {
+    const code = generateCode(makeHistory([{ tool: 'hide_keyboard', params: {} }]));
+    expect(code).toContain('await browser.hideKeyboard();');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device with device name → browser.emulate() without restore variable when not reset', () => {
+    const code = generateCode(makeHistory([{ tool: 'emulate_device', params: { device: 'iPhone 15' } }]));
+    expect(code).toContain("await browser.emulate('device', 'iPhone 15');");
+    expect(code).not.toContain('restoreDeviceEmulation');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device with no device (preset listing) → comment without calling browser.emulate()', () => {
+    const code = generateCode(makeHistory([{ tool: 'emulate_device', params: {} }]));
+    expect(code).toContain('// emulate_device: listed available devices');
+    expect(code).not.toContain('browser.emulate(');
+    expect(code).not.toContain('[unknown tool]');
+  });
+
+  it('emulate_device with reset captures and invokes restore function', async () => {
+    const code = generateCode(makeHistory([
+      { tool: 'emulate_device', params: { device: 'iPhone 15' } },
+      { tool: 'emulate_device', params: { device: 'Pixel 7' } },
+      { tool: 'emulate_device', params: { device: 'reset' } },
+      { tool: 'emulate_device', params: { device: 'reset' } },
+    ]));
+    expect(code).toContain('let restoreDeviceEmulation;');
+    expect(code).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
+    expect(code).toContain("restoreDeviceEmulation = await browser.emulate('device', 'Pixel 7');");
+    expect(code).toContain('await restoreDeviceEmulation?.();');
+    expect(code).not.toContain('[unknown tool]');
+
+    const events: unknown[] = [];
+    const browser = {
+      emulate: async (type: string, name: string) => {
+        events.push(['emulate', type, name]);
+        return async () => { events.push(['restore', name]); };
+      },
+      deleteSession: async () => { events.push('delete'); },
+    };
+    const runnable = code.replace(/^import .*;\n/m, '');
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('remote', runnable)(async () => browser);
+    expect(events).toEqual([
+      ['emulate', 'device', 'iPhone 15'],
+      ['emulate', 'device', 'Pixel 7'],
+      ['restore', 'Pixel 7'],
+      'delete',
+    ]);
+  });
+
+  it('does not declare restoreDeviceEmulation when a reset step failed', () => {
+    const code = generateCode(makeHistory([
+      { tool: 'emulate_device', params: { device: 'reset' }, status: 'error', error: 'BiDi required' },
+    ]));
+    expect(code).not.toContain('restoreDeviceEmulation');
+    expect(code).toContain('// [error] emulate_device:');
+  });
+
   it('switch_frame with a selector and no recorded code → not-replayable comment, no switchFrame call', () => {
     const code = generateCode(makeHistory([{ tool: 'switch_frame', params: { selector: '#frame' } }]));
     expect(code).toContain("// [not replayable: no recorded code] switch_frame: '#frame'");

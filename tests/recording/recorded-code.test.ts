@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { getState } from '../../src/session/state';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { getState, getToolSettings } from '../../src/session/state';
 import type { SessionHistory } from '../../src/types/recording';
 
 const run = vi.fn();
@@ -11,6 +13,7 @@ vi.mock('@wdio/session/agent', async (importOriginal) => ({
 
 const { withRecording } = await import('../../src/recording/step-recorder');
 const { generateCode } = await import('../../src/recording/code-generator');
+const { createServer } = await import('../../src/create-server');
 const { clickTool } = await import('../../src/tools/click.tool');
 const { performActionsTool, selectOptionTool, pressKeyTool } = await import('../../src/tools/page-input.tool');
 const { setCookieTool, deleteCookiesTool } = await import('../../src/tools/cookies.tool');
@@ -76,5 +79,102 @@ describe('recording the code the agent ran', () => {
       ["await browser.setCookies({ name: 'session', value: 'abc', path: '/' })"],
       ["await browser.deleteCookies('session')"],
     ]);
+  });
+
+  describe('server registrations', () => {
+    afterEach(() => {
+      const settings = getToolSettings();
+      settings.enabledGroups.clear();
+      settings.platform = undefined;
+    });
+
+    it('records switch_tab (by handle and index) and emulate_device through real server registrations', async () => {
+      const getWindowHandles = vi.fn().mockResolvedValue(['CDwindow-0', 'CDwindow-1']);
+      const restoreFn = vi.fn().mockResolvedValue(undefined);
+      getState().browsers.set('s1', {
+        isBidi: true,
+        getWindowHandles,
+        switchToWindow: vi.fn().mockResolvedValue(undefined),
+        emulate: vi.fn().mockResolvedValue(restoreFn),
+      } as unknown as WebdriverIO.Browser);
+
+      const server = createServer('none');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      try {
+        await client.callTool({ name: 'enable_tools', arguments: { groups: ['device'] } });
+        await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-1' } });
+        await client.callTool({ name: 'switch_tab', arguments: { index: 0 } });
+        await client.callTool({ name: 'emulate_device', arguments: { device: 'iPhone 15' } });
+        await client.callTool({ name: 'emulate_device', arguments: { device: 'reset' } });
+
+        expect(getWindowHandles).toHaveBeenCalledTimes(1);
+
+        const stepsRes = await client.readResource({ uri: 'wdio://session/current/steps' });
+        const stepsText = (stepsRes.contents[0] as { text: string }).text;
+        const parsed = JSON.parse(stepsText);
+        expect(parsed.steps.map((s: { tool: string }) => s.tool)).toEqual([
+          'switch_tab',
+          'switch_tab',
+          'emulate_device',
+          'emulate_device',
+        ]);
+
+        const codeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+        const generatedJs = (codeRes.contents[0] as { text: string }).text;
+        expect(generatedJs).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-1'");
+        expect(generatedJs).toContain('await browser.switchToWindow((await browser.getWindowHandles())[0]);');
+        expect(generatedJs).toContain("restoreDeviceEmulation = await browser.emulate('device', 'iPhone 15');");
+        expect(generatedJs).toContain('await restoreDeviceEmulation?.();');
+        expect(generatedJs).not.toContain('[unknown tool]');
+      } finally {
+        await Promise.all([client.close(), server.close()]);
+      }
+    });
+
+    it('keeps handle-based replay for attach_session and avoids falling back to ignored index on fresh sessions', async () => {
+      const getWindowHandles = vi.fn().mockResolvedValue(['CDwindow-0', 'CDwindow-1']);
+      getState().browsers.set('s1', {
+        isBidi: true,
+        getWindowHandles,
+        switchToWindow: vi.fn().mockResolvedValue(undefined),
+      } as unknown as WebdriverIO.Browser);
+
+      const server = createServer('none');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      try {
+        await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-0', index: 1 } });
+        const freshCodeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+        const freshJs = (freshCodeRes.contents[0] as { text: string }).text;
+        expect(freshJs).toContain("// [not replayable: session-specific window handle] switch_tab: 'CDwindow-0'");
+        expect(freshJs).not.toContain('getWindowHandles())[1]');
+
+        history.steps = [{
+          index: 1,
+          tool: 'attach_session',
+          params: { sessionId: 's1', provider: 'external', platform: 'browser' },
+          status: 'ok',
+          durationMs: 0,
+          timestamp: '2026-01-01T00:00:00.000Z',
+        }];
+        getState().sessionMetadata.set('s1', { type: 'browser', capabilities: {}, isAttached: true });
+
+        await client.callTool({ name: 'switch_tab', arguments: { handle: 'CDwindow-1', index: 0 } });
+        expect(getWindowHandles).not.toHaveBeenCalled();
+        expect(history.steps[1].code).toBeUndefined();
+        const attachedCodeRes = await client.readResource({ uri: 'wdio://session/current/code' });
+        const attachedJs = (attachedCodeRes.contents[0] as { text: string }).text;
+        expect(attachedJs).toContain("await browser.switchToWindow('CDwindow-1');");
+        expect(attachedJs).not.toContain('getWindowHandles())[1]');
+        expect(attachedJs).not.toContain('getWindowHandles())[0]');
+      } finally {
+        await Promise.all([client.close(), server.close()]);
+      }
+    });
   });
 });
