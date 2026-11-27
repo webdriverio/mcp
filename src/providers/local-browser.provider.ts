@@ -1,5 +1,6 @@
 import type { SessionProvider, ConnectionConfig } from './types';
 import type { NetworkLogsMode } from '../session/state';
+import { ACTION_TIMEOUT_MS } from '../session/agent';
 
 const BIDI_RESPONSE_TIMEOUT_MS = 30_000;
 // Aborts hung classic commands natively and never replays a timed-out command; longer than the 30s action/BiDi timeouts.
@@ -109,6 +110,8 @@ export class LocalBrowserProvider implements SessionProvider {
       'ms:edgeOptions': this.mergeCapabilityOptions(capabilities['ms:edgeOptions'], userCapabilities['ms:edgeOptions']),
       'ms:loggingPrefs': this.mergeCapabilityOptions(capabilities['ms:loggingPrefs'], userCapabilities['ms:loggingPrefs']),
       'moz:firefoxOptions': this.mergeCapabilityOptions(capabilities['moz:firefoxOptions'], userCapabilities['moz:firefoxOptions']),
+      // Chromedriver holds every command on a page whose navigation never completes (a popup Chrome blocks) until this expires.
+      timeouts: this.mergeCapabilityOptions({ pageLoad: ACTION_TIMEOUT_MS }, userCapabilities.timeouts),
     };
 
     for (const [key, value] of Object.entries(mergedCapabilities)) {
