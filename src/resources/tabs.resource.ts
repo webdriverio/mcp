@@ -1,5 +1,6 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
+import { activeSessionId, runInSessionQueue } from '../session/routing';
 import { withActionTimeout } from '../session/agent';
 import { SessionError } from '@wdio/session/agent';
 
@@ -62,7 +63,9 @@ export const tabsResource: ResourceDefinition = {
   uri: 'wdio://session/current/tabs',
   description: 'Browser tabs in the current session',
   handler: async () => {
-    const result = await readTabs();
+    // Resources skip the per-session queue; a classic read switches windows, so it must not interleave with switch_tab.
+    const sessionId = activeSessionId();
+    const result = sessionId ? await runInSessionQueue(sessionId, readTabs) : await readTabs();
     return { contents: [{ uri: 'wdio://session/current/tabs', mimeType: result.mimeType, text: result.text }] };
   },
 };

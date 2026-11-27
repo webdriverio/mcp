@@ -2,16 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/session/state', () => ({
   getBrowser: vi.fn(),
+  getState: vi.fn(),
 }));
 
-import { getBrowser } from '../../src/session/state';
+import { getBrowser, getState } from '../../src/session/state';
 import { readTabs, tabsResource } from '../../src/resources/tabs.resource';
 import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
+import { runInSessionQueue } from '../../src/session/routing';
 
 const mockGetBrowser = getBrowser as ReturnType<typeof vi.fn>;
+const mockGetState = getState as ReturnType<typeof vi.fn>;
+const readResource = tabsResource.handler as unknown as () => Promise<{ contents: { mimeType: string; text: string }[] }>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetState.mockReturnValue({ currentSession: null });
 });
 
 describe('readTabs', () => {
@@ -71,6 +76,30 @@ describe('readTabs', () => {
     expect(switchToWindow).toHaveBeenLastCalledWith('h0');
     expect(result.mimeType).toBe('text/plain');
     expect(result.text).toContain('timeout');
+  });
+
+  it('waits for queued calls on the session before the resource reads tabs', async () => {
+    mockGetState.mockReturnValue({ currentSession: 's1' });
+    const browser = {
+      isBidi: false,
+      getWindowHandles: vi.fn().mockResolvedValue(['h0']),
+      getWindowHandle: vi.fn().mockResolvedValue('h0'),
+      switchToWindow: vi.fn().mockResolvedValue(undefined),
+      getTitle: vi.fn().mockResolvedValue('Home'),
+      getUrl: vi.fn().mockResolvedValue('https://a.test/'),
+    };
+    mockGetBrowser.mockReturnValue(browser);
+    let release!: () => void;
+    const queued = runInSessionQueue('s1', () => new Promise<void>((resolve) => { release = resolve; }));
+
+    const pending = readResource();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(browser.getWindowHandles).not.toHaveBeenCalled();
+
+    release();
+    await queued;
+    const { contents } = await pending;
+    expect(JSON.parse(contents[0].text)).toEqual([{ handle: 'h0', title: 'Home', url: 'https://a.test/', isActive: true }]);
   });
 
   it('returns the timeout as the error response when the browser stops answering', async () => {
