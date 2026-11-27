@@ -12,13 +12,17 @@ import type { SessionResult } from '../../src/providers/types';
 import { createTraceSession, getTraceSession } from '../../src/trace/state';
 
 // Mock the provider registry so lifecycle tests don't depend on real providers
-const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime } = vi.hoisted(() => ({
+const { mockOnSessionClose, mockStopTunnel, mockCleanupSessionRuntime, mockCleanupUi5Runtime } = vi.hoisted(() => ({
   mockOnSessionClose: vi.fn().mockResolvedValue(undefined),
   mockStopTunnel: vi.fn().mockResolvedValue(undefined),
   mockCleanupSessionRuntime: vi.fn().mockResolvedValue(false),
+  mockCleanupUi5Runtime: vi.fn(),
 }));
 vi.mock('../../src/providers/registry', () => ({
   getProvider: vi.fn(() => ({ onSessionClose: mockOnSessionClose, stopTunnel: mockStopTunnel })),
+}));
+vi.mock('../../src/ui5/runtime', () => ({
+  cleanupUi5Runtime: mockCleanupUi5Runtime,
 }));
 vi.mock('../../src/electron/runtime', () => ({
   cleanupSessionRuntime: mockCleanupSessionRuntime,
@@ -582,6 +586,25 @@ describe('closeSession', () => {
     expect(state.sessionMetadata.has('electron-session')).toBe(false);
     expect(state.currentSession).toBeNull();
     error.mockRestore();
+  });
+
+  it('runs wdi5 runtime cleanup for a UI5 session instead of Electron cleanup', async () => {
+    const browser = makeBrowser();
+    const state = getState();
+    state.browsers.set('ui5-session', browser);
+    state.sessionMetadata.set('ui5-session', {
+      type: 'browser', runtime: 'ui5', capabilities: {}, isAttached: false, provider: 'local',
+    });
+    state.sessionHistory.set('ui5-session', {
+      sessionId: 'ui5-session', type: 'browser', runtime: 'ui5', startedAt: new Date().toISOString(), capabilities: {}, steps: [],
+    });
+    state.currentSession = 'ui5-session';
+
+    await closeSession('ui5-session', false, false);
+
+    expect(mockCleanupUi5Runtime).toHaveBeenCalledWith(browser);
+    expect(browser.deleteSession).toHaveBeenCalled();
+    expect(mockCleanupSessionRuntime).not.toHaveBeenCalled();
   });
 
   it('does not call onSessionClose when detach=true', async () => {

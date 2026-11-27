@@ -8,7 +8,7 @@ export type NetworkLogsMode = 'none' | 'failures' | 'all';
 export interface SessionMetadata {
   type: 'browser' | 'ios' | 'android';
   /** Browser sessions can have a specialised lifecycle while retaining renderer semantics. */
-  runtime?: 'webdriver' | 'electron';
+  runtime?: 'webdriver' | 'electron' | 'ui5';
   /** Normalized URI scheme explicitly allowed for Electron deeplink dispatch. */
   electronDeeplinkScheme?: string;
   capabilities: Record<string, unknown>;
@@ -62,7 +62,8 @@ export interface ToolSettings {
 const toolSettings: ToolSettings = { enabledGroups: new Set() };
 
 export function platformOf(metadata: SessionMetadata): ToolPlatform {
-  return metadata.runtime === 'electron' ? 'electron' : metadata.type;
+  if (metadata.runtime === 'electron' || metadata.runtime === 'ui5') return metadata.runtime;
+  return metadata.type;
 }
 
 /** the platform falls back to the active session when no registration was seen yet */
@@ -77,4 +78,8 @@ export function getToolSettings(): ToolSettings {
 
 export function getState() {
   return state;
+}
+
+export function isUi5Session(): boolean {
+  return state.sessionMetadata.get(activeSessionId())?.runtime === 'ui5';
 }

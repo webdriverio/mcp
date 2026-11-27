@@ -722,7 +722,7 @@ Set `WDIO_MCP_NETWORK_LOGS` to configure the default Chromium network/performanc
 
 | Tool             | Description                                                                                                                                                            |
 |------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `start_session`  | Start a browser, local Electron application, or mobile app session; `attach: true` retains the existing Chrome CDP connection mode. Optional `name` and `onExisting: "close" \| "keep"` (`keep` runs it alongside existing sessions; the new session is not made the default) |
+| `start_session`  | Start a browser, local Electron application, mobile app, or UI5 application session; `attach: true` retains the existing Chrome CDP connection mode. Optional `name` and `onExisting: "close" \| "keep"` (`keep` runs it alongside existing sessions; the new session is not made the default) |
 | `attach_session` | Attach to an existing remote WebDriver/Appium session by `sessionId` without creating a new session; optional `name` and `onExisting`. With only a `name`, looks up a live session |
 | `launch_chrome`  | Launch a new Chrome instance with remote debugging enabled (for use with `start_session({ attach: true })`)                                                            |
 | `close_session`  | Close or detach from the default session, or the one named by the optional `session` target (supports `detach: true` to disconnect without terminating) |
@@ -747,7 +747,7 @@ navigate({ url: "https://example.com", session: "bob" })
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `navigate`               | Navigate to a URL. In browsers the result shows the new page's interactive elements with refs                                                                                                         |
 | `snapshot`               | The page as an accessibility tree with refs (`button "Save" [ref=e3]`), interactive elements by default (plain text is dropped, `full: true` shows it); pass refs to `perform_actions` for several steps; `find` returns only the parts containing a text (link targets included), `full: true` adds all text, `viewport: true` keeps only what is on screen, `selectors: true` ends each ref with a selector for test code. Works for apps too (the screen's accessibility tree). |
-| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile and Electron sessions only (on web, `snapshot` with `selectors: true`); listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
+| `get_elements`           | Accessibility tree with refs and a ready-to-use selector on each actionable line. Supports `inViewportOnly` (default: false); output is capped at 12000 characters. Mobile, Electron and UI5 sessions (on web, `snapshot` with `selectors: true`); UI5 sessions list controls with `ui5:` selectors; listed after `enable_tools({ groups: ['elements'] })`, use `snapshot` first                                                          |
 | `get_accessibility_tree` | Deprecated, removed in v5; use `snapshot`. Get the accessibility tree with roles, names, and selectors. Electron-only; browsers use `snapshot`                                                                                                    |
 | `get_screenshot`         | Take a screenshot of the current page or screen (base64-encoded, auto-resized to max 2000px / 1MB)                                                                                                     |
 | `get_tabs`               | List all open browser tabs with handle, title, URL, and active status. Browser-only.                                                                                                                   |
@@ -987,6 +987,65 @@ start_session({
 })
 trigger_electron_deeplink({ url: 'myapp://open/item' })
 ```
+
+### UI5 applications
+
+UI5 support is local-only (Chrome or Edge) and requires `baseUrl`; it runs on the `wdio-ui5-service` bridge. Service options go in the top-level `wdi5` argument:
+
+```javascript
+start_session({
+  platform: 'ui5',
+  browser: 'chrome',
+  baseUrl: 'https://sdk.openui5.org/test-resources/sap/m/demokit/cart/webapp/index.html',
+  wdi5: { waitForUI5Timeout: 15000 }
+})
+```
+
+Element discovery returns `ui5:` selectors (JSON control selectors); `click_element` and `set_value` consume them like any other selector. A redirect can drop the injected UI5 context — discovery and actions re-inject it automatically. Code generation is not supported for UI5 sessions because `ui5:` selectors are not runnable through `browser.$()`.
+
+**Authentication:**
+
+Pass a `wdi5:authentication` capability to authenticate during session start. Supported providers: `BasicAuth`, `BTP`, `Office365`, `custom`.
+
+```javascript
+start_session({
+  platform: 'ui5',
+  baseUrl: 'https://my-app.example.com',
+  capabilities: {
+    'wdi5:authentication': { provider: 'BasicAuth' }
+  }
+})
+```
+
+Credentials are read by the service from the `wdi5_username` and `wdi5_password` environment variables — lowercase, per the wdi5 convention — and never sent through the MCP server; only the provider name crosses the tool boundary.
+
+<details>
+<summary>UI5 authentication environment variables</summary>
+
+```bash
+export wdi5_username=your_username
+export wdi5_password=your_password
+```
+
+```json
+{
+  "mcpServers": {
+    "wdio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@wdio/mcp@latest"],
+      "env": {
+        "wdi5_username": "your_username",
+        "wdi5_password": "your_password"
+      }
+    }
+  }
+}
+```
+
+| `wdi5_username` | UI5 username (required with `wdi5:authentication`) |
+| `wdi5_password` | UI5 password (required with `wdi5:authentication`) |
+
+</details>
 
 **Attach to a running Chrome instance:**
 

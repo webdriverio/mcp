@@ -49,6 +49,7 @@ src/
 ├── resources/         # One file per resource family (see Recording below)
 ├── recording/         # step-recorder.ts (withRecording HOF) + code-generator.ts
 ├── scripts/           # Browser script run via browser.execute() (get-browser-accessibility-tree.ts) — no try/catch, raw data only; element collection comes from @wdio/elements
+├── ui5/               # wdi5 boundary (runtime.ts — bridge/service by dist path) + ui5: selector codec
 ├── config/            # appium.config.ts — iOS/Android capability builders
 ├── utils/             # auth.ts, parse-args.ts, http-helpers.ts, zod-helpers.ts (coerceBoolean),
 │                       #   docs-index.ts + docs-client.ts (docs corpus)
@@ -117,7 +118,7 @@ MCP resources expose live session data. Fixed URIs appear in ListResources; temp
 `screenshot`, `cookies`, `tabs`, `contexts`, `context`, `geolocation`, `capabilities`, `logs`, and the
 template `app-state/{bundleId}`.
 
-- `elements` is viewport-only; `get_elements` (mobile and Electron sessions only; on web use `snapshot` with `selectors: true`) covers the whole page unless `inViewportOnly: true`; both cut output past `SNAPSHOT_MAX_CHARS` (`src/utils/snapshot-text.ts`)
+- `elements` is viewport-only; `get_elements` (mobile, Electron and UI5 sessions; on web use `snapshot` with `selectors: true`) covers the whole page unless `inViewportOnly: true`; both cut output past `SNAPSHOT_MAX_CHARS` (`src/utils/snapshot-text.ts`)
 - `capabilities` are the *resolved* values the driver accepted, including provider defaults
 - `logs` mixes crash logs with console output for the current session
 - `contexts` / `context` / `app-state` are mobile-only
@@ -181,12 +182,13 @@ Only files whose purpose is not evident from the tree above.
 | `src/providers/cloud/testingbot.provider.ts` | `tb:options` caps, single hub, form-encoded `test[success]` result marking, JAR tunnel via `testingbot-tunnel-launcher` |
 | `src/providers/cloud/digitalai.provider.ts` | `digitalai:accessKey` (web) / `digitalai:options.accessKey` (mobile) caps, `<DIGITALAI_CLOUD_URL>/wd/hub`, mobile `deviceQuery`, `cloud:<name>` app refs; REST API via Bearer accessKey |
 | `src/tools/session.tool.ts` | `start_session` (browser + mobile), `close_session` |
-| `src/tools/get-elements.tool.ts` | `get_elements` (mobile and Electron only) — `getSnapshot` accessibility tree text with selectors |
+| `src/tools/get-elements.tool.ts` | `get_elements` (mobile, Electron and UI5) — `getSnapshot` accessibility tree text with selectors, or UI5 controls on UI5 sessions |
 | `src/tools/cloud-provider.tool.ts` | `list_apps`, `upload_app` — generalized across BrowserStack / Sauce Labs / TestMu / TestingBot and Digital.ai (Bearer auth) |
 | `src/tools/query-docs.tool.ts` | `query_docs` — BM25 search over the WebdriverIO docs corpus |
 | `src/utils/docs-index.ts` | Docs corpus fetch/cache, fence-aware chunking, path alignment, 3-field BM25 index + search |
 | `src/utils/docs-client.ts` | Boundary layer for the docs corpus — resolves the cache dir and loads the index |
 | `src/resources/docs.resource.ts` | `wdio://docs/index` + `wdio://docs/page/{slug}` |
+| `src/ui5/runtime.ts` | wdi5 boundary — loads the bridge/service by dist path, owns the wdi5 ambient globals |
 | `src/recording/code-generator.ts` | Generates runnable WebdriverIO JS from `SessionHistory` |
 
 ## Gotchas
@@ -222,6 +224,10 @@ The MCP SDK only supports path-segment templates `{param}` in resource URIs — 
 
 Computation logic belongs in `src/scripts/` (no try/catch, returns raw data). Tools wrap scripts with try/catch and return `{ isError: true, content: [...] }` on failure. Resources wrap scripts and set `mimeType` in the response.
 
+### UI5 Sessions (wdi5)
+
+`platform: 'ui5'` runs a local Chrome/Edge session with wdi5 initialized against a required `baseUrl`. `wdio-ui5-service` is pinned exact and loaded by dist path in `src/ui5/runtime.ts` (its `exports` map blocks subpaths and the main entry pulls the wdio testrunner launcher); `.npmrc` sets `auto-install-peers=false` to keep the testrunner peers out. Codegen is excluded for ui5 sessions — `generateCode` returns a notice, since `ui5:` selectors are not runnable through `browser.$()`. Steps still record normally. OAuth redirects drop the injected bridge; discovery and ui5 action tools re-inject via `ensureUi5Injected` before use.
+
 ### Error Handling
 
 Tools return errors as text content, never throw. Keeps MCP protocol stable:
@@ -235,6 +241,8 @@ catch (e) {
 ## Selector Syntax Reference
 
 **Web:** CSS (`#id`, `.class`), XPath (`//button`), Text (`button=Exact`, `a*=Contains`)
+
+**UI5 (ui5 sessions):** `ui5:` + JSON control selector, e.g. `ui5:{"controlType":"sap.m.Button","viewName":"test.Main"}` — emitted by `get_elements` on ui5 sessions, accepted by `click_element`/`set_value` (resolved via wdi5's `asControl`, never `browser.$`)
 
 **Mobile:**
 
@@ -257,6 +265,8 @@ catch (e) {
 | `TESTINGBOT_SECRET` | TestingBot sessions + tools |
 | `DIGITALAI_CLOUD_URL` | Digital.ai sessions + tools (cloud host, e.g. `https://cloud.example.com`) |
 | `DIGITALAI_ACCESS_KEY` | Digital.ai sessions + tools |
+| `wdi5_username` | wdi5 authentication (`wdi5:authentication` capability on ui5 sessions) |
+| `wdi5_password` | wdi5 authentication (`wdi5:authentication` capability on ui5 sessions) |
 
 ## Planned Improvements
 

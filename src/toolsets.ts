@@ -1,4 +1,4 @@
-export type ToolPlatform = 'browser' | 'electron' | 'ios' | 'android';
+export type ToolPlatform = 'browser' | 'electron' | 'ui5' | 'ios' | 'android';
 
 /**
  * Tools that only make sense on some platforms. Everything else is always
@@ -14,10 +14,10 @@ const ONLY: Record<string, ToolPlatform[]> = {
   hide_keyboard: ['ios', 'android'],
   get_app_state: ['ios', 'android'],
   execute_electron_script: ['electron'],
-  get_elements: ['ios', 'android', 'electron'],
+  get_elements: ['ios', 'android', 'electron', 'ui5'],
   get_accessibility_tree: ['electron'],
-  select_option: ['browser'],
-  press_key: ['browser'],
+  select_option: ['browser', 'ui5'],
+  press_key: ['browser', 'ui5'],
   trigger_electron_deeplink: ['electron'],
 };
 
