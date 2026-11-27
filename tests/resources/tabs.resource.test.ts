@@ -8,7 +8,7 @@ vi.mock('../../src/session/state', () => ({
 import { getBrowser, getState } from '../../src/session/state';
 import { readTabs, tabsResource } from '../../src/resources/tabs.resource';
 import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
-import { runInSessionQueue } from '../../src/session/routing';
+import { activeSessionId, runInSessionQueue } from '../../src/session/routing';
 
 const mockGetBrowser = getBrowser as ReturnType<typeof vi.fn>;
 const mockGetState = getState as ReturnType<typeof vi.fn>;
@@ -100,6 +100,33 @@ describe('readTabs', () => {
     await queued;
     const { contents } = await pending;
     expect(JSON.parse(contents[0].text)).toEqual([{ handle: 'h0', title: 'Home', url: 'https://a.test/', isActive: true }]);
+  });
+
+  it('reads the session it queued on even if the default session changes while it waits', async () => {
+    const state = { currentSession: 's1' };
+    mockGetState.mockReturnValue(state);
+    const tabsOf = (handle: string) => ({
+      isBidi: false,
+      getWindowHandles: vi.fn().mockResolvedValue([handle]),
+      getWindowHandle: vi.fn().mockResolvedValue(handle),
+      switchToWindow: vi.fn().mockResolvedValue(undefined),
+      getTitle: vi.fn().mockResolvedValue(handle),
+      getUrl: vi.fn().mockResolvedValue('https://a.test/'),
+    });
+    const browsers: Record<string, ReturnType<typeof tabsOf>> = { s1: tabsOf('one'), s2: tabsOf('two') };
+    mockGetBrowser.mockImplementation(() => browsers[activeSessionId() as string]);
+    let release!: () => void;
+    const queued = runInSessionQueue('s1', () => new Promise<void>((resolve) => { release = resolve; }));
+
+    const pending = readResource();
+    state.currentSession = 's2';
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    await queued;
+    const { contents } = await pending;
+
+    expect(JSON.parse(contents[0].text)[0].handle).toBe('one');
+    expect(browsers.s2.getWindowHandles).not.toHaveBeenCalled();
   });
 
   it('returns the timeout as the error response when the browser stops answering', async () => {
