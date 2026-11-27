@@ -17,6 +17,7 @@ import { startTrace, recordInitialNavigation } from '../trace/recorder.js';
 import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.js';
 import { SessionError } from '@wdio/session/agent';
 import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
+import { noteTabSelected } from '../session/tab-selection';
 
 const TRACE_V5_NOTE = ' Format, location, player change in v5.';
 
@@ -244,6 +245,7 @@ async function closeStaleMappers(host: string, port: number): Promise<TabSnapsho
 }
 
 async function restoreAndSwitchToActiveTab(browser: WebdriverIO.Browser, activeTabUrl: string, allTabUrls: string[]): Promise<void> {
+  noteTabSelected(browser);
   const handles = await browser.getWindowHandles();
   const currentUrls: string[] = [];
   for (const handle of handles) {

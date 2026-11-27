@@ -1,6 +1,7 @@
 import type { ResourceDefinition } from '../types/resource';
 import { getBrowser } from '../session/state';
 import { withActionTimeout } from '../session/agent';
+import { tabSelectionGeneration } from '../session/tab-selection';
 
 type Tab = { handle: string; title: string; url: string; isActive: boolean };
 
@@ -17,7 +18,7 @@ async function readTabsBidi(browser: WebdriverIO.Browser, handles: string[], cur
   })));
 }
 
-async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], currentHandle: string, signal: AbortSignal): Promise<Tab[]> {
+async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], currentHandle: string, generation: number, signal: AbortSignal): Promise<Tab[]> {
   const tabs: Tab[] = [];
   try {
     for (const handle of handles) {
@@ -26,18 +27,20 @@ async function readTabsClassic(browser: WebdriverIO.Browser, handles: string[], 
       tabs.push({ handle, title: await browser.getTitle(), url: await browser.getUrl(), isActive: handle === currentHandle });
     }
   } finally {
-    await browser.switchToWindow(currentHandle);
+    // A selection made after this read began is newer; restoring would undo it.
+    if (tabSelectionGeneration(browser) === generation) await browser.switchToWindow(currentHandle);
   }
   return tabs;
 }
 
 async function readOpenTabs(signal: AbortSignal): Promise<Tab[]> {
   const browser = getBrowser();
+  const generation = tabSelectionGeneration(browser);
   const handles = await browser.getWindowHandles();
   const currentHandle = await browser.getWindowHandle();
   return browser.isBidi
     ? readTabsBidi(browser, handles, currentHandle)
-    : readTabsClassic(browser, handles, currentHandle, signal);
+    : readTabsClassic(browser, handles, currentHandle, generation, signal);
 }
 
 export async function readTabs(): Promise<{ mimeType: string; text: string }> {

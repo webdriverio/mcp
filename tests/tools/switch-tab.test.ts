@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../src/session/state';
 import { ACTION_TIMEOUT_MS } from '../../src/session/agent';
+import { tabSelectionGeneration } from '../../src/session/tab-selection';
 import { switchTabTool } from '../../src/tools/tabs.tool';
 
 const callTool = switchTabTool as unknown as (args: Record<string, unknown>) => Promise<{
@@ -63,6 +64,25 @@ describe('switch_tab', () => {
     const result = await callTool({ handle: 'handle-1' });
     expect(mockSwitchToWindow).toHaveBeenCalledWith('handle-1');
     expect(result.content[0].text).toContain('handle-1');
+  });
+
+  it('advances the tab selection generation when switching by handle', async () => {
+    setupSession('s6');
+    const browser = getState().browsers.get('s6')!;
+    const before = tabSelectionGeneration(browser);
+    mockSwitchToWindow.mockResolvedValue(undefined);
+    await callTool({ handle: 'handle-1' });
+    expect(tabSelectionGeneration(browser)).toBe(before + 1);
+  });
+
+  it('advances the tab selection generation when switching by index', async () => {
+    setupSession('s7');
+    const browser = getState().browsers.get('s7')!;
+    const before = tabSelectionGeneration(browser);
+    mockGetWindowHandles.mockResolvedValue(['h0', 'h1']);
+    mockSwitchToWindow.mockResolvedValue(undefined);
+    await callTool({ index: 1 });
+    expect(tabSelectionGeneration(browser)).toBe(before + 1);
   });
 
   it('switches by index', async () => {
