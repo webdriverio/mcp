@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { parseArgs, type ParsedArgs } from './utils/parse-args';
-import { extractHost, listenOn, sendJsonRpcError } from './utils/http-helpers';
+import { extractHost, listenOn, sendJsonRpcError, serverUrl } from './utils/http-helpers';
 import { installCrashHandlers } from './utils/crash-handlers';
 import { clientLine, initializeClientInfo } from './utils/client-info';
 import { closeAllSessions, killAllDriverTrees } from './session/lifecycle';
@@ -107,7 +107,7 @@ async function main() {
       process.exit(1);
     }
     const originsMsg = args.allowedOrigins.length ? args.allowedOrigins.join(', ') : '(none — browsers blocked)';
-    console.error(`WebdriverIO MCP Server running on Streamable HTTP at http://localhost:${args.port}/mcp`);
+    console.error(`WebdriverIO MCP Server running on Streamable HTTP at ${serverUrl(args.hosts, args.port)}`);
     console.error(`  listening on:    ${listening.map((server) => (server.address() as AddressInfo).address).join(', ')}`);
     console.error(`  allowed hosts:   ${args.allowedHosts.join(', ')}`);
     console.error(`  allowed origins: ${originsMsg}`);
