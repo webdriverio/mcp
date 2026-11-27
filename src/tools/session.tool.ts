@@ -18,7 +18,7 @@ import { cleanupSessionRuntime, getElectronService } from '../electron/runtime.j
 import { SessionError } from '@wdio/session/agent';
 import { pageReport, agentFor, withActionTimeout, errorResult } from '../session/agent';
 
-const TRACE_V5_NOTE = ' Format, location and player change in v5.';
+const TRACE_V5_NOTE = ' Format, location, player change in v5.';
 
 const platformEnum = z.enum(['browser', 'electron', 'ios', 'android']);
 const attachPlatformEnum = z.enum(['browser', 'ios', 'android']);
@@ -29,20 +29,20 @@ const uriScheme = z.string().regex(/^[A-Za-z][A-Za-z0-9+.-]*$/, 'Must be a URI s
 
 export const startSessionToolDefinition: ToolDefinition = {
   name: 'start_session',
-  description: 'Starts a browser, Electron app or mobile app session (closes the active one unless onExisting: "keep"). Browsers run headless at 1280x800 by default; pass navigationUrl to open a page right away. attach: true connects to a running Chrome via CDP.',
+  description: 'Starts a browser, Electron or mobile session. Browsers run headless at 1280x800 by default; attach: true connects to a running Chrome via CDP.',
   annotations: { title: 'Start Session', destructiveHint: false },
   sessionless: true,
   inputSchema: {
-    name: z.string().min(1).optional().describe('Name for this session, unique among live sessions. Target it from other tools with session: <name>.'),
-    onExisting: z.enum(['close', 'keep']).optional().default('close').describe('close (default) replaces the active session. keep is an explicit opt-in to run this session alongside the existing ones; the new session is NOT made the default when one exists, so target it with session: <name>.'),
-    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Default local. Cloud providers read credentials from env. external: a W3C WebDriver endpoint (webdriverConfig).'),
+    name: z.string().min(1).optional().describe('Unique name for this live session; target it with session: <name>.'),
+    onExisting: z.enum(['close', 'keep']).optional().default('close').describe('close (default) replaces the active session. keep runs alongside it, not made the default; target it with session: <name>.'),
+    provider: z.enum(['local', 'browserstack', 'saucelabs', 'testmu', 'testingbot', 'digitalai', 'external']).optional().default('local').describe('Default local; cloud providers read credentials from env; external connects to a W3C WebDriver endpoint in webdriverConfig.'),
     platform: platformEnum,
     browser: browserEnum.optional().describe('Required for platform browser'),
     browserVersion: z.string().optional().describe('Cloud only'),
     electronRootDir: z.string().min(1).optional().describe('Electron: project root for Builder/Forge discovery'),
-    electronDeeplinkScheme: uriScheme.optional().describe('Electron: URI scheme (no ":") allowed for trigger_electron_deeplink'),
-    os: z.string().optional().describe('Cloud browser OS, provider-native, passed as-is: BrowserStack "OS X"/"Windows", Sauce Labs and TestMu "macOS"/"Windows", TestingBot "SEQUOIA"/"WIN11"'),
-    osVersion: z.string().optional().describe('Cloud browser OS version, provider-native: BrowserStack and TestMu "Sequoia", Sauce Labs "15", Windows "11"; omit for TestingBot'),
+    electronDeeplinkScheme: uriScheme.optional().describe('Electron: URI scheme without ":", for trigger_electron_deeplink.'),
+    os: z.string().optional().describe('Cloud browser OS, provider-native, as-is: BrowserStack "OS X"/"Windows", Sauce/TestMu "macOS"/"Windows", TestingBot "SEQUOIA"/"WIN11".'),
+    osVersion: z.string().optional().describe('Cloud OS version, provider-native: BrowserStack/TestMu "Sequoia", Sauce "15", Windows "11"; omit for TestingBot.'),
     app: z.string().optional().describe('Cloud app URL from upload_app (bs://, storage:filename=, lt://, tb://, cloud:<name>)'),
     reporting: z.object({
       project: z.string().optional(),
@@ -65,7 +65,7 @@ export const startSessionToolDefinition: ToolDefinition = {
     noReset: coerceBoolean.optional(),
     fullReset: coerceBoolean.optional(),
     newCommandTimeout: z.number().min(0).optional().default(300).describe('Appium, seconds'),
-    trace: coerceBoolean.optional().default(false).describe('Save a Playwright-compatible trace zip to .trace/ on close_session' + TRACE_V5_NOTE),
+    trace: coerceBoolean.optional().default(false).describe('Playwright-compatible trace zip saved to .trace/ on close_session.' + TRACE_V5_NOTE),
     attach: coerceBoolean.optional().default(false).describe('Attach to a running Chrome (attachConfig, default localhost:9222)'),
     attachConfig: z.object({
       port: z.number().optional().default(9222),
@@ -84,11 +84,11 @@ export const startSessionToolDefinition: ToolDefinition = {
       protocol: z.string().optional(),
     }).optional().describe('Local Appium server'),
     region: z.enum(['us-west-1', 'eu-central-1', 'apac-southeast-1']).optional().default('eu-central-1').describe('Sauce Labs only'),
-    tunnel: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Cloud: true starts a tunnel, "external" uses a running one'),
+    tunnel: z.union([z.literal('external'), coerceBoolean]).optional().default(false).describe('Cloud: true starts a tunnel; "external" uses a running one.'),
     tunnelName: z.string().optional(),
     navigationUrl: z.string().optional().describe('URL to open after starting'),
-    networkLogs: networkLogsEnum.optional().describe('Local Chromium performance log capture (default from WDIO_MCP_NETWORK_LOGS or "none")'),
-    capabilities: z.record(z.string(), z.unknown()).optional().describe('Extra capabilities to merge, e.g. "wdio:electronServiceOptions"'),
+    networkLogs: networkLogsEnum.optional().describe('Local Chromium perf-log capture; default from WDIO_MCP_NETWORK_LOGS, else "none".'),
+    capabilities: z.record(z.string(), z.unknown()).optional().describe('Capabilities to merge, e.g. "wdio:electronServiceOptions".'),
   },
 };
 
