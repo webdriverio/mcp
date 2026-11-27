@@ -1,4 +1,4 @@
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type { ResourceDefinition } from '../types/resource';
 import { PAGE_CHAR_CAP, capPageText, pageBySlug, slugOf } from '../utils/docs-index';
 import { loadDocsIndex } from '../utils/docs-client';

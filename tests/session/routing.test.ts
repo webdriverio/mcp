@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { getState } from '../../src/session/state';
 import { resolveSession, withSessionTarget, sessionContext, activeSessionId } from '../../src/session/routing';
 

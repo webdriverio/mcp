@@ -1,5 +1,4 @@
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback, CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { getBrowser, getState } from '../session/state';
 import { activeSessionId } from '../session/context';

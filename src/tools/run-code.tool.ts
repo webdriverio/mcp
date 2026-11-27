@@ -1,6 +1,5 @@
 import fs from 'node:fs';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolCallback, CallToolResult } from '@modelcontextprotocol/server';
 import { SessionError } from '@wdio/session/agent';
 import { z } from 'zod';
 import type { ToolDefinition } from '../types/tool';

@@ -1,4 +1,4 @@
-import type { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ResourceTemplate } from '@modelcontextprotocol/server';
 
 type ResourceContent = { uri: string; mimeType?: string; text: string } | { uri: string; mimeType?: string; blob: string };
 

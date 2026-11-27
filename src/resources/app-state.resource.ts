@@ -1,5 +1,5 @@
 import type { ResourceDefinition } from '../types/resource';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import { getBrowser } from '../session/state';
 
 export async function readAppState(bundleId: string): Promise<{ mimeType: string; text: string }> {

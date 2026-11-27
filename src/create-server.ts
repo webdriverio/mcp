@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import pkg from '../package.json' with { type: 'json' };
-import type { RegisteredTool, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { InitializeRequestSchema, type ServerResult } from '@modelcontextprotocol/sdk/types.js';
+import type { RegisteredTool, ToolCallback, InitializeResult } from '@modelcontextprotocol/server';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { ToolDefinition } from './types/tool';
 import type { ResourceDefinition } from './types/resource';
 import { navigateTool, navigateToolDefinition } from './tools/navigate.tool';
@@ -137,14 +136,14 @@ export function serverInstructions(allowCode: boolean): string {
   ].join('\n');
 }
 
-type InitializeHandler = (request: unknown, extra: unknown) => Promise<ServerResult>;
+type InitializeHandler = (request: unknown, extra: unknown) => Promise<InitializeResult>;
 
 /** the SDK keeps its initialize handler private, so it is wrapped: the first tools/list follows this response, so tools must already be enabled */
 function onClientInitialize(server: McpServer, onClient: (clientName: string | undefined) => void): void {
   const handlers = (server.server as unknown as { _requestHandlers: Map<string, InitializeHandler> })._requestHandlers;
-  const initialize = handlers.get(InitializeRequestSchema.shape.method.value);
+  const initialize = handlers.get('initialize');
   if (!initialize) throw new Error('MCP SDK initialize handler not found; onClientInitialize needs updating for this SDK version');
-  server.server.setRequestHandler(InitializeRequestSchema, async (request, extra) => {
+  server.server.setRequestHandler('initialize', async (request, extra) => {
     const result = await initialize(request, extra);
     onClient(request.params.clientInfo?.name);
     return result;

@@ -1,5 +1,5 @@
 import { createAgentSession, SessionError, type ActionArgsOf, type AgentActionName, type AgentSession, type PageChange } from '@wdio/session/agent';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { getBrowser, getState } from './state';
 import { activeSessionId } from './context';
 import { mcpHint } from './hints';

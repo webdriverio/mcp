@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolCallback } from '@modelcontextprotocol/server';
 import { remote } from 'webdriverio';
 import { attachSessionRecorded, closeSessionTool, startSessionTool } from '../../src/tools/session.tool';
 import { withRecording } from '../../src/recording/step-recorder';
