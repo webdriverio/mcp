@@ -553,6 +553,37 @@ describe('generateCode - tool mappings', () => {
     expect(code).toContain('"#btn"');
   });
 
+  it('execute_script resolves explicit { selector } args to browser.$() in exported scripts', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: {
+        script: 'arguments[0].dataset.label = arguments[1]',
+        args: [{ selector: '#submit' }, 'main', 42, { selector: '.card', extra: true }],
+      },
+    }]));
+    expect(code).toContain("await browser.execute('arguments[0].dataset.label = arguments[1]', await browser.$('#submit'), \"main\", 42,");
+    expect(code).not.toContain("browser.$('main')");
+    expect(code).not.toContain("browser.$('.card')");
+  });
+
+  it('execute_script preserves { selector } args verbatim for mobile: commands', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: { script: 'mobile: tap', args: [{ selector: '#submit' }] },
+    }]));
+    expect(code).toContain("await browser.execute('mobile: tap',");
+    expect(code).toContain('"selector": "#submit"');
+    expect(code).not.toContain("browser.$('#submit')");
+  });
+
+  it('execute_script marks snapshot ref { selector } args as unreplayable', () => {
+    const code = generateCode(makeHistory([{
+      tool: 'execute_script',
+      params: { script: 'arguments[0].click()', args: [{ selector: 'e12' }] },
+    }]));
+    expect(code).toContain('// [not replayable: snapshot ref] execute_script:');
+  });
+
   it('drag_and_drop (selector form) → $().dragAndDrop($())', () => {
     const code = generateCode(makeHistory([{
       tool: 'drag_and_drop',

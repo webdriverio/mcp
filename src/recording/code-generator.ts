@@ -1,5 +1,6 @@
 // src/recording/code-generator.ts
 import type { RecordedStep, SessionHistory } from '../types/recording';
+import { isSelectorArg } from '../tools/execute-script.tool';
 import { normalizeBrowserMethod, respondParams } from '../utils/browser-mock';
 import { hoistRunCodeSteps } from './run-code-hoist';
 
@@ -362,8 +363,21 @@ function generateStep(step: RecordedStep, history: SessionHistory, hasDeviceRese
       }
       return `await browser.$('${escapeStr(p.sourceSelector)}').dragAndDrop({ x: ${p.x}, y: ${p.y} });`;
     case 'execute_script': {
-      const scriptCode = `'${escapeStr(p.script)}'`;
-      const scriptArgs = (p.args as unknown[])?.length ? `, ${indentJson(p.args)}` : '';
+      const script = String(p.script ?? '');
+      const isMobile = script.startsWith('mobile:');
+      const scriptCode = `'${escapeStr(script)}'`;
+      const rawArgs = Array.isArray(p.args) ? p.args : [];
+      if (!isMobile && rawArgs.some((arg) => isSelectorArg(arg) && isSnapshotRef(arg.selector))) {
+        return unreplayableRef(step);
+      }
+      const formattedArgs = rawArgs.map((arg) => {
+        if (!isMobile && isSelectorArg(arg)) {
+          const escapedSelector = escapeStr(arg.selector).replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+          return `await browser.$('${escapedSelector}')`;
+        }
+        return arg === undefined ? 'undefined' : indentJson(arg);
+      });
+      const scriptArgs = formattedArgs.length ? `, ${formattedArgs.join(', ')}` : '';
       return `await browser.execute(${scriptCode}${scriptArgs});`;
     }
     case 'execute_electron_script': {
