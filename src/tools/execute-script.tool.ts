@@ -16,12 +16,12 @@ function isFunctionExpression(script: string): boolean {
   return FUNCTION_SYNTAX.test(script);
 }
 
-interface SelectorArg {
+export interface SelectorArg {
   selector: string;
 }
 
 /** Matches only plain objects of the exact shape `{ selector: string }` */
-function isSelectorArg(arg: unknown): arg is SelectorArg {
+export function isSelectorArg(arg: unknown): arg is SelectorArg {
   if (typeof arg !== 'object' || arg === null || Array.isArray(arg)) {
     return false;
   }
